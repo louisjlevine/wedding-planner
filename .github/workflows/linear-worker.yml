@@ -1,0 +1,25 @@
+name: Wedding Planner — Linear Issue Worker
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-base-action@beta
+        with:
+          prompt: >
+            Find the highest-priority open issue in the "Wedding Website" Linear project.
+            Implement it, commit to a new branch, push, and move the issue to "In Review."
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
