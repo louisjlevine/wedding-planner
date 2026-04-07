@@ -8,7 +8,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  id-token: write
 
 jobs:
   run:
@@ -16,10 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
       - name: Run Claude Code
-        uses: anthropics/claude-code-base-action@beta
-        with:
-          prompt: >
-            Find the highest-priority open issue in the "Wedding Website" Linear project.
-            Implement it, commit to a new branch, push, and move the issue to "In Review."
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          claude -p "Find the highest-priority open issue in the 'Wedding Website' Linear project. Implement it, commit to a new branch, push, and move the issue to 'In Review'." \
+            --allowedTools "Bash,Read,Write,Edit,Glob,Grep" \
+            --dangerously-skip-permissions
