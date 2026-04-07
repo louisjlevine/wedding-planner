@@ -20,6 +20,9 @@ const RSVP_VARIANTS: Record<Guest["rsvp"], "green" | "red" | "yellow" | "gray"> 
 const RELATIONSHIPS: GuestRelationship[] = ["family", "close_friend", "friend", "acquaintance"];
 const LOCATIONS: GuestLocation[] = ["local", "out_of_town"];
 
+const CSV_COLUMNS = ["name", "email", "address", "relationship", "location", "plusone", "dietary", "table"] as const;
+const CSV_SAMPLE_ROW = ["Jane Smith", "jane@example.com", "123 Main St, Denver CO 80202", "family", "local", "no", "vegetarian", "Table 1"];
+
 // ── CSV / vCard import helpers ────────────────────────────────────────────────
 
 function parseCSV(text: string): Partial<Guest>[] {
@@ -95,6 +98,60 @@ function parseVCard(text: string): Partial<Guest>[] {
       rsvp: "pending" as const,
     };
   }).filter(Boolean) as Partial<Guest>[];
+}
+
+// ── CSV template download ─────────────────────────────────────────────────────
+
+function downloadTemplate() {
+  const rows = [CSV_COLUMNS.join(","), CSV_SAMPLE_ROW.join(",")];
+  const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "guest-list-template.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+
+function exportCSV(guests: Guest[]) {
+  const escape = (v: string | undefined) => {
+    if (!v) return "";
+    return v.includes(",") ? `"${v.replace(/"/g, '""')}"` : v;
+  };
+  const rows = [
+    CSV_COLUMNS.join(","),
+    ...guests.map((g) =>
+      [
+        escape(g.name),
+        escape(g.email),
+        escape(g.address),
+        escape(g.relationship),
+        escape(g.guestLocation),
+        g.plusOne ? "yes" : "no",
+        escape(g.dietary),
+        escape(g.table),
+      ].join(",")
+    ),
+  ];
+  const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "guest-list.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Import preview types ──────────────────────────────────────────────────────
+
+interface ImportPreviewRow {
+  data: Partial<Guest>;
+  valid: boolean;
+  error?: string;
+  action: "add" | "update";
+  existingId?: string;
 }
 
 // ── Inline edit form ──────────────────────────────────────────────────────────
@@ -202,6 +259,108 @@ function EditGuestForm({
   );
 }
 
+// ── Import preview panel ──────────────────────────────────────────────────────
+
+function ImportPreview({
+  rows,
+  onConfirm,
+  onCancel,
+}: {
+  rows: ImportPreviewRow[];
+  onConfirm: (rows: ImportPreviewRow[]) => void;
+  onCancel: () => void;
+}) {
+  const valid = rows.filter((r) => r.valid);
+  const invalid = rows.filter((r) => !r.valid);
+  const updates = valid.filter((r) => r.action === "update");
+  const adds = valid.filter((r) => r.action === "add");
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">Import preview</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {adds.length} to add
+            {updates.length > 0 && `, ${updates.length} to update`}
+            {invalid.length > 0 && `, ${invalid.length} skipped`}
+          </p>
+        </div>
+        <button onClick={onCancel} className="text-xs text-gray-400 hover:text-gray-600">Discard</button>
+      </div>
+
+      {invalid.length > 0 && (
+        <div className="bg-red-50 border border-red-100 rounded-lg px-4 py-3">
+          <p className="text-xs font-medium text-red-600 mb-1">Rows with errors (will be skipped)</p>
+          <ul className="space-y-0.5">
+            {invalid.map((r, i) => (
+              <li key={i} className="text-xs text-red-500">
+                Row {rows.indexOf(r) + 2}: {r.error}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="border border-gray-100 rounded-lg overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium">Name</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium">Email</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium">Relationship</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium">Location</th>
+              <th className="px-3 py-2 text-left text-gray-500 font-medium">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.map((r, i) => (
+              <tr key={i} className={r.valid ? "" : "opacity-40"}>
+                <td className="px-3 py-2 font-medium text-gray-800">{r.data.name ?? "—"}</td>
+                <td className="px-3 py-2 text-gray-500">{r.data.email ?? "—"}</td>
+                <td className="px-3 py-2 text-gray-500">
+                  {r.data.relationship ? RELATIONSHIP_LABELS[r.data.relationship] : "—"}
+                </td>
+                <td className="px-3 py-2 text-gray-500">
+                  {r.data.guestLocation ? LOCATION_LABELS[r.data.guestLocation] : "—"}
+                </td>
+                <td className="px-3 py-2">
+                  {r.valid ? (
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                      r.action === "update"
+                        ? "bg-blue-50 text-blue-600"
+                        : "bg-green-50 text-green-600"
+                    }`}>
+                      {r.action === "update" ? "update" : "add"}
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-500">skip</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {valid.length === 0 ? (
+        <p className="text-xs text-gray-400 text-center py-2">No valid rows to import.</p>
+      ) : (
+        <div className="flex gap-2">
+          <button
+            onClick={() => onConfirm(valid)}
+            className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors">
+            Confirm import ({valid.length})
+          </button>
+          <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Guests page ──────────────────────────────────────────────────────────
 
 export function Guests() {
@@ -209,6 +368,7 @@ export function Guests() {
 
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreviewRow[] | null>(null);
   const [form, setForm] = useState({
     name: "", email: "", address: "", plusOne: false, dietary: "", table: "",
     relationship: "" as GuestRelationship | "",
@@ -238,6 +398,26 @@ export function Guests() {
     setAdding(false);
   }
 
+  // ── Build import preview rows ────────────────────────────────────────────
+
+  function buildPreviewRows(parsed: Partial<Guest>[]): ImportPreviewRow[] {
+    return parsed.map((g) => {
+      if (!g.name?.trim()) {
+        return { data: g, valid: false, error: "Missing name", action: "add" };
+      }
+      // Match on email for update detection
+      const existing = g.email
+        ? guests.find((ex) => ex.email && ex.email.toLowerCase() === g.email!.toLowerCase())
+        : undefined;
+      return {
+        data: g,
+        valid: true,
+        action: existing ? "update" : "add",
+        existingId: existing?.id,
+      };
+    });
+  }
+
   // ── CSV import ───────────────────────────────────────────────────────────
 
   function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -246,24 +426,44 @@ export function Guests() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const imported = parseCSV(text);
-      imported.forEach((g, i) => {
-        addGuest({
-          id:            `guest-import-${Date.now()}-${i}`,
-          name:          g.name ?? "Unknown",
-          email:         g.email,
-          address:       g.address,
-          plusOne:       g.plusOne ?? false,
-          rsvp:          "pending",
-          dietary:       g.dietary,
-          table:         g.table,
-          relationship:  g.relationship,
-          guestLocation: g.guestLocation,
-        });
-      });
+      const parsed = parseCSV(text);
+      setImportPreview(buildPreviewRows(parsed));
     };
     reader.readAsText(file);
     e.target.value = "";
+  }
+
+  // ── Confirm import ───────────────────────────────────────────────────────
+
+  function handleConfirmImport(validRows: ImportPreviewRow[]) {
+    validRows.forEach((r, i) => {
+      if (r.action === "update" && r.existingId) {
+        updateGuest(r.existingId, {
+          name:          r.data.name,
+          email:         r.data.email,
+          address:       r.data.address,
+          plusOne:       r.data.plusOne ?? false,
+          dietary:       r.data.dietary,
+          table:         r.data.table,
+          relationship:  r.data.relationship,
+          guestLocation: r.data.guestLocation,
+        });
+      } else {
+        addGuest({
+          id:            `guest-import-${Date.now()}-${i}`,
+          name:          r.data.name ?? "Unknown",
+          email:         r.data.email,
+          address:       r.data.address,
+          plusOne:       r.data.plusOne ?? false,
+          rsvp:          "pending",
+          dietary:       r.data.dietary,
+          table:         r.data.table,
+          relationship:  r.data.relationship,
+          guestLocation: r.data.guestLocation,
+        });
+      }
+    });
+    setImportPreview(null);
   }
 
   // ── vCard import ─────────────────────────────────────────────────────────
@@ -313,6 +513,10 @@ export function Guests() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
+          <button onClick={downloadTemplate}
+            className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
+            CSV template
+          </button>
           <button onClick={() => csvInputRef.current?.click()}
             className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
             Import CSV
@@ -321,6 +525,12 @@ export function Guests() {
             className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
             Import vCard
           </button>
+          {guests.length > 0 && (
+            <button onClick={() => exportCSV(guests)}
+              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
+              Export CSV
+            </button>
+          )}
           <button onClick={() => setAdding(true)}
             className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors">
             Add guest
@@ -363,6 +573,15 @@ export function Guests() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Import preview */}
+      {importPreview && (
+        <ImportPreview
+          rows={importPreview}
+          onConfirm={handleConfirmImport}
+          onCancel={() => setImportPreview(null)}
+        />
       )}
 
       {/* Add form */}
@@ -434,10 +653,10 @@ export function Guests() {
         </div>
       )}
 
-      {guests.length === 0 && !adding && (
+      {guests.length === 0 && !adding && !importPreview && (
         <div className="text-center py-12 text-gray-400">
           <p className="text-sm">No guests yet. Add manually or import a CSV / vCard file.</p>
-          <p className="text-xs mt-1 text-gray-300">CSV columns: name, email, address, relationship, location, plusone, dietary, table</p>
+          <p className="text-xs mt-1 text-gray-300">Download the CSV template to get started with the right column format.</p>
         </div>
       )}
 
