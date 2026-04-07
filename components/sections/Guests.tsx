@@ -20,6 +20,50 @@ const RSVP_VARIANTS: Record<Guest["rsvp"], "green" | "red" | "yellow" | "gray"> 
 const RELATIONSHIPS: GuestRelationship[] = ["family", "close_friend", "friend", "acquaintance"];
 const LOCATIONS: GuestLocation[] = ["local", "out_of_town"];
 
+// ── CSV helpers ───────────────────────────────────────────────────────────────
+
+const CSV_COLUMNS = ["name","email","phone","address","relationship","location","plusone","dietary","table","rsvp","notes"] as const;
+
+const CSV_TEMPLATE_ROW = ["Jane Smith","jane@example.com","555-0100","123 Main St, Denver CO 80202","family","local","no","vegetarian","Table 1","pending","Childhood friend"];
+
+export function downloadCSVTemplate() {
+  const rows = [CSV_COLUMNS.join(","), CSV_TEMPLATE_ROW.join(",")];
+  const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = "guest-list-template.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function exportGuestsCSV(guests: Guest[]) {
+  const escape = (v: string) => v.includes(",") ? `"${v}"` : v;
+  const rows: string[] = [CSV_COLUMNS.join(",")];
+  for (const g of guests) {
+    rows.push([
+      escape(g.name),
+      escape(g.email      ?? ""),
+      "",
+      escape(g.address    ?? ""),
+      escape(g.relationship  ?? ""),
+      escape(g.guestLocation ?? ""),
+      g.plusOne ? "yes" : "no",
+      escape(g.dietary ?? ""),
+      escape(g.table   ?? ""),
+      escape(g.rsvp),
+      "",
+    ].join(","));
+  }
+  const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = "guest-list.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ── CSV / vCard import helpers ────────────────────────────────────────────────
 
 function parseCSV(text: string): Partial<Guest>[] {
@@ -218,6 +262,9 @@ export function Guests() {
   const csvInputRef  = useRef<HTMLInputElement>(null);
   const vcfInputRef  = useRef<HTMLInputElement>(null);
 
+  const [csvPreview,  setCsvPreview]  = useState<Partial<Guest>[] | null>(null);
+  const [csvWarnings, setCsvWarnings] = useState<string[]>([]);
+
   // ── Add single guest ─────────────────────────────────────────────────────
 
   function handleAdd() {
@@ -238,7 +285,7 @@ export function Guests() {
     setAdding(false);
   }
 
-  // ── CSV import ───────────────────────────────────────────────────────────
+  // ── CSV import — parse then preview ──────────────────────────────────────
 
   function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -246,24 +293,45 @@ export function Guests() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const imported = parseCSV(text);
-      imported.forEach((g, i) => {
-        addGuest({
-          id:            `guest-import-${Date.now()}-${i}`,
-          name:          g.name ?? "Unknown",
-          email:         g.email,
-          address:       g.address,
-          plusOne:       g.plusOne ?? false,
-          rsvp:          "pending",
-          dietary:       g.dietary,
-          table:         g.table,
-          relationship:  g.relationship,
-          guestLocation: g.guestLocation,
-        });
+      const parsed = parseCSV(text);
+      const warnings: string[] = [];
+      parsed.forEach((g, i) => {
+        if (!g.name) warnings.push(`Row ${i + 2}: missing name — will be skipped`);
       });
+      if (parsed.length === 0) {
+        warnings.push("No valid rows found. Check that your file has a header row and at least one data row.");
+      }
+      setCsvPreview(parsed);
+      setCsvWarnings(warnings);
     };
     reader.readAsText(file);
     e.target.value = "";
+  }
+
+  function confirmCsvImport() {
+    if (!csvPreview) return;
+    csvPreview.forEach((g, i) => {
+      if (!g.name) return;
+      addGuest({
+        id:            `guest-import-${Date.now()}-${i}`,
+        name:          g.name,
+        email:         g.email,
+        address:       g.address,
+        plusOne:       g.plusOne ?? false,
+        rsvp:          "pending",
+        dietary:       g.dietary,
+        table:         g.table,
+        relationship:  g.relationship,
+        guestLocation: g.guestLocation,
+      });
+    });
+    setCsvPreview(null);
+    setCsvWarnings([]);
+  }
+
+  function cancelCsvImport() {
+    setCsvPreview(null);
+    setCsvWarnings([]);
   }
 
   // ── vCard import ─────────────────────────────────────────────────────────
@@ -313,10 +381,20 @@ export function Guests() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
+          <button onClick={downloadCSVTemplate}
+            className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
+            Download template
+          </button>
           <button onClick={() => csvInputRef.current?.click()}
             className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
             Import CSV
           </button>
+          {guests.length > 0 && (
+            <button onClick={() => exportGuestsCSV(guests)}
+              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
+              Export CSV
+            </button>
+          )}
           <button onClick={() => vcfInputRef.current?.click()}
             className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
             Import vCard
@@ -345,6 +423,45 @@ export function Guests() {
           </div>
         )}
       </div>
+
+      {/* CSV import preview */}
+      {csvPreview && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-700">
+              Preview import — {csvPreview.filter((g) => g.name).length} guest{csvPreview.filter((g) => g.name).length !== 1 ? "s" : ""} ready
+            </h3>
+            <button onClick={cancelCsvImport} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+          </div>
+          {csvWarnings.length > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 space-y-1">
+              {csvWarnings.map((w, i) => (
+                <p key={i} className="text-xs text-yellow-800">{w}</p>
+              ))}
+            </div>
+          )}
+          <div className="max-h-52 overflow-y-auto divide-y divide-gray-100 rounded-lg border border-gray-100">
+            {csvPreview.filter((g) => g.name).map((g, i) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-2">
+                <p className="text-sm font-medium text-gray-800 w-40 shrink-0">{g.name}</p>
+                {g.email        && <p className="text-xs text-gray-400">{g.email}</p>}
+                {g.relationship && <span className="text-xs text-gray-400">{RELATIONSHIP_LABELS[g.relationship]}</span>}
+                {g.guestLocation && <span className="text-xs text-gray-400">{LOCATION_LABELS[g.guestLocation]}</span>}
+                {g.plusOne      && <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">+1</span>}
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={confirmCsvImport}
+              className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors">
+              Confirm import
+            </button>
+            <button onClick={cancelCsvImport} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Probability legend */}
       {guests.length > 0 && (
