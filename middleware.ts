@@ -82,6 +82,7 @@ export function middleware(request: NextRequest) {
   // Block bot User-Agents before doing anything else
   const ua = request.headers.get('user-agent') ?? ''
   if (!ua || BOT_UA_BLOCKLIST.some((p) => p.test(ua))) {
+    console.log('[middleware] Blocked by UA check — ua:', ua)
     return new NextResponse('Forbidden', { status: 403 })
   }
 
@@ -100,6 +101,7 @@ export function middleware(request: NextRequest) {
     const origin = request.headers.get('origin')
     if (origin) {
       const allowedOrigins = getAllowedOrigins()
+      console.log('[middleware] CORS check — origin:', origin, '| allowedOrigins:', [...allowedOrigins], '| raw env:', process.env.ALLOWED_ORIGINS)
       if (allowedOrigins.size > 0 && !allowedOrigins.has(origin)) {
         return new NextResponse('Forbidden', { status: 403 })
       }
