@@ -82,6 +82,7 @@ interface PlanState {
   toggleTimelineItem: (id: string) => void;
 
   setActiveTab: (tab: Tab) => void;
+  importStore: (data: Partial<PlanState>) => void;
 }
 
 function emptySession(state: PlanState, type: string): ResearchSession {
@@ -321,6 +322,13 @@ export const usePlanStore = create<PlanState>()(
         }),
 
       setActiveTab: (tab) => set({ activeTab: tab }),
+
+      importStore: (data) =>
+        set((state) => ({
+          ...state,
+          ...data,
+          intakeComplete: !!(data.answers ?? state.answers),
+        })),
     }),
     {
       name: "wedding-planner-store",

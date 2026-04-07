@@ -1,11 +1,42 @@
 "use client";
 
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/lib/plan-store";
 
 export function Topbar() {
-  const { answers, resetIntake, setActiveTab } = usePlanStore();
+  const { answers, resetIntake, setActiveTab, importStore } = usePlanStore();
   const router = useRouter();
+  const importRef = useRef<HTMLInputElement>(null);
+
+  function handleExport() {
+    const raw = localStorage.getItem("wedding-planner-store");
+    if (!raw) return;
+    const blob = new Blob([raw], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "wedding-planner-backup.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string);
+        const state = parsed?.state ?? parsed;
+        importStore(state);
+      } catch {
+        alert("Invalid backup file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -44,6 +75,19 @@ export function Topbar() {
             Ask advisor
           </button>
         )}
+        <button
+          onClick={handleExport}
+          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          Export
+        </button>
+        <button
+          onClick={() => importRef.current?.click()}
+          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          Import
+        </button>
+        <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
         <button
           onClick={resetIntake}
           className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
