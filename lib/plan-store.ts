@@ -31,6 +31,7 @@ interface PlanState {
   budgetOverrides: Record<string, BudgetOverride>;
   dismissedRecommendations: Record<string, string[]>; // type → [lowercased title, ...]
   triggerResearchFor: string | null; // set by Vendors "Find similar" to auto-fetch
+  timelineDoneIds: string[];
   activeTab: Tab;
   intakeComplete: boolean;
 
@@ -77,6 +78,9 @@ interface PlanState {
   // Research trigger from Vendors
   setTriggerResearchFor: (type: string | null) => void;
 
+  // Timeline done state
+  toggleTimelineItem: (id: string) => void;
+
   setActiveTab: (tab: Tab) => void;
 }
 
@@ -97,6 +101,7 @@ export const usePlanStore = create<PlanState>()(
       budgetOverrides: {},
       dismissedRecommendations: {},
       triggerResearchFor: null,
+      timelineDoneIds: [],
       activeTab: "overview",
       intakeComplete: false,
 
@@ -294,6 +299,13 @@ export const usePlanStore = create<PlanState>()(
       resetBudgetOverrides: () => set({ budgetOverrides: {} }),
 
       setTriggerResearchFor: (type) => set({ triggerResearchFor: type }),
+
+      toggleTimelineItem: (id) =>
+        set((state) => ({
+          timelineDoneIds: state.timelineDoneIds.includes(id)
+            ? state.timelineDoneIds.filter((x) => x !== id)
+            : [...state.timelineDoneIds, id],
+        })),
 
       // Advisor memory
       setAdvisorMessages: (messages) => set({ advisorMessages: messages }),

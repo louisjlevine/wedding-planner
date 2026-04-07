@@ -6,7 +6,12 @@ import { buildTimeline, buildBudgetCategories, buildInitialTasks } from "@/lib/p
 export function usePlan() {
   const store = usePlanStore();
 
-  const timeline = store.answers ? buildTimeline(store.answers) : [];
+  const doneSet = new Set(store.timelineDoneIds);
+  const timeline = store.answers
+    ? buildTimeline(store.answers).map((item) =>
+        doneSet.has(item.id) ? { ...item, done: true } : item
+      )
+    : [];
 
   const budgetCategories = store.answers
     ? buildBudgetCategories(store.answers).map((cat) => {

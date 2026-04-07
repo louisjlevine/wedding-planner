@@ -1,10 +1,12 @@
 "use client";
 
 import { usePlan } from "@/hooks/usePlan";
+import { usePlanStore } from "@/lib/plan-store";
 import { Badge } from "@/components/ui/Badge";
 
 export function Timeline() {
   const { timeline, answers } = usePlan();
+  const { toggleTimelineItem } = usePlanStore();
 
   if (!answers) return null;
 
@@ -22,7 +24,8 @@ export function Timeline() {
       <div>
         <h1 className="text-xl font-bold text-gray-900">Timeline</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Your wedding planning roadmap, personalised to {answers.date}
+          Your wedding planning roadmap, personalised to {answers.date} &middot;{" "}
+          {timeline.filter((t) => t.done).length} of {timeline.length} done
         </p>
       </div>
 
@@ -41,13 +44,15 @@ export function Timeline() {
               } ${isPast && !item.done ? "opacity-60" : ""}`}
             >
               <div className="shrink-0 mt-0.5">
-                <div
-                  className={`w-4 h-4 rounded-full border-2 ${
+                <button
+                  onClick={() => toggleTimelineItem(item.id)}
+                  title={item.done ? "Mark incomplete" : "Mark complete"}
+                  className={`w-4 h-4 rounded-full border-2 transition-colors hover:opacity-70 ${
                     item.done
                       ? "bg-[#D4537E] border-[#D4537E]"
                       : isToday
                       ? "border-[#D4537E]"
-                      : "border-gray-300"
+                      : "border-gray-300 hover:border-[#D4537E]"
                   }`}
                 />
               </div>
