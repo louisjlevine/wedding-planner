@@ -15,6 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
@@ -24,6 +29,16 @@ jobs:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          claude -p "Find the highest-priority open issue in the 'Wedding Website' Linear project. Implement it, commit to a new branch, push, and move the issue to 'In Review'." \
+          claude -p "You are working in a GitHub Actions runner with access to a Next.js wedding planner codebase.
+
+          Step 1 — Find the issue: Query the Linear GraphQL API to find the highest-priority open issue in the 'Wedding Website' project. Use curl with the LINEAR_API_KEY environment variable as a Bearer token against https://api.linear.app/graphql.
+
+          Step 2 — Implement it: Read the relevant files in this repo, then implement the changes described by the issue.
+
+          Step 3 — Commit and push: Create a new branch named linear/<issue-identifier>-<slug>, commit all changes with a descriptive message referencing the issue, and push the branch. Use the GITHUB_TOKEN for authentication: set the remote URL to https://x-access-token:\${GITHUB_TOKEN}@github.com/louisjlevine/wedding-planner.git before pushing.
+
+          Step 4 — Open a PR: Create a pull request to main using the GitHub API (https://api.github.com/repos/louisjlevine/wedding-planner/pulls) with a summary of what was changed and why. Use GITHUB_TOKEN as the Bearer token.
+
+          Step 5 — Update Linear: Move the issue to 'In Review' state using the Linear GraphQL API." \
             --allowedTools "Bash,Read,Write,Edit,Glob,Grep" \
             --dangerously-skip-permissions
