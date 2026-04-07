@@ -45,7 +45,8 @@ async function createLinearIssue(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      // Personal API keys use the key directly; OAuth tokens use Bearer
+      Authorization: apiKey.startsWith("lin_oauth_") ? `Bearer ${apiKey}` : `${apiKey}`,
     },
     body: JSON.stringify({
       query: mutation,
@@ -53,14 +54,30 @@ async function createLinearIssue(
     }),
   });
 
-  if (!res.ok) throw new Error(`Linear API error: ${res.status}`);
+  const body = await res.text();
+  if (!res.ok) {
+    console.error(`[feedback] Linear HTTP ${res.status}:`, body);
+    throw new Error(`Linear API error: ${res.status}`);
+  }
 
-  const json = await res.json();
+  let json: { data?: { issueCreate?: { success?: boolean; issue?: { url?: string } } }; errors?: unknown };
+  try {
+    json = JSON.parse(body);
+  } catch {
+    console.error("[feedback] Linear non-JSON response:", body);
+    throw new Error("Linear returned non-JSON");
+  }
+
+  if (json.errors) {
+    console.error("[feedback] Linear GraphQL errors:", JSON.stringify(json.errors));
+  }
+
   if (!json.data?.issueCreate?.success) {
+    console.error("[feedback] Linear issueCreate not successful:", JSON.stringify(json));
     throw new Error("Linear issue creation failed");
   }
 
-  return json.data.issueCreate.issue.url;
+  return json.data.issueCreate.issue?.url ?? "";
 }
 
 export async function POST(req: NextRequest) {
@@ -74,6 +91,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Use Claude to diagnose and structure the feedback into a Linear issue
+    console.log("[feedback] Calling Claude to structure feedback");
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 512,
@@ -125,11 +143,13 @@ Priority guide:
 
     const fullDescription = `${description}\n\n---\n\n**Original feedback:**\n> ${feedback}`;
 
+    console.log("[feedback] Creating Linear issue:", title, "priority:", priority);
     const issueUrl = await createLinearIssue(title, fullDescription, priority);
+    console.log("[feedback] Issue created:", issueUrl);
 
     return NextResponse.json({ ok: true, issueUrl });
   } catch (error) {
-    console.error("Feedback API error:", error);
+    console.error("[feedback] Error:", error instanceof Error ? error.message : error);
     return NextResponse.json(
       { error: "Failed to submit feedback" },
       { status: 500 }
