@@ -33,6 +33,11 @@ function parseJsonArray(raw: string): Record<string, string>[] | null {
   }
 }
 
+const VALID_TYPES = new Set<ResearchType>([
+  "venue", "photographer", "caterer", "florist", "music",
+  "dress", "honeymoon", "timeline", "budget",
+]);
+
 export async function POST(req: NextRequest) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -43,6 +48,10 @@ export async function POST(req: NextRequest) {
       notes: string;
       answers: WeddingAnswers;
     };
+
+    if (!type || !VALID_TYPES.has(type) || !answers || typeof answers !== "object") {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
 
     const label = TYPE_LABELS[type] ?? type;
     const isLuxury = answers.budget >= 100_000;
@@ -88,13 +97,23 @@ Example:
       const rawStatus = (r.status ?? "").toLowerCase();
       const status: ResearchRecommendation["status"] =
         rawStatus === "open" ? "open" : rawStatus === "closed" ? "closed" : "unknown";
+
+      // Only pass through https:// URLs from AI responses
+      let website: string | undefined;
+      if (r.website && typeof r.website === "string") {
+        try {
+          const u = new URL(r.website);
+          if (u.protocol === "https:") website = r.website;
+        } catch { /* drop malformed URLs */ }
+      }
+
       return {
         id: `rec-${Date.now()}-${i}`,
-        title:       r.title       ?? "Untitled",
-        description: r.description ?? "",
-        priceRange:  r.priceRange  || undefined,
-        website:     r.website     || undefined,
-        why:         r.why         ?? "",
+        title:       typeof r.title === "string"       ? r.title       : "Untitled",
+        description: typeof r.description === "string" ? r.description : "",
+        priceRange:  typeof r.priceRange === "string"  ? r.priceRange  : undefined,
+        website,
+        why:         typeof r.why === "string"         ? r.why         : "",
         status,
         statusNote:  status !== "unknown" ? "Based on AI training data — verify before booking" : undefined,
       };

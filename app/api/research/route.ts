@@ -5,6 +5,11 @@ import type { WeddingAnswers } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+const VALID_RESEARCH_TYPES = new Set<ResearchType>([
+  "venue", "photographer", "caterer", "florist", "music",
+  "dress", "honeymoon", "timeline", "budget",
+]);
+
 export async function POST(req: NextRequest) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -15,9 +20,9 @@ export async function POST(req: NextRequest) {
       answers: WeddingAnswers;
     };
 
-    if (!type || !answers) {
+    if (!type || !VALID_RESEARCH_TYPES.has(type) || !answers || typeof answers !== "object") {
       return NextResponse.json(
-        { error: "Missing type or answers" },
+        { error: "Invalid request" },
         { status: 400 }
       );
     }

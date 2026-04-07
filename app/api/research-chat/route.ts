@@ -1,9 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { WeddingAnswers, ResearchRecommendation } from "@/lib/types";
 import type { ResearchType } from "@/lib/research-prompts";
 
 export const dynamic = "force-dynamic";
+
+const VALID_RESEARCH_TYPES = new Set<ResearchType>([
+  "venue", "photographer", "caterer", "florist", "music",
+  "dress", "honeymoon", "timeline", "budget",
+]);
 
 export async function POST(req: NextRequest) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -17,6 +22,13 @@ export async function POST(req: NextRequest) {
       type: ResearchType;
       answers: WeddingAnswers;
     };
+
+    if (!type || !VALID_RESEARCH_TYPES.has(type) || !answers || typeof answers !== "object") {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
 
     const recContext =
       recommendations.length > 0

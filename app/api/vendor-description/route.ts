@@ -4,9 +4,30 @@ import type { WeddingAnswers, Vendor } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+// ── SSRF guard: block requests to private / internal addresses ────────────────
+
+function isPrivateUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return true;
+    const h = url.hostname;
+    if (h === "localhost" || h === "::1") return true;
+    if (/^127\./.test(h)) return true;
+    if (/^10\./.test(h)) return true;
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+    if (/^192\.168\./.test(h)) return true;
+    if (/^169\.254\./.test(h)) return true;
+    if (/^0\./.test(h)) return true;
+    return false;
+  } catch {
+    return true; // unparseable URL → block
+  }
+}
+
 // ── Fetch + strip a vendor website down to readable text ──────────────────────
 
 async function scrapeWebsite(url: string): Promise<string> {
+  if (isPrivateUrl(url)) return "";
   try {
     const res = await fetch(url, {
       headers: {

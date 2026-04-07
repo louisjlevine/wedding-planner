@@ -1,9 +1,17 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/lib/plan-store";
 
 export function Topbar() {
   const { answers, resetIntake, setActiveTab } = usePlanStore();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
 
   const daysUntil = answers?.date
     ? Math.ceil(
@@ -41,6 +49,12 @@ export function Topbar() {
           className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
         >
           Reset
+        </button>
+        <button
+          onClick={handleLogout}
+          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          Sign out
         </button>
       </div>
     </header>
