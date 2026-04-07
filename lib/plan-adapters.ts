@@ -2,6 +2,7 @@ import type {
   WeddingAnswers,
   TimelineItem,
   BudgetCategory,
+  AdaptiveAdjustment,
   Task,
 } from "./types";
 
@@ -134,44 +135,73 @@ export function buildTimeline(answers: WeddingAnswers): TimelineItem[] {
 
 // ── Budget ────────────────────────────────────────────────────────────────────
 
+// Industry-default baseline percentages (before any adaptive adjustments)
+const BUDGET_BASELINES: Record<string, number> = {
+  venue: 28,
+  catering: 23,
+  photography: 10,
+  flowers: 8,
+  music: 7,
+  attire: 8,
+  stationery: 2,
+  transport: 2,
+  rings: 3,
+  misc: 5,
+};
+
 export function buildBudgetCategories(
   answers: WeddingAnswers
 ): BudgetCategory[] {
   const total = answers.budget;
   const isLuxury = total >= 100_000;
 
+  const foodPriority = answers.priorities.includes("food");
+  const photoPriority = answers.priorities.includes("photography");
+
   const base: Array<{
     id: string;
     name: string;
     pct: number;
     tip?: string;
+    adjustments: AdaptiveAdjustment[];
   }> = [
-    { id: "venue", name: "Venue", pct: 28 },
+    {
+      id: "venue",
+      name: "Venue",
+      pct: BUDGET_BASELINES.venue,
+      adjustments: [],
+    },
     {
       id: "catering",
       name: "Catering & Bar",
-      pct: answers.priorities.includes("food") ? 28 : 23,
-      tip: answers.priorities.includes("food")
-        ? "Food is a top priority — budget boosted 5%"
-        : undefined,
+      pct: foodPriority ? 28 : BUDGET_BASELINES.catering,
+      tip: foodPriority ? "Food is a top priority — budget boosted 5%" : undefined,
+      adjustments: foodPriority
+        ? [{ reason: "Food listed as a top priority", delta: 5 }]
+        : [],
     },
     {
       id: "photography",
       name: "Photography & Video",
-      pct: answers.priorities.includes("photography") ? 15 : 10,
-      tip: answers.priorities.includes("photography")
+      pct: photoPriority ? 15 : BUDGET_BASELINES.photography,
+      tip: photoPriority
         ? "Photography is a top priority — budget boosted 5%"
         : isLuxury
         ? "Consider a luxury film photographer for this budget level"
         : undefined,
+      adjustments: photoPriority
+        ? [{ reason: "Photography listed as a top priority", delta: 5 }]
+        : isLuxury
+        ? [{ reason: "Luxury budget tier — consider premium vendors", delta: 0 }]
+        : [],
     },
-    { id: "flowers", name: "Flowers & Decor", pct: 8 },
-    { id: "music", name: "Music & Entertainment", pct: 7 },
-    { id: "attire", name: "Attire & Beauty", pct: 8 },
-    { id: "stationery", name: "Stationery", pct: 2 },
-    { id: "transport", name: "Transportation", pct: 2 },
-    { id: "rings", name: "Rings", pct: 3 },
-    { id: "misc", name: "Miscellaneous / Buffer", pct: 5 },
+    { id: "flowers", name: "Flowers & Decor", pct: BUDGET_BASELINES.flowers, adjustments: [] },
+    { id: "music", name: "Music & Entertainment", pct: BUDGET_BASELINES.music, adjustments: [] },
+    { id: "attire", name: "Attire & Beauty", pct: BUDGET_BASELINES.attire, adjustments: [] },
+    { id: "stationery", name: "Stationery", pct: BUDGET_BASELINES.stationery, adjustments: [] },
+    { id: "transport", name: "Transportation", pct: BUDGET_BASELINES.transport, adjustments: [] },
+    { id: "rings", name: "Rings", pct: BUDGET_BASELINES.rings, adjustments: [] },
+    { id: "misc", name: "Miscellaneous / Buffer", pct: BUDGET_BASELINES.misc, adjustments: [] },
   ];
 
   // Normalise percentages to 100
@@ -187,6 +217,8 @@ export function buildBudgetCategories(
       amount: Math.round((pct / 100) * total),
       spent: 0,
       tip: c.tip,
+      baselinePercentage: BUDGET_BASELINES[c.id] ?? c.pct,
+      adjustments: c.adjustments,
     };
   });
 }

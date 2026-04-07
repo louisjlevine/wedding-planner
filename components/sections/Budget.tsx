@@ -21,6 +21,7 @@ function BudgetRow({
   const [editingAmt, setEditingAmt]     = useState(false);
   const [editingPct, setEditingPct]     = useState(false);
   const [editingSpent, setEditingSpent] = useState(false);
+  const [showWhy, setShowWhy]           = useState(false);
 
   const [draftAmt,   setDraftAmt]   = useState(cat.amount.toString());
   const [draftPct,   setDraftPct]   = useState(cat.percentage.toString());
@@ -81,11 +82,23 @@ function BudgetRow({
   const spentPct = cat.amount > 0 ? Math.min((cat.spent / cat.amount) * 100, 100) : 0;
   const isOver   = cat.spent > cat.amount;
 
+  const hasAdjustments = cat.adjustments && cat.adjustments.length > 0;
+  const adjustedBaseline = cat.baselinePercentage + (cat.adjustments ?? []).reduce((s, a) => s + a.delta, 0);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        {/* Name */}
-        <span className="text-sm font-medium text-gray-700 w-40 shrink-0">{cat.name}</span>
+        {/* Name + Why? toggle */}
+        <div className="flex items-center gap-1 w-40 shrink-0">
+          <span className="text-sm font-medium text-gray-700">{cat.name}</span>
+          <button
+            onClick={() => setShowWhy((v) => !v)}
+            className="text-[10px] text-gray-400 hover:text-[#D4537E] transition-colors leading-none border border-gray-200 hover:border-[#D4537E] rounded px-1 py-0.5"
+            title="Show how this allocation was calculated"
+          >
+            {showWhy ? "hide" : "why?"}
+          </button>
+        </div>
 
         {/* Dollar amount */}
         <div className="flex items-center gap-1 min-w-[90px]">
@@ -167,6 +180,35 @@ function BudgetRow({
       </div>
 
       {cat.tip && <p className="text-xs text-[#D4537E]">{cat.tip}</p>}
+
+      {showWhy && (
+        <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5 text-xs text-gray-600 space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">Industry default</span>
+            <span className="tabular-nums font-medium">{cat.baselinePercentage}%</span>
+          </div>
+          {(cat.adjustments ?? []).map((adj, i) => (
+            <div key={i} className="flex items-center justify-between">
+              <span className="text-gray-500">{adj.reason}</span>
+              {adj.delta !== 0 && (
+                <span className={`tabular-nums font-medium ${adj.delta > 0 ? "text-[#D4537E]" : "text-blue-500"}`}>
+                  {adj.delta > 0 ? "+" : ""}{adj.delta}%
+                </span>
+              )}
+            </div>
+          ))}
+          {hasAdjustments && (
+            <div className="flex items-center justify-between border-t border-gray-200 pt-1 mt-1">
+              <span className="text-gray-500">Pre-scaling total</span>
+              <span className="tabular-nums font-medium">{adjustedBaseline}%</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between border-t border-gray-200 pt-1 mt-1">
+            <span className="text-gray-500">Final allocation (scaled to 100%)</span>
+            <span className="tabular-nums font-semibold text-gray-800">{cat.percentage}%</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

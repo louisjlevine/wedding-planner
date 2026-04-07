@@ -96,6 +96,11 @@ export interface TimelineItem {
   done: boolean;
 }
 
+export interface AdaptiveAdjustment {
+  reason: string;
+  delta: number; // percentage points added (pre-normalization)
+}
+
 export interface BudgetCategory {
   id: string;
   name: string;
@@ -103,6 +108,8 @@ export interface BudgetCategory {
   amount: number;
   spent: number;
   tip?: string;
+  baselinePercentage: number; // industry default % before any adaptive adjustments
+  adjustments: AdaptiveAdjustment[]; // list of rules that changed the baseline
 }
 
 export interface Note {
