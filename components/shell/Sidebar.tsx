@@ -5,13 +5,13 @@ import type { Tab } from "@/lib/types";
 
 const NAV: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "advisor", label: "Advisor" },
+  { id: "research", label: "Research" },
   { id: "timeline", label: "Timeline" },
   { id: "budget", label: "Budget" },
   { id: "tasks", label: "Tasks" },
   { id: "vendors", label: "Vendors" },
   { id: "guests", label: "Guests" },
-  { id: "research", label: "Research" },
-  { id: "advisor", label: "Advisor" },
 ];
 
 export function Sidebar() {
