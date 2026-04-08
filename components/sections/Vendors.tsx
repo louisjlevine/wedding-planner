@@ -379,37 +379,42 @@ export function Vendors() {
                         <option value="booked">Booked</option>
                         <option value="rejected">Rejected</option>
                       </select>
-                      <button
-                        onClick={() => removeVendor(vendor.id)}
-                        className="text-xs text-gray-300 hover:text-red-400 transition-colors"
-                      >
-                        remove
-                      </button>
                     </div>
 
-                    {canFindSimilar && (
+                    <div className="flex items-center gap-2">
+                      {canFindSimilar && (
+                        <button
+                          onClick={() => handleFindSimilar(vendor)}
+                          disabled={isLoading}
+                          className="inline-flex items-center gap-1.5 text-xs text-gray-400 border border-gray-200 rounded-lg px-2.5 py-1 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 transition-colors"
+                        >
+                          {isLoading ? (
+                            <>
+                              <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                              Finding…
+                            </>
+                          ) : (
+                            <>
+                              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                <circle cx="6.5" cy="6.5" r="4.5" />
+                                <path d="M14 14l-3-3" />
+                                <path d="M6.5 4v5M4 6.5h5" />
+                              </svg>
+                              Find similar
+                            </>
+                          )}
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleFindSimilar(vendor)}
-                        disabled={isLoading}
-                        className="inline-flex items-center gap-1.5 text-xs text-gray-400 border border-gray-200 rounded-lg px-2.5 py-1 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 transition-colors"
+                        onClick={() => removeVendor(vendor.id)}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1 hover:bg-red-100 hover:border-red-300 transition-colors"
                       >
-                        {isLoading ? (
-                          <>
-                            <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                            Finding…
-                          </>
-                        ) : (
-                          <>
-                            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                              <circle cx="6.5" cy="6.5" r="4.5" />
-                              <path d="M14 14l-3-3" />
-                              <path d="M6.5 4v5M4 6.5h5" />
-                            </svg>
-                            Find similar
-                          </>
-                        )}
+                        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9" />
+                        </svg>
+                        Remove
                       </button>
-                    )}
+                    </div>
                   </div>
                 </div>
               );
