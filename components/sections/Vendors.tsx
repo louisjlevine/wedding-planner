@@ -164,6 +164,12 @@ export function Vendors() {
   // Per-vendor loading state for "Find similar"
   const [findingFor, setFindingFor] = useState<string | null>(null);
 
+  // Category filter — "All" means no filter
+  const [filterCategory, setFilterCategory] = useState<string>("All");
+
+  // Venue comparison table pop-out
+  const [showVenueTable, setShowVenueTable] = useState(false);
+
   function handleAdd() {
     if (!form.name.trim()) return;
     const isVenue = form.category === "Venue";
@@ -213,14 +219,73 @@ export function Vendors() {
     }
   }
 
+  // Categories that actually have vendors (for filter pills)
+  const presentCategories = CATEGORIES.filter((c) => vendors.some((v) => v.category === c));
+
   const grouped = vendors.reduce<Record<string, Vendor[]>>((acc, v) => {
     if (!acc[v.category]) acc[v.category] = [];
     acc[v.category].push(v);
     return acc;
   }, {});
 
+  // Apply category filter
+  const visibleEntries = Object.entries(grouped).filter(
+    ([category]) => filterCategory === "All" || category === filterCategory
+  );
+
+  const venueVendors = grouped["Venue"] ?? [];
+
   return (
     <div className="space-y-6">
+      {/* Venue comparison pop-out modal */}
+      {showVenueTable && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowVenueTable(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900">Venue comparison</h2>
+              <button
+                onClick={() => setShowVenueTable(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M2 2l12 12M14 2L2 14" />
+                </svg>
+              </button>
+            </div>
+            <div className="overflow-x-auto p-5">
+              <table className="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
+                <thead>
+                  <tr className="bg-gray-50 text-left text-gray-500">
+                    <th className="px-3 py-2 font-medium">Venue</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                    <th className="px-3 py-2 font-medium">Base price</th>
+                    <th className="px-3 py-2 font-medium">Rental period</th>
+                    <th className="px-3 py-2 font-medium">Overtime rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {venueVendors.map((v) => (
+                    <tr key={v.id} className="border-t border-gray-100 hover:bg-gray-50">
+                      <td className="px-3 py-2 font-medium text-gray-900">{v.name}</td>
+                      <td className="px-3 py-2 capitalize text-gray-600">{v.status}</td>
+                      <td className="px-3 py-2 text-gray-600">{v.price ? `$${v.price.toLocaleString()}` : "—"}</td>
+                      <td className="px-3 py-2 text-gray-600">{v.rentalPeriod || "—"}</td>
+                      <td className="px-3 py-2 text-gray-600">{v.overtimeRate || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Vendors</h1>
@@ -229,12 +294,22 @@ export function Vendors() {
             {vendors.length} total
           </p>
         </div>
-        <button
-          onClick={() => setAdding(true)}
-          className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
-        >
-          Add vendor
-        </button>
+        <div className="flex items-center gap-2">
+          {venueVendors.length >= 2 && (
+            <button
+              onClick={() => setShowVenueTable(true)}
+              className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
+            >
+              Compare venues
+            </button>
+          )}
+          <button
+            onClick={() => setAdding(true)}
+            className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
+          >
+            Add vendor
+          </button>
+        </div>
       </div>
 
       {adding && (
@@ -337,6 +412,25 @@ export function Vendors() {
         </div>
       )}
 
+      {/* Category filter pills — only shown when there are vendors */}
+      {vendors.length > 0 && presentCategories.length > 1 && (
+        <div className="flex flex-wrap gap-1.5">
+          {["All", ...presentCategories].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilterCategory(cat)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                filterCategory === cat
+                  ? "bg-[var(--accent)] text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
+
       {vendors.length === 0 && !adding && (
         <div className="border-2 border-dashed border-gray-200 rounded-2xl py-16 flex flex-col items-center gap-3 text-center">
           <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
@@ -357,39 +451,11 @@ export function Vendors() {
         </div>
       )}
 
-      {Object.entries(grouped).map(([category, catVendors]) => (
+      {visibleEntries.map(([category, catVendors]) => (
         <div key={category}>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
             {category}
           </h2>
-
-          {/* Venue comparison table — shown when 2+ venues are tracked */}
-          {category === "Venue" && catVendors.length >= 2 && (
-            <div className="mb-3 overflow-x-auto">
-              <table className="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
-                <thead>
-                  <tr className="bg-gray-50 text-left text-gray-500">
-                    <th className="px-3 py-2 font-medium">Venue</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Base price</th>
-                    <th className="px-3 py-2 font-medium">Rental period</th>
-                    <th className="px-3 py-2 font-medium">Overtime rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {catVendors.map((v) => (
-                    <tr key={v.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-3 py-2 font-medium text-gray-900">{v.name}</td>
-                      <td className="px-3 py-2 capitalize text-gray-600">{v.status}</td>
-                      <td className="px-3 py-2 text-gray-600">{v.price ? `$${v.price.toLocaleString()}` : "—"}</td>
-                      <td className="px-3 py-2 text-gray-600">{v.rentalPeriod || "—"}</td>
-                      <td className="px-3 py-2 text-gray-600">{v.overtimeRate || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
 
           <div className="space-y-2">
             {catVendors.map((vendor) => {
