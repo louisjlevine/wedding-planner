@@ -9,7 +9,7 @@ import {
   RELATIONSHIP_LABELS,
   LOCATION_LABELS,
 } from "@/lib/guest-probability";
-import type { Guest, GuestRelationship, GuestLocation } from "@/lib/types";
+import type { Guest, GuestRelationship, GuestLocation, GuestSide } from "@/lib/types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -19,12 +19,14 @@ const RSVP_VARIANTS: Record<Guest["rsvp"], "green" | "red" | "yellow" | "gray"> 
 
 const RELATIONSHIPS: GuestRelationship[] = ["family", "close_friend", "friend", "acquaintance"];
 const LOCATIONS: GuestLocation[] = ["local", "out_of_town"];
+const SIDES: GuestSide[] = ["bride", "groom", "both"];
+const SIDE_LABELS: Record<GuestSide, string> = { bride: "Bride's side", groom: "Groom's side", both: "Both sides" };
 
 // ── CSV helpers ───────────────────────────────────────────────────────────────
 
-const CSV_COLUMNS = ["name","email","phone","address","relationship","location","plusone","dietary","table","rsvp","notes"] as const;
+const CSV_COLUMNS = ["name","email","phone","address","relationship","location","side","plusone","dietary","table","rsvp","notes"] as const;
 
-const CSV_TEMPLATE_ROW = ["Jane Smith","jane@example.com","555-0100","123 Main St, Denver CO 80202","family","local","no","vegetarian","Table 1","pending","Childhood friend"];
+const CSV_TEMPLATE_ROW = ["Jane Smith","jane@example.com","555-0100","123 Main St, Denver CO 80202","family","local","bride","no","vegetarian","Table 1","pending","Childhood friend"];
 
 export function downloadCSVTemplate() {
   const rows = [CSV_COLUMNS.join(","), CSV_TEMPLATE_ROW.join(",")];
@@ -48,6 +50,7 @@ export function exportGuestsCSV(guests: Guest[]) {
       escape(g.address    ?? ""),
       escape(g.relationship  ?? ""),
       escape(g.guestLocation ?? ""),
+      escape(g.side ?? ""),
       g.plusOne ? "yes" : "no",
       escape(g.dietary ?? ""),
       escape(g.table   ?? ""),
@@ -78,6 +81,7 @@ function parseCSV(text: string): Partial<Guest>[] {
       address:      ["address", "addr", "mailing"],
       relationship: ["relationship", "relation", "type"],
       guestlocation:["location", "guestlocation", "city"],
+      side:         ["side", "family_side", "familyside"],
       plusone:      ["plusone", "plus_one", "guest"],
       dietary:      ["dietary", "diet", "food"],
       table:        ["table", "tablenumber", "seat"],
@@ -106,6 +110,12 @@ function parseCSV(text: string): Partial<Guest>[] {
       locRaw.startsWith("local") || locRaw === "denver" || locRaw === "in town" ? "local"
       : locRaw.includes("out") || locRaw === "remote" || locRaw === "travel" ? "out_of_town"
       : undefined;
+    const sideRaw = col(row, "side").toLowerCase();
+    const side: GuestSide | undefined =
+      sideRaw.startsWith("bride") ? "bride"
+      : sideRaw.startsWith("groom") ? "groom"
+      : sideRaw === "both" || sideRaw === "shared" ? "both"
+      : undefined;
     return {
       name,
       email:        col(row, "email")   || undefined,
@@ -115,6 +125,7 @@ function parseCSV(text: string): Partial<Guest>[] {
       plusOne:      ["yes","true","1","x"].includes(col(row, "plusone").toLowerCase()),
       relationship: rel,
       guestLocation: loc,
+      side,
       rsvp: "pending" as const,
     };
   }).filter(Boolean) as Partial<Guest>[];
@@ -158,6 +169,7 @@ function EditGuestForm({
     address:       guest.address       ?? "",
     relationship:  guest.relationship  ?? ("" as GuestRelationship | ""),
     guestLocation: guest.guestLocation ?? ("" as GuestLocation | ""),
+    side:          guest.side          ?? ("" as GuestSide | ""),
     plusOne:       guest.plusOne,
     dietary:       guest.dietary ?? "",
     table:         guest.table   ?? "",
@@ -191,6 +203,14 @@ function EditGuestForm({
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
             <option value="">— unset —</option>
             {LOCATIONS.map((l) => <option key={l} value={l}>{LOCATION_LABELS[l]}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Side of family</label>
+          <select value={d.side} onChange={(e) => setD((x) => ({ ...x, side: e.target.value as GuestSide }))}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
+            <option value="">— unset —</option>
+            {SIDES.map((s) => <option key={s} value={s}>{SIDE_LABELS[s]}</option>)}
           </select>
         </div>
         <div>
@@ -232,6 +252,7 @@ function EditGuestForm({
           address:       d.address  || undefined,
           relationship:  d.relationship  || undefined,
           guestLocation: d.guestLocation || undefined,
+          side:          d.side          || undefined,
           plusOne:       d.plusOne,
           dietary:       d.dietary  || undefined,
           table:         d.table    || undefined,
@@ -253,10 +274,12 @@ export function Guests() {
 
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [sideFilter, setSideFilter] = useState<GuestSide | "all">("all");
   const [form, setForm] = useState({
     name: "", email: "", address: "", plusOne: false, dietary: "", table: "",
     relationship: "" as GuestRelationship | "",
     guestLocation: "" as GuestLocation | "",
+    side: "" as GuestSide | "",
   });
 
   const csvInputRef  = useRef<HTMLInputElement>(null);
@@ -280,8 +303,9 @@ export function Guests() {
       table:         form.table         || undefined,
       relationship:  form.relationship  || undefined,
       guestLocation: form.guestLocation || undefined,
+      side:          form.side          || undefined,
     });
-    setForm({ name: "", email: "", address: "", plusOne: false, dietary: "", table: "", relationship: "", guestLocation: "" });
+    setForm({ name: "", email: "", address: "", plusOne: false, dietary: "", table: "", relationship: "", guestLocation: "", side: "" });
     setAdding(false);
   }
 
@@ -312,18 +336,37 @@ export function Guests() {
     if (!csvPreview) return;
     csvPreview.forEach((g, i) => {
       if (!g.name) return;
-      addGuest({
-        id:            `guest-import-${Date.now()}-${i}`,
-        name:          g.name,
-        email:         g.email,
-        address:       g.address,
-        plusOne:       g.plusOne ?? false,
-        rsvp:          "pending",
-        dietary:       g.dietary,
-        table:         g.table,
-        relationship:  g.relationship,
-        guestLocation: g.guestLocation,
-      });
+      // Re-import/update: match on email if both sides have one
+      const existing = g.email
+        ? guests.find((eg) => eg.email && eg.email.toLowerCase() === g.email!.toLowerCase())
+        : undefined;
+      if (existing) {
+        updateGuest(existing.id, {
+          name:          g.name,
+          email:         g.email,
+          address:       g.address       ?? existing.address,
+          plusOne:       g.plusOne       ?? existing.plusOne,
+          dietary:       g.dietary       ?? existing.dietary,
+          table:         g.table         ?? existing.table,
+          relationship:  g.relationship  ?? existing.relationship,
+          guestLocation: g.guestLocation ?? existing.guestLocation,
+          side:          g.side          ?? existing.side,
+        });
+      } else {
+        addGuest({
+          id:            `guest-import-${Date.now()}-${i}`,
+          name:          g.name,
+          email:         g.email,
+          address:       g.address,
+          plusOne:       g.plusOne ?? false,
+          rsvp:          "pending",
+          dietary:       g.dietary,
+          table:         g.table,
+          relationship:  g.relationship,
+          guestLocation: g.guestLocation,
+          side:          g.side,
+        });
+      }
     });
     setCsvPreview(null);
     setCsvWarnings([]);
@@ -360,13 +403,17 @@ export function Guests() {
 
   // ── Derived counts ───────────────────────────────────────────────────────
 
+  const filteredGuests = sideFilter === "all"
+    ? guests
+    : guests.filter((g) => g.side === sideFilter || (sideFilter === "both" && g.side === "both"));
+
   const counts = {
-    yes:     guests.filter((g) => g.rsvp === "yes").length,
-    no:      guests.filter((g) => g.rsvp === "no").length,
-    maybe:   guests.filter((g) => g.rsvp === "maybe").length,
-    pending: guests.filter((g) => g.rsvp === "pending").length,
+    yes:     filteredGuests.filter((g) => g.rsvp === "yes").length,
+    no:      filteredGuests.filter((g) => g.rsvp === "no").length,
+    maybe:   filteredGuests.filter((g) => g.rsvp === "maybe").length,
+    pending: filteredGuests.filter((g) => g.rsvp === "pending").length,
   };
-  const estimated = estimatedAttendance(guests);
+  const estimated = estimatedAttendance(filteredGuests);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -408,6 +455,25 @@ export function Guests() {
         <input ref={vcfInputRef} type="file" accept=".vcf,.vcard"   className="hidden" onChange={handleVcfFile} />
       </div>
 
+      {/* Side of family filter */}
+      {guests.length > 0 && (
+        <div className="flex items-center gap-2">
+          {(["all", ...SIDES] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setSideFilter(s)}
+              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                sideFilter === s
+                  ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                  : "border-gray-200 text-gray-500 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              }`}
+            >
+              {s === "all" ? "All guests" : SIDE_LABELS[s]}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Metrics */}
       <div className="grid grid-cols-5 gap-3">
         {(["yes","no","maybe","pending"] as Guest["rsvp"][]).map((status) => (
@@ -429,7 +495,12 @@ export function Guests() {
         <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-700">
-              Preview import — {csvPreview.filter((g) => g.name).length} guest{csvPreview.filter((g) => g.name).length !== 1 ? "s" : ""} ready
+              {(() => {
+                const valid = csvPreview.filter((g) => g.name);
+                const updates = valid.filter((g) => g.email && guests.some((eg) => eg.email && eg.email.toLowerCase() === g.email!.toLowerCase())).length;
+                const adds = valid.length - updates;
+                return `Preview import — ${adds > 0 ? `${adds} new` : ""}${adds > 0 && updates > 0 ? ", " : ""}${updates > 0 ? `${updates} update` : ""}`;
+              })()}
             </h3>
             <button onClick={cancelCsvImport} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
           </div>
@@ -441,15 +512,24 @@ export function Guests() {
             </div>
           )}
           <div className="max-h-52 overflow-y-auto divide-y divide-gray-100 rounded-lg border border-gray-100">
-            {csvPreview.filter((g) => g.name).map((g, i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-2">
-                <p className="text-sm font-medium text-gray-800 w-40 shrink-0">{g.name}</p>
-                {g.email        && <p className="text-xs text-gray-400">{g.email}</p>}
-                {g.relationship && <span className="text-xs text-gray-400">{RELATIONSHIP_LABELS[g.relationship]}</span>}
-                {g.guestLocation && <span className="text-xs text-gray-400">{LOCATION_LABELS[g.guestLocation]}</span>}
-                {g.plusOne      && <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">+1</span>}
-              </div>
-            ))}
+            {csvPreview.filter((g) => g.name).map((g, i) => {
+              const existingByEmail = g.email
+                ? guests.find((eg) => eg.email && eg.email.toLowerCase() === g.email!.toLowerCase())
+                : undefined;
+              return (
+                <div key={i} className="flex items-center gap-3 px-3 py-2">
+                  <p className="text-sm font-medium text-gray-800 w-40 shrink-0">{g.name}</p>
+                  {existingByEmail && (
+                    <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">update</span>
+                  )}
+                  {g.email        && <p className="text-xs text-gray-400">{g.email}</p>}
+                  {g.relationship && <span className="text-xs text-gray-400">{RELATIONSHIP_LABELS[g.relationship]}</span>}
+                  {g.guestLocation && <span className="text-xs text-gray-400">{LOCATION_LABELS[g.guestLocation]}</span>}
+                  {g.side         && <span className="text-xs text-gray-400">{SIDE_LABELS[g.side]}</span>}
+                  {g.plusOne      && <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">+1</span>}
+                </div>
+              );
+            })}
           </div>
           <div className="flex gap-2">
             <button onClick={confirmCsvImport}
@@ -522,6 +602,14 @@ export function Guests() {
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
             </div>
             <div>
+              <label className="text-xs text-gray-500 mb-1 block">Side of family</label>
+              <select value={form.side} onChange={(e) => setForm((f) => ({ ...f, side: e.target.value as GuestSide }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
+                <option value="">— unset —</option>
+                {SIDES.map((s) => <option key={s} value={s}>{SIDE_LABELS[s]}</option>)}
+              </select>
+            </div>
+            <div>
               <label className="text-xs text-gray-500 mb-1 block">Dietary needs</label>
               <input value={form.dietary} onChange={(e) => setForm((f) => ({ ...f, dietary: e.target.value }))}
                 placeholder="e.g. vegetarian"
@@ -588,7 +676,7 @@ export function Guests() {
 
       {/* Guest rows */}
       <div className="space-y-2">
-        {guests.map((guest) => {
+        {filteredGuests.map((guest) => {
           if (editingId === guest.id) {
             return (
               <EditGuestForm
@@ -616,6 +704,9 @@ export function Guests() {
                   )}
                   {guest.guestLocation && (
                     <span className="text-xs text-gray-400">{LOCATION_LABELS[guest.guestLocation]}</span>
+                  )}
+                  {guest.side && (
+                    <span className="text-xs text-gray-400">{SIDE_LABELS[guest.side]}</span>
                   )}
                   {showProb && (
                     <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
