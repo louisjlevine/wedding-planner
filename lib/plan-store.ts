@@ -13,6 +13,7 @@ import type {
   ResearchChatMessage,
   AdvisorMessage,
   Tab,
+  EmailDigestPrefs,
 } from "./types";
 
 interface BudgetOverride {
@@ -81,6 +82,9 @@ interface PlanState {
   // Timeline done state
   toggleTimelineItem: (id: string) => void;
 
+  emailPrefs: EmailDigestPrefs | null;
+  setEmailPrefs: (prefs: EmailDigestPrefs) => void;
+
   setActiveTab: (tab: Tab) => void;
   importStore: (data: Partial<PlanState>) => void;
 }
@@ -105,6 +109,7 @@ export const usePlanStore = create<PlanState>()(
       timelineDoneIds: [],
       activeTab: "overview",
       intakeComplete: false,
+      emailPrefs: null,
 
       setAnswers: (answers) =>
         set({ answers, intakeComplete: true, activeTab: "advisor" }),
@@ -320,6 +325,8 @@ export const usePlanStore = create<PlanState>()(
           if (msgs.length > 0) msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content };
           return { advisorMessages: msgs };
         }),
+
+      setEmailPrefs: (prefs) => set({ emailPrefs: prefs }),
 
       setActiveTab: (tab) => set({ activeTab: tab }),
 

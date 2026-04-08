@@ -11,6 +11,7 @@ import { Budget } from "@/components/sections/Budget";
 import { Vendors } from "@/components/sections/Vendors";
 import { Guests } from "@/components/sections/Guests";
 import { Advisor } from "@/components/sections/Advisor";
+import { DigestSettings } from "@/components/sections/DigestSettings";
 
 export function Layout() {
   const { intakeComplete, activeTab } = usePlanStore();
@@ -27,6 +28,7 @@ export function Layout() {
     timeline: <Timeline />,
     vendors: <Vendors />,
     guests: <Guests />,
+    digest: <DigestSettings />,
   };
 
   return (

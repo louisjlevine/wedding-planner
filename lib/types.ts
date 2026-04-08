@@ -160,4 +160,13 @@ export type Tab =
   | "vendors"
   | "guests"
   | "research"
-  | "advisor";
+  | "advisor"
+  | "digest";
+
+export interface EmailDigestPrefs {
+  emailLouis: string;
+  emailPartner: string;
+  sendDay: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Sunday … 6 = Saturday
+  optInLouis: boolean;
+  optInPartner: boolean;
+}
