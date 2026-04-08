@@ -72,6 +72,7 @@ export interface Task {
 
 export type GuestRelationship = "family" | "close_friend" | "friend" | "acquaintance";
 export type GuestLocation    = "local" | "out_of_town";
+export type GuestSide        = "bride" | "groom" | "both";
 
 export interface Guest {
   id: string;
@@ -84,6 +85,7 @@ export interface Guest {
   table?: string;
   relationship?: GuestRelationship;
   guestLocation?: GuestLocation;
+  side?: GuestSide;
 }
 
 export interface TimelineItem {
