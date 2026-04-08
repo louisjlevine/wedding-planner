@@ -58,6 +58,9 @@ export interface Vendor {
   price?: number;
   status: "considering" | "contacted" | "booked" | "rejected";
   notes?: string;
+  // Venue-specific fields
+  rentalPeriod?: string;  // e.g. "8 hours", "full day"
+  overtimeRate?: string;  // e.g. "$250/hour"
 }
 
 export interface Task {
