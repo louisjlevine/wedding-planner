@@ -17,7 +17,7 @@ import { DigestSettings } from "@/components/sections/DigestSettings";
 export function Layout() {
   const { intakeComplete, activeTab } = usePlanStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { syncStatus, syncError, forcePush } = useServerSync();
+  useServerSync();
 
   const sections: Record<string, React.ReactNode> = {
     overview: <Overview />,
@@ -29,35 +29,12 @@ export function Layout() {
     digest: <DigestSettings />,
   };
 
-  const syncBanner =
-    syncStatus === "error" ? (
-      <div className="bg-red-600 text-white text-xs px-4 py-2 text-center flex items-center justify-center gap-3">
-        <span>Sync error — {syncError}</span>
-        <button onClick={forcePush} className="underline font-semibold">Retry</button>
-      </div>
-    ) : syncStatus === "loading" ? (
-      <div className="bg-yellow-500 text-white text-xs px-4 py-2 text-center">
-        Loading your data...
-      </div>
-    ) : syncStatus === "ok" ? (
-      <div className="bg-green-600 text-white text-xs px-4 py-2 text-center flex items-center justify-center gap-3">
-        <span>Synced</span>
-        <button onClick={forcePush} className="underline">Push now</button>
-      </div>
-    ) : null;
-
   if (!intakeComplete) {
-    return (
-      <>
-        {syncBanner}
-        <Intake />
-      </>
-    );
+    return <Intake />;
   }
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
-      {syncBanner}
       <div className="flex flex-1 overflow-hidden">
         {/* Mobile overlay */}
         {sidebarOpen && (
