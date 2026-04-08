@@ -40,24 +40,28 @@ function EditVendorForm({
   onCancel: () => void;
 }) {
   const [draft, setDraft] = useState({
-    name:     vendor.name,
-    category: vendor.category,
-    contact:  vendor.contact  ?? "",
-    website:  vendor.website  ?? "",
-    price:    vendor.price?.toString() ?? "",
-    notes:    vendor.notes    ?? "",
-    status:   vendor.status,
+    name:         vendor.name,
+    category:     vendor.category,
+    contact:      vendor.contact      ?? "",
+    website:      vendor.website      ?? "",
+    price:        vendor.price?.toString() ?? "",
+    rentalPeriod: vendor.rentalPeriod ?? "",
+    overtimeRate: vendor.overtimeRate ?? "",
+    notes:        vendor.notes        ?? "",
+    status:       vendor.status,
   });
 
   function commit() {
     onSave({
-      name:     draft.name.trim() || vendor.name,
-      category: draft.category,
-      contact:  draft.contact  || undefined,
-      website:  draft.website  || undefined,
-      price:    draft.price    ? parseInt(draft.price) : undefined,
-      notes:    draft.notes    || undefined,
-      status:   draft.status,
+      name:         draft.name.trim() || vendor.name,
+      category:     draft.category,
+      contact:      draft.contact      || undefined,
+      website:      draft.website      || undefined,
+      price:        draft.price        ? parseInt(draft.price) : undefined,
+      rentalPeriod: draft.rentalPeriod || undefined,
+      overtimeRate: draft.overtimeRate || undefined,
+      notes:        draft.notes        || undefined,
+      status:       draft.status,
     });
   }
 
@@ -104,6 +108,22 @@ function EditVendorForm({
             <option value="rejected">Rejected</option>
           </select>
         </div>
+        {draft.category === "Venue" && (
+          <>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Rental period</label>
+              <input value={draft.rentalPeriod} onChange={(e) => setDraft((d) => ({ ...d, rentalPeriod: e.target.value }))}
+                placeholder="e.g. 6 hours, Full day"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Overtime rate</label>
+              <input value={draft.overtimeRate} onChange={(e) => setDraft((d) => ({ ...d, overtimeRate: e.target.value }))}
+                placeholder="e.g. $500/hr"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+            </div>
+          </>
+        )}
       </div>
       <div>
         <label className="text-xs text-gray-500 mb-1 block">Notes</label>
@@ -135,7 +155,8 @@ export function Vendors() {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
-    category: "Venue", name: "", contact: "", website: "", price: "", notes: "",
+    category: "Venue", name: "", contact: "", website: "", price: "",
+    rentalPeriod: "", overtimeRate: "", notes: "",
   });
 
   // Per-vendor loading state for "Find similar"
@@ -144,16 +165,18 @@ export function Vendors() {
   function handleAdd() {
     if (!form.name.trim()) return;
     addVendor({
-      id:       `vendor-${Date.now()}`,
-      category: form.category,
-      name:     form.name,
-      contact:  form.contact  || undefined,
-      website:  form.website  || undefined,
-      price:    form.price    ? parseInt(form.price) : undefined,
-      notes:    form.notes    || undefined,
-      status:   "considering",
+      id:           `vendor-${Date.now()}`,
+      category:     form.category,
+      name:         form.name,
+      contact:      form.contact      || undefined,
+      website:      form.website      || undefined,
+      price:        form.price        ? parseInt(form.price) : undefined,
+      rentalPeriod: form.rentalPeriod || undefined,
+      overtimeRate: form.overtimeRate || undefined,
+      notes:        form.notes        || undefined,
+      status:       "considering",
     });
-    setForm({ category: "Venue", name: "", contact: "", website: "", price: "", notes: "" });
+    setForm({ category: "Venue", name: "", contact: "", website: "", price: "", rentalPeriod: "", overtimeRate: "", notes: "" });
     setAdding(false);
   }
 
@@ -271,6 +294,28 @@ export function Vendors() {
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
+            {form.category === "Venue" && (
+              <>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Rental period</label>
+                  <input
+                    value={form.rentalPeriod}
+                    onChange={(e) => setForm((f) => ({ ...f, rentalPeriod: e.target.value }))}
+                    placeholder="e.g. 6 hours, Full day"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Overtime rate</label>
+                  <input
+                    value={form.overtimeRate}
+                    onChange={(e) => setForm((f) => ({ ...f, overtimeRate: e.target.value }))}
+                    placeholder="e.g. $500/hr"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
+              </>
+            )}
           </div>
           <div className="flex gap-2">
             <button
@@ -357,7 +402,18 @@ export function Vendors() {
                       <p className="text-xs text-gray-400 mt-0.5">{vendor.contact}</p>
                     )}
                     {vendor.price && (
-                      <p className="text-xs text-gray-500 mt-0.5">Est. ${vendor.price.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Est. ${vendor.price.toLocaleString()}
+                        {vendor.rentalPeriod && <span className="text-gray-400"> &middot; {vendor.rentalPeriod}</span>}
+                        {vendor.overtimeRate && <span className="text-gray-400"> &middot; OT: {vendor.overtimeRate}</span>}
+                      </p>
+                    )}
+                    {!vendor.price && (vendor.rentalPeriod || vendor.overtimeRate) && (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {vendor.rentalPeriod && <span>{vendor.rentalPeriod}</span>}
+                        {vendor.rentalPeriod && vendor.overtimeRate && <span> &middot; </span>}
+                        {vendor.overtimeRate && <span>OT: {vendor.overtimeRate}</span>}
+                      </p>
                     )}
                     {vendor.notes && (
                       <p className="text-xs text-gray-400 mt-1 italic line-clamp-2">{vendor.notes}</p>

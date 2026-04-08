@@ -56,6 +56,8 @@ export interface Vendor {
   contact?: string;
   website?: string;
   price?: number;
+  rentalPeriod?: string;  // e.g. "6 hours", "Full day (12 hrs)" — venue rental window
+  overtimeRate?: string;  // e.g. "$500/hr" — cost beyond included period
   status: "considering" | "contacted" | "booked" | "rejected";
   notes?: string;
 }
