@@ -1,17 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { usePlanStore } from "@/lib/plan-store";
-import { Badge } from "@/components/ui/Badge";
 import type { Vendor } from "@/lib/types";
 import type { ResearchType } from "@/lib/research-prompts";
 
-const STATUS_VARIANTS: Record<Vendor["status"], "gray" | "yellow" | "green" | "red"> = {
-  considering: "gray",
-  contacted:   "yellow",
-  booked:      "green",
-  rejected:    "red",
+const STATUS_DOT: Record<Vendor["status"], string> = {
+  considering: "bg-gray-400",
+  contacted:   "bg-yellow-400",
+  booked:      "bg-green-500",
+  rejected:    "bg-red-400",
 };
+
+const TAGS = ["Toured", "Has Quote", "Priority", "Referred", "Waitlisted"] as const;
 
 const CATEGORIES = [
   "Venue", "Photography", "Catering", "Florist", "Music",
@@ -27,6 +28,96 @@ const CATEGORY_TO_RESEARCH: Partial<Record<string, ResearchType>> = {
   "Music":        "music",
   "Attire":       "dress",
 };
+
+// ── Combined status + tags selector ──────────────────────────────────────────
+
+function StatusTagsSelector({
+  vendor,
+  onUpdate,
+}: {
+  vendor: Vendor;
+  onUpdate: (updates: Partial<Vendor>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const tags = vendor.tags ?? [];
+
+  return (
+    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-[var(--accent)] transition-colors"
+      >
+        <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[vendor.status]}`} />
+        <span className="capitalize">{vendor.status}</span>
+        {tags.length > 0 && (
+          <span className="text-gray-400 font-normal">· {tags.join(", ")}</span>
+        )}
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-gray-400 ml-0.5">
+          <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 z-20 min-w-[170px]">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Status</p>
+          <div className="space-y-1.5 mb-3">
+            {(["considering", "contacted", "booked", "rejected"] as const).map((s) => (
+              <label key={s} className="flex items-center gap-2 cursor-pointer group">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[s]}`} />
+                <input
+                  type="radio"
+                  name={`status-${vendor.id}`}
+                  checked={vendor.status === s}
+                  onChange={() => onUpdate({ status: s })}
+                  className="sr-only"
+                />
+                <span className={`text-xs capitalize ${vendor.status === s ? "font-semibold text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
+                  {s}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tags</p>
+          <div className="space-y-1.5">
+            {TAGS.map((tag) => {
+              const active = tags.includes(tag);
+              return (
+                <label key={tag} className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    onChange={(e) => {
+                      const newTags = e.target.checked
+                        ? [...tags, tag]
+                        : tags.filter((t) => t !== tag);
+                      onUpdate({ tags: newTags });
+                    }}
+                    className="w-3 h-3 accent-[var(--accent)] cursor-pointer"
+                  />
+                  <span className={`text-xs ${active ? "font-semibold text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
+                    {tag}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Inline vendor edit form ───────────────────────────────────────────────────
 
@@ -47,6 +138,7 @@ function EditVendorForm({
     price:         vendor.price?.toString() ?? "",
     notes:         vendor.notes         ?? "",
     status:        vendor.status,
+    tags:          vendor.tags          ?? [] as string[],
     rentalPeriod:  vendor.rentalPeriod  ?? "",
     overtimeRate:  vendor.overtimeRate  ?? "",
   });
@@ -62,6 +154,7 @@ function EditVendorForm({
       price:        draft.price        ? parseInt(draft.price) : undefined,
       notes:        draft.notes        || undefined,
       status:       draft.status,
+      tags:         draft.tags.length  ? draft.tags : undefined,
       rentalPeriod: isVenue ? (draft.rentalPeriod || undefined) : undefined,
       overtimeRate: isVenue ? (draft.overtimeRate || undefined) : undefined,
     });
@@ -109,6 +202,31 @@ function EditVendorForm({
             <option value="booked">Booked</option>
             <option value="rejected">Rejected</option>
           </select>
+        </div>
+        <div className="col-span-2">
+          <label className="text-xs text-gray-500 mb-1.5 block">Tags</label>
+          <div className="flex flex-wrap gap-2">
+            {TAGS.map((tag) => {
+              const active = draft.tags.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setDraft((d) => ({
+                    ...d,
+                    tags: active ? d.tags.filter((t) => t !== tag) : [...d.tags, tag],
+                  }))}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    active
+                      ? "bg-[var(--accent)] text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
         </div>
         {isVenue && (
           <>
@@ -483,7 +601,6 @@ export function Vendors() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold text-gray-900">{vendor.name}</p>
-                      <Badge variant={STATUS_VARIANTS[vendor.status]}>{vendor.status}</Badge>
                     </div>
                     {vendor.website && (
                       <a
@@ -518,18 +635,10 @@ export function Vendors() {
                     className="flex flex-row sm:flex-col items-center sm:items-end gap-2 shrink-0"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={vendor.status}
-                        onChange={(e) => updateVendor(vendor.id, { status: e.target.value as Vendor["status"] })}
-                        className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[var(--accent)]"
-                      >
-                        <option value="considering">Considering</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="booked">Booked</option>
-                        <option value="rejected">Rejected</option>
-                      </select>
-                    </div>
+                    <StatusTagsSelector
+                      vendor={vendor}
+                      onUpdate={(updates) => updateVendor(vendor.id, updates)}
+                    />
 
                     <div className="flex items-center gap-2">
                       {canFindSimilar && (
