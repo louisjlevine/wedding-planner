@@ -87,21 +87,22 @@ function BudgetRow({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3">
-        {/* Name + Why? toggle */}
-        <div className="flex items-center gap-1 w-40 shrink-0">
-          <span className="text-sm font-medium text-gray-700">{cat.name}</span>
-          <button
-            onClick={() => setShowWhy((v) => !v)}
-            className="text-[10px] text-gray-400 hover:text-[#D4537E] transition-colors leading-none border border-gray-200 hover:border-[#D4537E] rounded px-1 py-0.5"
-            title="Show how this allocation was calculated"
-          >
-            {showWhy ? "hide" : "why?"}
-          </button>
-        </div>
+      {/* Line 1: category name + why? */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-gray-800 flex-1 min-w-0 truncate">{cat.name}</span>
+        <button
+          onClick={() => setShowWhy((v) => !v)}
+          className="text-[10px] text-gray-400 hover:text-[var(--accent)] transition-colors leading-none border border-gray-200 hover:border-[var(--accent)] rounded px-1.5 py-0.5 shrink-0"
+          title="Show how this allocation was calculated"
+        >
+          {showWhy ? "hide" : "why?"}
+        </button>
+      </div>
 
+      {/* Line 2: dollar | % | spent (pushed right) */}
+      <div className="flex items-center gap-4">
         {/* Dollar amount */}
-        <div className="flex items-center gap-1 min-w-[90px]">
+        <div className="flex items-center gap-1">
           <span className="text-xs text-gray-400">$</span>
           {editingAmt ? (
             <input
@@ -110,12 +111,12 @@ function BudgetRow({
               onChange={(e) => setDraftAmt(e.target.value)}
               onBlur={commitAmt}
               onKeyDown={(e) => { if (e.key === "Enter") commitAmt(); if (e.key === "Escape") { setEditingAmt(false); setDraftAmt(cat.amount.toString()); } }}
-              className="w-24 text-sm text-gray-900 border-b border-[#D4537E] outline-none bg-transparent"
+              className="w-20 text-sm text-gray-900 border-b border-[var(--accent)] outline-none bg-transparent"
             />
           ) : (
             <button
               onClick={() => setEditingAmt(true)}
-              className="text-sm text-gray-900 hover:text-[#D4537E] transition-colors tabular-nums"
+              className="text-sm font-medium text-gray-900 hover:text-[var(--accent)] transition-colors tabular-nums"
               title="Click to edit dollar amount"
             >
               {cat.amount.toLocaleString()}
@@ -124,7 +125,7 @@ function BudgetRow({
         </div>
 
         {/* Percentage */}
-        <div className="flex items-center gap-1 min-w-[58px]">
+        <div className="flex items-center gap-1">
           {editingPct ? (
             <input
               ref={pctRef}
@@ -132,12 +133,12 @@ function BudgetRow({
               onChange={(e) => setDraftPct(e.target.value)}
               onBlur={commitPct}
               onKeyDown={(e) => { if (e.key === "Enter") commitPct(); if (e.key === "Escape") { setEditingPct(false); setDraftPct(cat.percentage.toString()); } }}
-              className="w-12 text-sm text-gray-500 border-b border-[#D4537E] outline-none bg-transparent"
+              className="w-10 text-sm text-gray-500 border-b border-[var(--accent)] outline-none bg-transparent"
             />
           ) : (
             <button
               onClick={() => setEditingPct(true)}
-              className="text-sm text-gray-400 hover:text-[#D4537E] transition-colors tabular-nums"
+              className="text-sm text-gray-400 hover:text-[var(--accent)] transition-colors tabular-nums"
               title="Click to edit percentage"
             >
               {cat.percentage}%
@@ -145,10 +146,9 @@ function BudgetRow({
           )}
         </div>
 
-        {/* Spent */}
+        {/* Spent — pushed right */}
         <div className="flex items-center gap-1 ml-auto">
-          <span className="text-xs text-gray-400">spent</span>
-          <span className="text-xs text-gray-400">$</span>
+          <span className="text-xs text-gray-400">spent $</span>
           {editingSpent ? (
             <input
               ref={spentRef}
@@ -156,12 +156,12 @@ function BudgetRow({
               onChange={(e) => setDraftSpent(e.target.value)}
               onBlur={commitSpent}
               onKeyDown={(e) => { if (e.key === "Enter") commitSpent(); if (e.key === "Escape") { setEditingSpent(false); setDraftSpent(cat.spent.toString()); } }}
-              className="w-20 text-xs text-gray-700 border-b border-[#D4537E] outline-none bg-transparent"
+              className="w-16 text-xs text-gray-700 border-b border-[var(--accent)] outline-none bg-transparent"
             />
           ) : (
             <button
               onClick={() => setEditingSpent(true)}
-              className={`text-xs tabular-nums transition-colors hover:text-[#D4537E] ${isOver ? "text-red-500 font-semibold" : "text-gray-700"}`}
+              className={`text-xs tabular-nums transition-colors hover:text-[var(--accent)] ${isOver ? "text-red-500 font-semibold" : "text-gray-700"}`}
               title="Click to update amount spent"
             >
               {cat.spent.toLocaleString()}
@@ -174,12 +174,12 @@ function BudgetRow({
       {/* Progress bar */}
       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all ${isOver ? "bg-red-400" : "bg-[#D4537E]"}`}
+          className={`h-full rounded-full transition-all ${isOver ? "bg-red-400" : "bg-[var(--accent)]"}`}
           style={{ width: `${spentPct}%` }}
         />
       </div>
 
-      {cat.tip && <p className="text-xs text-[#D4537E]">{cat.tip}</p>}
+      {cat.tip && <p className="text-xs text-[var(--accent)]">{cat.tip}</p>}
 
       {showWhy && (
         <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5 text-xs text-gray-600 space-y-1">
@@ -191,7 +191,7 @@ function BudgetRow({
             <div key={i} className="flex items-center justify-between">
               <span className="text-gray-500">{adj.reason}</span>
               {adj.delta !== 0 && (
-                <span className={`tabular-nums font-medium ${adj.delta > 0 ? "text-[#D4537E]" : "text-blue-500"}`}>
+                <span className={`tabular-nums font-medium ${adj.delta > 0 ? "text-[var(--accent)]" : "text-blue-500"}`}>
                   {adj.delta > 0 ? "+" : ""}{adj.delta}%
                 </span>
               )}
@@ -237,7 +237,7 @@ export function Budget() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Budget</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            ${answers.budget.toLocaleString()} total &middot; click any amount or % to edit &middot; track spend per category
+            ${answers.budget.toLocaleString()} total &middot; click any value to edit
           </p>
         </div>
         {hasOverrides && (
@@ -250,7 +250,7 @@ export function Budget() {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <MetricCard label="Total budget" value={`$${answers.budget.toLocaleString()}`} />
         <MetricCard
           label="Spent so far"

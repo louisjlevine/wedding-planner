@@ -59,12 +59,12 @@ export function Tasks() {
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           placeholder="Add a task..."
-          className="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#D4537E] focus:ring-1 focus:ring-[#D4537E]"
+          className="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
         />
         <button
           onClick={handleAdd}
-          className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors"
+          className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
         >
           Add
         </button>
@@ -79,12 +79,12 @@ export function Tasks() {
           >
             <button
               onClick={() => toggleTask(task.id)}
-              className="mt-0.5 w-4 h-4 rounded border-2 border-gray-300 hover:border-[#D4537E] shrink-0 transition-colors"
+              className="mt-0.5 w-4 h-4 rounded border-2 border-gray-300 hover:border-[var(--accent)] shrink-0 transition-colors"
             />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900">{task.title}</p>
               {task.flag && (
-                <p className="text-xs text-[#D4537E] mt-0.5">{task.flag}</p>
+                <p className="text-xs text-[var(--accent)] mt-0.5">{task.flag}</p>
               )}
               <div className="flex items-center gap-2 mt-1">
                 <Badge variant={priorityVariant(task.priority)}>
@@ -128,7 +128,7 @@ export function Tasks() {
               >
                 <button
                   onClick={() => toggleTask(task.id)}
-                  className="w-4 h-4 rounded bg-[#D4537E] border-2 border-[#D4537E] shrink-0"
+                  className="w-4 h-4 rounded bg-[var(--accent)] border-2 border-[var(--accent)] shrink-0"
                 />
                 <p className="text-sm text-gray-400 line-through">{task.title}</p>
               </div>

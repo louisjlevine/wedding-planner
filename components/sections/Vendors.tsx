@@ -62,17 +62,17 @@ function EditVendorForm({
   }
 
   return (
-    <div className="bg-pink-50/30 border border-[#D4537E] rounded-xl px-5 py-4 space-y-3">
+    <div className="bg-[var(--accent)]/5 border border-[var(--accent)] rounded-xl px-5 py-4 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Name</label>
           <input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Category</label>
           <select value={draft.category} onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]">
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
             {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
           </select>
         </div>
@@ -80,24 +80,24 @@ function EditVendorForm({
           <label className="text-xs text-gray-500 mb-1 block">Contact</label>
           <input value={draft.contact} onChange={(e) => setDraft((d) => ({ ...d, contact: e.target.value }))}
             placeholder="email or phone"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Website</label>
           <input value={draft.website} onChange={(e) => setDraft((d) => ({ ...d, website: e.target.value }))}
             placeholder="https://..."
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Estimated price ($)</label>
           <input type="number" value={draft.price} onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))}
             placeholder="0"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Status</label>
           <select value={draft.status} onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value as Vendor["status"] }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]">
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
             <option value="considering">Considering</option>
             <option value="contacted">Contacted</option>
             <option value="booked">Booked</option>
@@ -109,11 +109,11 @@ function EditVendorForm({
         <label className="text-xs text-gray-500 mb-1 block">Notes</label>
         <textarea value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
           rows={2} placeholder="Any notes..."
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E] resize-none" />
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] resize-none" />
       </div>
       <div className="flex gap-2">
         <button onClick={commit}
-          className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors">
+          className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
           Save
         </button>
         <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
@@ -205,7 +205,7 @@ export function Vendors() {
         </div>
         <button
           onClick={() => setAdding(true)}
-          className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors"
+          className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
         >
           Add vendor
         </button>
@@ -220,7 +220,7 @@ export function Vendors() {
               <select
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
               >
                 {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
               </select>
@@ -231,7 +231,7 @@ export function Vendors() {
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Vendor name"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
             <div>
@@ -240,7 +240,7 @@ export function Vendors() {
                 value={form.contact}
                 onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))}
                 placeholder="email or phone"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
             <div>
@@ -249,7 +249,7 @@ export function Vendors() {
                 value={form.website}
                 onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
                 placeholder="https://..."
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
             <div>
@@ -259,7 +259,7 @@ export function Vendors() {
                 value={form.price}
                 onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
                 placeholder="0"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
             <div>
@@ -268,14 +268,14 @@ export function Vendors() {
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                 placeholder="Any notes..."
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleAdd}
-              className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors"
+              className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
             >
               Add
             </button>
@@ -290,8 +290,22 @@ export function Vendors() {
       )}
 
       {vendors.length === 0 && !adding && (
-        <div className="text-center py-12 text-gray-400">
-          <p className="text-sm">No vendors yet. Add your first one above.</p>
+        <div className="border-2 border-dashed border-gray-200 rounded-2xl py-16 flex flex-col items-center gap-3 text-center">
+          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-700">No vendors yet</p>
+            <p className="text-xs text-gray-400 mt-0.5">Add venues, photographers, caterers and more</p>
+          </div>
+          <button
+            onClick={() => setAdding(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            Add your first vendor
+          </button>
         </div>
       )}
 
@@ -320,7 +334,8 @@ export function Vendors() {
               return (
                 <div
                   key={vendor.id}
-                  className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex items-start justify-between gap-4"
+                  onClick={() => setEditingId(vendor.id)}
+                  className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 cursor-pointer hover:border-[var(--accent)]/50 hover:-translate-y-0.5 transition-all duration-150"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -328,8 +343,13 @@ export function Vendors() {
                       <Badge variant={STATUS_VARIANTS[vendor.status]}>{vendor.status}</Badge>
                     </div>
                     {vendor.website && (
-                      <a href={vendor.website} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-[#D4537E] hover:underline mt-0.5 block truncate">
+                      <a
+                        href={vendor.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs text-[var(--accent)] hover:underline mt-0.5 block truncate"
+                      >
                         {vendor.website.replace(/^https?:\/\//, "")}
                       </a>
                     )}
@@ -344,24 +364,25 @@ export function Vendors() {
                     )}
                   </div>
 
-                  <div className="flex flex-col items-end gap-2 shrink-0">
+                  <div
+                    className="flex flex-row sm:flex-col items-center sm:items-end gap-2 shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="flex items-center gap-2">
-                      <button onClick={() => setEditingId(vendor.id)}
-                        className="text-xs text-gray-400 hover:text-gray-700 transition-colors">
-                        edit
-                      </button>
                       <select
                         value={vendor.status}
                         onChange={(e) => updateVendor(vendor.id, { status: e.target.value as Vendor["status"] })}
-                        className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[#D4537E]"
+                        className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[var(--accent)]"
                       >
                         <option value="considering">Considering</option>
                         <option value="contacted">Contacted</option>
                         <option value="booked">Booked</option>
                         <option value="rejected">Rejected</option>
                       </select>
-                      <button onClick={() => removeVendor(vendor.id)}
-                        className="text-xs text-gray-300 hover:text-red-400 transition-colors">
+                      <button
+                        onClick={() => removeVendor(vendor.id)}
+                        className="text-xs text-gray-300 hover:text-red-400 transition-colors"
+                      >
                         remove
                       </button>
                     </div>
@@ -370,7 +391,7 @@ export function Vendors() {
                       <button
                         onClick={() => handleFindSimilar(vendor)}
                         disabled={isLoading}
-                        className="inline-flex items-center gap-1.5 text-xs text-gray-400 border border-gray-200 rounded-lg px-2.5 py-1 hover:border-[#D4537E] hover:text-[#D4537E] disabled:opacity-50 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-xs text-gray-400 border border-gray-200 rounded-lg px-2.5 py-1 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 transition-colors"
                       >
                         {isLoading ? (
                           <>

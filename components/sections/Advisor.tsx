@@ -29,7 +29,7 @@ const mdComponents: React.ComponentProps<typeof ReactMarkdown>["components"] = {
   hr: () => <hr className="my-3 border-gray-200" />,
   a: ({ href, children }) => (
     <a href={href} target="_blank" rel="noopener noreferrer"
-      className="text-[#D4537E] underline underline-offset-2 hover:text-[#bf4a70] transition-colors">
+      className="text-[var(--accent)] underline underline-offset-2 hover:text-[var(--accent)] transition-colors">
       {children}
     </a>
   ),
@@ -147,7 +147,7 @@ export function Advisor() {
         <div className="flex items-center gap-3 mt-1">
           {notes.length > 0 && (
             <button onClick={() => setNotesOpen((o) => !o)}
-              className="text-xs text-[#D4537E] border border-pink-200 rounded-lg px-2.5 py-1 hover:bg-pink-50 transition-colors">
+              className="text-xs text-[var(--accent)] border border-[var(--accent)]/30 rounded-lg px-2.5 py-1 hover:bg-[var(--accent)]/10 transition-colors">
               {notes.length} saved note{notes.length !== 1 ? "s" : ""}
             </button>
           )}
@@ -162,9 +162,9 @@ export function Advisor() {
 
       {/* Saved notes panel */}
       {notesOpen && notes.length > 0 && (
-        <div className="shrink-0 mb-4 border border-pink-200 rounded-xl bg-pink-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-pink-200">
-            <span className="text-xs font-semibold text-[#D4537E] uppercase tracking-wide">Saved Notes</span>
+        <div className="shrink-0 mb-4 border border-[var(--accent)]/30 rounded-xl bg-[var(--accent)]/10 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--accent)]/30">
+            <span className="text-xs font-semibold text-[var(--accent)] uppercase tracking-wide">Saved Notes</span>
             <button onClick={() => setNotesOpen(false)} className="text-xs text-gray-400 hover:text-gray-600">Close</button>
           </div>
           <div className="max-h-52 overflow-y-auto divide-y divide-pink-100">
@@ -210,7 +210,7 @@ export function Advisor() {
               <div className="flex flex-col gap-1 max-w-[82%]">
                 <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.role === "user"
-                    ? "bg-[#D4537E] text-white rounded-br-sm"
+                    ? "bg-[var(--accent)] text-white rounded-br-sm"
                     : "bg-white border border-gray-200 text-gray-800 rounded-bl-sm"
                 }`}>
                   {msg.content ? (
@@ -227,7 +227,7 @@ export function Advisor() {
                   <button
                     onClick={() => !isSaved && handleSave(i, msg.content)}
                     className={`self-start text-xs px-2 py-1 rounded transition-colors ${
-                      isSaved ? "text-[#D4537E] cursor-default" : "text-gray-400 hover:text-[#D4537E]"
+                      isSaved ? "text-[var(--accent)] cursor-default" : "text-gray-400 hover:text-[var(--accent)]"
                     }`}
                   >
                     {isSaved ? "Saved" : "Save note"}
@@ -243,7 +243,7 @@ export function Advisor() {
           <div className="flex flex-wrap gap-2 pt-1">
             {FOLLOW_UPS.map((s) => (
               <button key={s} onClick={() => sendMessage(s)}
-                className="px-3 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
+                className="px-3 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors">
                 {s}
               </button>
             ))}
@@ -262,10 +262,10 @@ export function Advisor() {
           onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
           placeholder="Ask anything about your wedding…"
           disabled={loading}
-          className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#D4537E] focus:ring-1 focus:ring-[#D4537E] disabled:opacity-50"
+          className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50"
         />
         <button onClick={() => sendMessage(input)} disabled={loading || !input.trim()}
-          className="px-4 py-2.5 bg-[#D4537E] text-white text-sm font-medium rounded-xl hover:bg-[#bf4a70] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+          className="px-4 py-2.5 bg-[var(--accent)] text-white text-sm font-medium rounded-xl hover:opacity-90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
           Send
         </button>
       </div>

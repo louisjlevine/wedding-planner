@@ -5,10 +5,13 @@ import { useState, useRef, useEffect } from "react";
 type State = "idle" | "open" | "submitting" | "success" | "error";
 
 export default function FeedbackWidget() {
+  const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<State>("idle");
   const [text, setText] = useState("");
   const [issueUrl, setIssueUrl] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (state === "open") {
@@ -51,6 +54,8 @@ export default function FeedbackWidget() {
     setIssueUrl(null);
     setText("");
   }
+
+  if (!mounted) return null;
 
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
@@ -115,7 +120,7 @@ export default function FeedbackWidget() {
                     href={issueUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-[#D4537E] underline underline-offset-2 hover:opacity-80"
+                    className="text-xs text-[var(--accent)] underline underline-offset-2 hover:opacity-80"
                   >
                     View issue
                   </a>
@@ -134,7 +139,7 @@ export default function FeedbackWidget() {
                 </p>
                 <button
                   onClick={() => setState("open")}
-                  className="rounded-lg bg-[#D4537E] px-4 py-2 text-xs font-medium text-white hover:opacity-90 transition-opacity"
+                  className="rounded-lg bg-[var(--accent)] px-4 py-2 text-xs font-medium text-white hover:opacity-90 transition-opacity"
                 >
                   Try again
                 </button>
@@ -149,7 +154,7 @@ export default function FeedbackWidget() {
                   rows={4}
                   maxLength={2000}
                   disabled={state === "submitting"}
-                  className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-[#D4537E] focus:ring-1 focus:ring-[#D4537E] disabled:opacity-50 transition-colors"
+                  className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50 transition-colors"
                 />
                 <div className="mt-3 flex items-center justify-between">
                   <span className="text-xs text-gray-400">
@@ -158,7 +163,7 @@ export default function FeedbackWidget() {
                   <button
                     onClick={submit}
                     disabled={!text.trim() || state === "submitting"}
-                    className="flex items-center gap-2 rounded-lg bg-[#D4537E] px-4 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
+                    className="flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
                   >
                     {state === "submitting" ? (
                       <>
@@ -198,7 +203,7 @@ export default function FeedbackWidget() {
       {/* Floating button */}
       <button
         onClick={() => (state === "idle" ? setState("open") : reset())}
-        className="flex items-center gap-2 rounded-full bg-[#D4537E] px-4 py-2.5 text-sm font-medium text-white shadow-lg hover:opacity-90 active:scale-95 transition-all"
+        className="flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white shadow-lg hover:opacity-90 active:scale-95 transition-all"
         aria-label="Send feedback"
       >
         <svg

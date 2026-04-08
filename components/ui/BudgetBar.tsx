@@ -22,13 +22,13 @@ export function BudgetBar({ label, amount, spent, percentage, tip }: BudgetBarPr
       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all ${
-            isOver ? "bg-red-500" : "bg-[#D4537E]"
+            isOver ? "bg-red-500" : "bg-[var(--accent)]"
           }`}
           style={{ width: `${spentPct}%` }}
         />
       </div>
       {tip && (
-        <p className="text-xs text-[#D4537E]">{tip}</p>
+        <p className="text-xs text-[var(--accent)]">{tip}</p>
       )}
     </div>
   );

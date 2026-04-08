@@ -53,7 +53,7 @@ const mdComponents: React.ComponentProps<typeof ReactMarkdown>["components"] = {
   hr: () => <hr className="my-3 border-gray-100" />,
   a: ({ href, children }) => (
     <a href={href} target="_blank" rel="noopener noreferrer"
-      className="text-[#D4537E] underline underline-offset-2 hover:text-[#bf4a70] transition-colors">
+      className="text-[var(--accent)] underline underline-offset-2 hover:text-[var(--accent)] transition-colors">
       {children}
     </a>
   ),
@@ -185,7 +185,7 @@ export function ResearchCard({ type, title, description, answers }: ResearchCard
           {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
           <button
             onClick={fetchResearch}
-            className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors"
+            className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
           >
             {error ? "Try again" : "Get Research"}
           </button>
@@ -195,7 +195,7 @@ export function ResearchCard({ type, title, description, answers }: ResearchCard
       {/* Loading */}
       {loading && (
         <div className="p-5 flex items-center gap-2 text-sm text-gray-500">
-          <div className="w-4 h-4 border-2 border-[#D4537E] border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
           Researching...
         </div>
       )}
@@ -215,8 +215,8 @@ export function ResearchCard({ type, title, description, answers }: ResearchCard
               onClick={() => setChatOpen((o) => !o)}
               className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
                 chatOpen
-                  ? "bg-[#D4537E] text-white border-[#D4537E]"
-                  : "text-gray-600 border-gray-200 hover:border-[#D4537E] hover:text-[#D4537E]"
+                  ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                  : "text-gray-600 border-gray-200 hover:border-[var(--accent)] hover:text-[var(--accent)]"
               }`}
             >
               {chatOpen ? "Close chat" : "Ask a follow-up"}
@@ -228,7 +228,7 @@ export function ResearchCard({ type, title, description, answers }: ResearchCard
                 className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
                   vendorFormOpen
                     ? "bg-gray-100 text-gray-700 border-gray-200"
-                    : "text-gray-600 border-gray-200 hover:border-[#D4537E] hover:text-[#D4537E]"
+                    : "text-gray-600 border-gray-200 hover:border-[var(--accent)] hover:text-[var(--accent)]"
                 }`}
               >
                 Add to vendors
@@ -256,12 +256,12 @@ export function ResearchCard({ type, title, description, answers }: ResearchCard
                 onKeyDown={(e) => e.key === "Enter" && handleAddVendor()}
                 placeholder={`${VENDOR_CATEGORY[type]} name...`}
                 autoFocus
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]"
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
               />
               <button
                 onClick={handleAddVendor}
                 disabled={!vendorName.trim()}
-                className="px-3 py-2 bg-[#D4537E] text-white text-sm rounded-lg hover:bg-[#bf4a70] disabled:opacity-40 transition-colors"
+                className="px-3 py-2 bg-[var(--accent)] text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-40 transition-colors"
               >
                 Save
               </button>
@@ -285,7 +285,7 @@ export function ResearchCard({ type, title, description, answers }: ResearchCard
                       <div
                         className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
                           msg.role === "user"
-                            ? "bg-[#D4537E] text-white"
+                            ? "bg-[var(--accent)] text-white"
                             : "bg-white border border-gray-200 text-gray-800"
                         }`}
                       >
@@ -318,7 +318,7 @@ export function ResearchCard({ type, title, description, answers }: ResearchCard
                     <button
                       key={s}
                       onClick={() => sendChat(s)}
-                      className="text-xs px-3 py-1.5 border border-gray-200 bg-white rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors"
+                      className="text-xs px-3 py-1.5 border border-gray-200 bg-white rounded-lg text-gray-600 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
                     >
                       {s}
                     </button>
@@ -334,12 +334,12 @@ export function ResearchCard({ type, title, description, answers }: ResearchCard
                   onKeyDown={(e) => e.key === "Enter" && sendChat(chatInput)}
                   placeholder="Ask a follow-up question..."
                   disabled={chatLoading}
-                  className="flex-1 border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E] disabled:opacity-50"
+                  className="flex-1 border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] disabled:opacity-50"
                 />
                 <button
                   onClick={() => sendChat(chatInput)}
                   disabled={chatLoading || !chatInput.trim()}
-                  className="px-3 py-2 bg-[#D4537E] text-white text-sm rounded-lg hover:bg-[#bf4a70] disabled:opacity-40 transition-colors"
+                  className="px-3 py-2 bg-[var(--accent)] text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-40 transition-colors"
                 >
                   Ask
                 </button>

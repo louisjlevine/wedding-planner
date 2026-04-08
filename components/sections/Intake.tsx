@@ -105,7 +105,7 @@ function ProgressBar({ step }: { step: number }) {
         <div
           key={i}
           className={`flex-1 h-1 rounded-full transition-all ${
-            i <= step ? "bg-[#D4537E]" : "bg-gray-200"
+            i <= step ? "bg-[var(--accent)]" : "bg-gray-100"
           }`}
         />
       ))}
@@ -197,10 +197,13 @@ export function Intake() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 w-full max-w-lg p-8">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm w-full max-w-lg p-8 animate-fade-in">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Wedding Planner</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[var(--accent)] mb-2">
+            Wedding Planner
+          </p>
+          <h1 className="text-2xl font-bold text-gray-900">Let&apos;s plan your day</h1>
+          <p className="text-sm text-gray-500 mt-1">
             Tell us about your wedding so we can personalise everything.
           </p>
         </div>
@@ -222,7 +225,7 @@ export function Intake() {
               value={partnerName}
               onChange={(e) => setPartnerName(e.target.value)}
               placeholder="e.g. Alex"
-              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#D4537E] focus:ring-1 focus:ring-[#D4537E]"
+              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
               onKeyDown={(e) => e.key === "Enter" && canProceed && next()}
               autoFocus
             />
@@ -246,8 +249,8 @@ export function Intake() {
                   onClick={() => setSeason(value)}
                   className={`px-4 py-3 rounded-lg text-sm border transition-all text-left ${
                     season === value
-                      ? "bg-[#D4537E] text-white border-[#D4537E]"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-[#D4537E]"
+                      ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]"
                   }`}
                 >
                   <div className="font-medium">{value}</div>
@@ -262,7 +265,7 @@ export function Intake() {
               <select
                 value={year}
                 onChange={(e) => setYear(Number(e.target.value))}
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:border-[#D4537E] focus:ring-1 focus:ring-[#D4537E]"
+                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
               >
                 {[0, 1, 2, 3].map((offset) => {
                   const y = new Date().getFullYear() + offset;
@@ -270,7 +273,7 @@ export function Intake() {
                 })}
               </select>
             </div>
-            <p className="text-xs text-[#D4537E] mt-3">
+            <p className="text-xs text-[var(--accent)] mt-3">
               Planning for {season} {year} — roughly {seasonToDate(season, year).slice(0, 7)}
             </p>
           </div>
@@ -291,7 +294,7 @@ export function Intake() {
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="e.g. Tuscany, Italy or Nashville, TN"
-              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#D4537E] focus:ring-1 focus:ring-[#D4537E]"
+              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
               onKeyDown={(e) => e.key === "Enter" && canProceed && next()}
               autoFocus
             />
@@ -314,12 +317,12 @@ export function Intake() {
               onChange={(e) => setGuestCount(e.target.value)}
               placeholder="e.g. 120"
               min="1"
-              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#D4537E] focus:ring-1 focus:ring-[#D4537E]"
+              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
               onKeyDown={(e) => e.key === "Enter" && canProceed && next()}
               autoFocus
             />
             {parseInt(guestCount) < 50 && parseInt(guestCount) > 0 && (
-              <p className="text-xs text-[#D4537E] mt-2">
+              <p className="text-xs text-[var(--accent)] mt-2">
                 Intimate wedding — you&apos;ll have more flexibility with venues.
               </p>
             )}
@@ -341,8 +344,8 @@ export function Intake() {
                   onClick={() => setBudget(range.value)}
                   className={`w-full px-4 py-3 rounded-lg text-sm border transition-all flex items-center justify-between ${
                     budget === range.value
-                      ? "bg-[#D4537E] text-white border-[#D4537E]"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-[#D4537E]"
+                      ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]"
                   }`}
                 >
                   <span className="font-medium">{range.label}</span>
@@ -353,7 +356,7 @@ export function Intake() {
               ))}
             </div>
             {budget !== null && budget >= 100_000 && (
-              <p className="text-xs text-[#D4537E] mt-3">
+              <p className="text-xs text-[var(--accent)] mt-3">
                 Luxury budget — we&apos;ll include premium vendor suggestions.
               </p>
             )}
@@ -377,8 +380,8 @@ export function Intake() {
                   onClick={() => toggleVibe(value)}
                   className={`px-4 py-2.5 rounded-lg text-sm font-medium border transition-all ${
                     vibe.includes(value)
-                      ? "bg-[#D4537E] text-white border-[#D4537E]"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-[#D4537E]"
+                      ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]"
                   }`}
                 >
                   {label}
@@ -408,10 +411,10 @@ export function Intake() {
                     onClick={() => !disabled && togglePriority(value)}
                     className={`px-4 py-2.5 rounded-lg text-sm font-medium border transition-all ${
                       selected
-                        ? "bg-[#D4537E] text-white border-[#D4537E]"
+                        ? "bg-[var(--accent)] text-white border-[var(--accent)]"
                         : disabled
                         ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
-                        : "bg-white text-gray-700 border-gray-200 hover:border-[#D4537E]"
+                        : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]"
                     }`}
                   >
                     {label}
@@ -442,8 +445,8 @@ export function Intake() {
                   onClick={() => setSetting(value)}
                   className={`px-4 py-3 rounded-lg text-sm border transition-all text-left ${
                     setting === value
-                      ? "bg-[#D4537E] text-white border-[#D4537E]"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-[#D4537E]"
+                      ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]"
                   }`}
                 >
                   <div className="font-medium">{label}</div>
@@ -458,7 +461,7 @@ export function Intake() {
               ))}
             </div>
             {(setting === "outdoor" || setting === "mixed") && (
-              <p className="text-xs text-[#D4537E] mt-3">
+              <p className="text-xs text-[var(--accent)] mt-3">
                 We&apos;ll add weather contingency tasks to your plan.
               </p>
             )}
@@ -482,8 +485,8 @@ export function Intake() {
                   onClick={() => setFunding(value)}
                   className={`w-full px-4 py-3 rounded-lg text-sm font-medium border transition-all text-left ${
                     funding === value
-                      ? "bg-[#D4537E] text-white border-[#D4537E]"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-[#D4537E]"
+                      ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]"
                   }`}
                 >
                   {label}
@@ -510,8 +513,8 @@ export function Intake() {
                   onClick={() => toggleStress(value)}
                   className={`px-4 py-2.5 rounded-lg text-sm font-medium border transition-all text-left ${
                     stress.includes(value)
-                      ? "bg-[#D4537E] text-white border-[#D4537E]"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-[#D4537E]"
+                      ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]"
                   }`}
                 >
                   {label}
@@ -536,7 +539,7 @@ export function Intake() {
             <button
               onClick={next}
               disabled={!canProceed}
-              className="px-6 py-2.5 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center px-6 py-2.5 rounded-lg bg-[var(--accent)] text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Continue
             </button>
@@ -544,7 +547,7 @@ export function Intake() {
             <button
               onClick={finish}
               disabled={!canProceed}
-              className="px-6 py-2.5 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center px-6 py-2.5 rounded-lg bg-[var(--accent)] text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Let&apos;s go
             </button>

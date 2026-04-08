@@ -38,18 +38,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 w-full max-w-sm">
-        <h1 className="text-xl font-semibold text-gray-900 mb-1">
-          Wedding Planner
-        </h1>
-        <p className="text-sm text-gray-500 mb-6">
-          Sign in to access your planning dashboard.
-        </p>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 w-full max-w-sm animate-fade-in">
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[var(--accent)] mb-2">
+            Wedding Planner
+          </p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Welcome back</h1>
+          <p className="text-sm text-gray-500">
+            Sign in to access your planning dashboard.
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
               Username
             </label>
             <input
@@ -59,11 +62,11 @@ export default function LoginPage() {
               required
               autoComplete="username"
               autoFocus
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D4537E] focus:border-transparent"
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition-shadow"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1.5">
               Password
             </label>
             <input
@@ -72,7 +75,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D4537E] focus:border-transparent"
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition-shadow"
             />
           </div>
 
@@ -81,7 +84,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 text-sm font-medium text-white bg-[#D4537E] rounded-lg hover:bg-[#C04470] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full inline-flex items-center justify-center py-2.5 px-6 rounded-lg bg-[var(--accent)] text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>

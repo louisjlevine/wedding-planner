@@ -24,7 +24,7 @@ const mdComponents: React.ComponentProps<typeof ReactMarkdown>["components"] = {
   hr: () => <hr className="my-3 border-gray-100" />,
   a: ({ href, children }) => (
     <a href={href} target="_blank" rel="noopener noreferrer"
-      className="text-[#D4537E] underline underline-offset-2 hover:text-[#bf4a70] transition-colors break-all">
+      className="text-[var(--accent)] underline underline-offset-2 hover:text-[var(--accent)] transition-colors break-all">
       {children}
     </a>
   ),
@@ -109,39 +109,39 @@ function RecommendationCard({
 
   if (editing) {
     return (
-      <div className="border border-[#D4537E] rounded-xl p-4 space-y-3 bg-pink-50/30">
+      <div className="border border-[var(--accent)] rounded-xl p-4 space-y-3 bg-[var(--accent)]/5">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-gray-500 mb-1 block font-medium">Name</label>
             <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block font-medium">Price range</label>
             <input value={draft.priceRange ?? ""} onChange={(e) => setDraft({ ...draft, priceRange: e.target.value })}
               placeholder="e.g. $5,000–$8,000"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
           </div>
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block font-medium">Website</label>
           <input value={draft.website ?? ""} onChange={(e) => setDraft({ ...draft, website: e.target.value })}
             placeholder="https://..."
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block font-medium">Description</label>
           <textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-            rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E] resize-none" />
+            rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] resize-none" />
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block font-medium">Why it fits</label>
           <textarea value={draft.why} onChange={(e) => setDraft({ ...draft, why: e.target.value })}
-            rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E] resize-none" />
+            rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] resize-none" />
         </div>
         <div className="flex gap-2">
           <button onClick={saveEdit}
-            className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors">
+            className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
             Save
           </button>
           <button onClick={() => { setDraft({ ...rec }); setEditing(false); }}
@@ -181,7 +181,7 @@ function RecommendationCard({
           </div>
           {rec.website && (
             <a href={rec.website} target="_blank" rel="noopener noreferrer"
-              className="text-xs text-[#D4537E] hover:underline mt-0.5 block truncate">
+              className="text-xs text-[var(--accent)] hover:underline mt-0.5 block truncate">
               {rec.website.replace(/^https?:\/\//, "")}
             </a>
           )}
@@ -198,14 +198,14 @@ function RecommendationCard({
         </div>
       </div>
       <p className="text-sm text-gray-600 mb-2">{rec.description}</p>
-      <p className="text-xs text-[#D4537E] italic">{rec.why}</p>
+      <p className="text-xs text-[var(--accent)] italic">{rec.why}</p>
       {vendorCategory && (
         <div className="mt-3 pt-3 border-t border-gray-100">
           {addedToVendors ? (
             <span className="text-xs text-green-600">Added to vendors</span>
           ) : (
             <button onClick={handleAddVendor}
-              className="text-xs text-gray-400 hover:text-[#D4537E] transition-colors">
+              className="text-xs text-gray-400 hover:text-[var(--accent)] transition-colors">
               + Add to vendors
             </button>
           )}
@@ -331,7 +331,7 @@ function ResearchPanel({ type, label, vendorCategory, answers }: {
           onChange={(e) => setResearchNotes(type, e.target.value)}
           placeholder={`Any specifics for your ${label.toLowerCase()} search? Budget range, style preferences, things you've already ruled out…`}
           rows={3}
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#D4537E] focus:ring-1 focus:ring-[#D4537E] resize-none"
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] resize-none"
         />
       </div>
 
@@ -340,7 +340,7 @@ function ResearchPanel({ type, label, vendorCategory, answers }: {
         <button
           onClick={fetchRecommendations}
           disabled={loadingRecs}
-          className="px-5 py-2.5 bg-[#D4537E] text-white text-sm font-medium rounded-xl hover:bg-[#bf4a70] disabled:opacity-50 transition-colors flex items-center gap-2"
+          className="px-5 py-2.5 bg-[var(--accent)] text-white text-sm font-medium rounded-xl hover:opacity-90 disabled:opacity-50 transition-colors flex items-center gap-2"
         >
           {loadingRecs && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           {hasRecs ? "Refresh recommendations" : "Get recommendations"}
@@ -411,7 +411,7 @@ function ResearchPanel({ type, label, vendorCategory, answers }: {
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
                   msg.role === "user"
-                    ? "bg-[#D4537E] text-white"
+                    ? "bg-[var(--accent)] text-white"
                     : "bg-gray-50 border border-gray-200 text-gray-800"
                 }`}>
                   {msg.role === "assistant" ? (
@@ -435,7 +435,7 @@ function ResearchPanel({ type, label, vendorCategory, answers }: {
           <div className="px-4 py-3 flex flex-wrap gap-2 bg-white border-b border-gray-100">
             {starters.map((s) => (
               <button key={s} onClick={() => sendChat(s)}
-                className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors bg-white">
+                className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors bg-white">
                 {s}
               </button>
             ))}
@@ -450,10 +450,10 @@ function ResearchPanel({ type, label, vendorCategory, answers }: {
             onKeyDown={(e) => e.key === "Enter" && sendChat(chatInput)}
             placeholder={`Ask anything about ${label.toLowerCase()}…`}
             disabled={chatLoading}
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E] disabled:opacity-50"
+            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] disabled:opacity-50"
           />
           <button onClick={() => sendChat(chatInput)} disabled={chatLoading || !chatInput.trim()}
-            className="px-4 py-2 bg-[#D4537E] text-white text-sm rounded-lg hover:bg-[#bf4a70] disabled:opacity-40 transition-colors">
+            className="px-4 py-2 bg-[var(--accent)] text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-40 transition-colors">
             Ask
           </button>
         </div>
@@ -500,7 +500,7 @@ export function Research() {
                 onClick={() => setActiveType(type)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
                   activeType === type
-                    ? "bg-pink-50 text-[#D4537E] font-medium"
+                    ? "bg-[var(--accent)]/10 text-[var(--accent)] font-medium"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
@@ -508,7 +508,7 @@ export function Research() {
                 <span className="flex-1 truncate">{label}</span>
                 {hasActivity && (
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    hasRecs ? "bg-[#D4537E]" : "bg-gray-300"
+                    hasRecs ? "bg-[var(--accent)]" : "bg-gray-300"
                   }`} />
                 )}
               </button>

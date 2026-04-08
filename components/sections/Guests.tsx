@@ -165,22 +165,22 @@ function EditGuestForm({
   });
 
   return (
-    <div className="bg-pink-50/30 border border-[#D4537E] rounded-xl px-5 py-4 space-y-3">
+    <div className="bg-[var(--accent)]/5 border border-[var(--accent)] rounded-xl px-5 py-4 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Name</label>
           <input value={d.name} onChange={(e) => setD((x) => ({ ...x, name: e.target.value }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Email</label>
           <input type="email" value={d.email} onChange={(e) => setD((x) => ({ ...x, email: e.target.value }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Relationship</label>
           <select value={d.relationship} onChange={(e) => setD((x) => ({ ...x, relationship: e.target.value as GuestRelationship }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]">
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
             <option value="">— unset —</option>
             {RELATIONSHIPS.map((r) => <option key={r} value={r}>{RELATIONSHIP_LABELS[r]}</option>)}
           </select>
@@ -188,7 +188,7 @@ function EditGuestForm({
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Location</label>
           <select value={d.guestLocation} onChange={(e) => setD((x) => ({ ...x, guestLocation: e.target.value as GuestLocation }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]">
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
             <option value="">— unset —</option>
             {LOCATIONS.map((l) => <option key={l} value={l}>{LOCATION_LABELS[l]}</option>)}
           </select>
@@ -196,7 +196,7 @@ function EditGuestForm({
         <div>
           <label className="text-xs text-gray-500 mb-1 block">RSVP</label>
           <select value={d.rsvp} onChange={(e) => setD((x) => ({ ...x, rsvp: e.target.value as Guest["rsvp"] }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]">
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
             <option value="pending">Pending</option>
             <option value="yes">Yes</option>
             <option value="no">No</option>
@@ -206,19 +206,19 @@ function EditGuestForm({
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Table</label>
           <input value={d.table} onChange={(e) => setD((x) => ({ ...x, table: e.target.value }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Dietary</label>
           <input value={d.dietary} onChange={(e) => setD((x) => ({ ...x, dietary: e.target.value }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
       </div>
       <div>
         <label className="text-xs text-gray-500 mb-1 block">Address</label>
         <input value={d.address} onChange={(e) => setD((x) => ({ ...x, address: e.target.value }))}
           placeholder="123 Main St, Denver CO 80202"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
       </div>
       <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" checked={d.plusOne} onChange={(e) => setD((x) => ({ ...x, plusOne: e.target.checked }))}
@@ -237,7 +237,7 @@ function EditGuestForm({
           table:         d.table    || undefined,
           rsvp:          d.rsvp,
         })}
-          className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors">
+          className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
           Save
         </button>
         <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
@@ -386,7 +386,7 @@ export function Guests() {
             Download template
           </button>
           <button onClick={() => csvInputRef.current?.click()}
-            className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
+            className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors">
             Import CSV
           </button>
           {guests.length > 0 && (
@@ -396,11 +396,11 @@ export function Guests() {
             </button>
           )}
           <button onClick={() => vcfInputRef.current?.click()}
-            className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
+            className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors">
             Import vCard
           </button>
           <button onClick={() => setAdding(true)}
-            className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors">
+            className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
             Add guest
           </button>
         </div>
@@ -417,9 +417,9 @@ export function Guests() {
           </div>
         ))}
         {guests.length > 0 && (
-          <div className="bg-pink-50 border border-pink-200 rounded-xl p-4 text-center">
-            <p className="text-2xl font-bold text-[#D4537E]">{estimated}</p>
-            <p className="text-xs text-[#D4537E]/70 mt-0.5">Est. attending</p>
+          <div className="bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-[var(--accent)]">{estimated}</p>
+            <p className="text-xs text-[var(--accent)]/70 mt-0.5">Est. attending</p>
           </div>
         )}
       </div>
@@ -491,18 +491,18 @@ export function Guests() {
               <label className="text-xs text-gray-500 mb-1 block">Name *</label>
               <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Full name"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
             </div>
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Email</label>
               <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 placeholder="email@example.com"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
             </div>
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Relationship</label>
               <select value={form.relationship} onChange={(e) => setForm((f) => ({ ...f, relationship: e.target.value as GuestRelationship }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]">
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
                 <option value="">— unset —</option>
                 {RELATIONSHIPS.map((r) => <option key={r} value={r}>{RELATIONSHIP_LABELS[r]}</option>)}
               </select>
@@ -510,7 +510,7 @@ export function Guests() {
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Location</label>
               <select value={form.guestLocation} onChange={(e) => setForm((f) => ({ ...f, guestLocation: e.target.value as GuestLocation }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]">
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
                 <option value="">— unset —</option>
                 {LOCATIONS.map((l) => <option key={l} value={l}>{LOCATION_LABELS[l]}</option>)}
               </select>
@@ -519,20 +519,20 @@ export function Guests() {
               <label className="text-xs text-gray-500 mb-1 block">Table</label>
               <input value={form.table} onChange={(e) => setForm((f) => ({ ...f, table: e.target.value }))}
                 placeholder="Table name/number"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
             </div>
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Dietary needs</label>
               <input value={form.dietary} onChange={(e) => setForm((f) => ({ ...f, dietary: e.target.value }))}
                 placeholder="e.g. vegetarian"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
             </div>
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Address</label>
             <input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
               placeholder="123 Main St, Denver CO 80202"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D4537E]" />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
           </div>
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input type="checkbox" checked={form.plusOne} onChange={(e) => setForm((f) => ({ ...f, plusOne: e.target.checked }))}
@@ -541,7 +541,7 @@ export function Guests() {
           </label>
           <div className="flex gap-2">
             <button onClick={handleAdd}
-              className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors">
+              className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
               Add
             </button>
             <button onClick={() => setAdding(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
@@ -552,9 +552,37 @@ export function Guests() {
       )}
 
       {guests.length === 0 && !adding && (
-        <div className="text-center py-12 text-gray-400">
-          <p className="text-sm">No guests yet. Add manually or import a CSV / vCard file.</p>
-          <p className="text-xs mt-1 text-gray-300">CSV columns: name, email, address, relationship, location, plusone, dietary, table</p>
+        <div className="border-2 border-dashed border-gray-200 rounded-2xl py-16 flex flex-col items-center gap-3 text-center">
+          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-700">No guests yet</p>
+            <p className="text-xs text-gray-400 mt-0.5">Add guests manually or import a CSV / vCard file</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-center">
+            <button
+              onClick={() => csvInputRef.current?.click()}
+              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
+            >
+              Import CSV
+            </button>
+            <button
+              onClick={() => vcfInputRef.current?.click()}
+              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
+            >
+              Import vCard
+            </button>
+            <button
+              onClick={() => setAdding(true)}
+              className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
+            >
+              Add your first guest
+            </button>
+          </div>
+          <p className="text-xs text-gray-300 mt-1">CSV columns: name, email, address, relationship, location, plusone, dietary, table</p>
         </div>
       )}
 
@@ -608,7 +636,7 @@ export function Guests() {
                   edit
                 </button>
                 <select value={guest.rsvp} onChange={(e) => updateGuest(guest.id, { rsvp: e.target.value as Guest["rsvp"] })}
-                  className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[#D4537E]">
+                  className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[var(--accent)]">
                   <option value="pending">Pending</option>
                   <option value="yes">Yes</option>
                   <option value="no">No</option>
