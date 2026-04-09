@@ -786,7 +786,7 @@ export function Guests() {
                       <td className="text-gray-300">{RELATIONSHIP_LABELS[r]}</td>
                       {LOCATIONS.map((l) => (
                         <td key={l} className="text-center font-semibold">
-                          {Math.round({ family: { local: 0.95, out_of_town: 0.75 }, close_friend: { local: 0.90, out_of_town: 0.65 }, friend: { local: 0.75, out_of_town: 0.45 }, acquaintance: { local: 0.50, out_of_town: 0.25 } }[r][l] * 100)}%
+                          {Math.round({ family: { local: 1.00, out_of_town: 0.85 }, close_friend: { local: 1.00, out_of_town: 0.75 }, friend: { local: 0.75, out_of_town: 0.45 }, acquaintance: { local: 0.50, out_of_town: 0.25 } }[r][l] * 100)}%
                         </td>
                       ))}
                     </tr>

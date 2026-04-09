@@ -3,8 +3,8 @@ import type { Guest, GuestRelationship, GuestLocation } from "./types";
 // ── Attendance probability table ──────────────────────────────────────────────
 
 const PROB: Record<GuestRelationship, Record<GuestLocation, number>> = {
-  family:       { local: 0.95, out_of_town: 0.75 },
-  close_friend: { local: 0.90, out_of_town: 0.65 },
+  family:       { local: 1.00, out_of_town: 0.85 },
+  close_friend: { local: 1.00, out_of_town: 0.75 },
   friend:       { local: 0.75, out_of_town: 0.45 },
   acquaintance: { local: 0.50, out_of_town: 0.25 },
 };

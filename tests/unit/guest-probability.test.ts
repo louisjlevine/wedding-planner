@@ -21,20 +21,20 @@ function makeGuest(overrides: Partial<Guest> = {}): Guest {
 // ── getBaseProbability ────────────────────────────────────────────────────────
 
 describe("getBaseProbability", () => {
-  it("returns 0.95 for local family", () => {
-    expect(getBaseProbability(makeGuest({ relationship: "family", guestLocation: "local" }))).toBe(0.95);
+  it("returns 1.00 for local family", () => {
+    expect(getBaseProbability(makeGuest({ relationship: "family", guestLocation: "local" }))).toBe(1.00);
   });
 
-  it("returns 0.75 for out-of-town family", () => {
-    expect(getBaseProbability(makeGuest({ relationship: "family", guestLocation: "out_of_town" }))).toBe(0.75);
+  it("returns 0.85 for out-of-town family", () => {
+    expect(getBaseProbability(makeGuest({ relationship: "family", guestLocation: "out_of_town" }))).toBe(0.85);
   });
 
-  it("returns 0.90 for local close friend", () => {
-    expect(getBaseProbability(makeGuest({ relationship: "close_friend", guestLocation: "local" }))).toBe(0.90);
+  it("returns 1.00 for local close friend", () => {
+    expect(getBaseProbability(makeGuest({ relationship: "close_friend", guestLocation: "local" }))).toBe(1.00);
   });
 
-  it("returns 0.65 for out-of-town close friend", () => {
-    expect(getBaseProbability(makeGuest({ relationship: "close_friend", guestLocation: "out_of_town" }))).toBe(0.65);
+  it("returns 0.75 for out-of-town close friend", () => {
+    expect(getBaseProbability(makeGuest({ relationship: "close_friend", guestLocation: "out_of_town" }))).toBe(0.75);
   });
 
   it("returns 0.75 for local friend", () => {
@@ -73,8 +73,8 @@ describe("guestExpectedCount", () => {
 
   it("'maybe' reduces expected count to p * 0.5", () => {
     const g = makeGuest({ rsvp: "maybe", relationship: "family", guestLocation: "local" });
-    // p = 0.95, factor = 0.95 * 0.5 = 0.475
-    expect(guestExpectedCount(g)).toBeCloseTo(0.475);
+    // p = 1.00, factor = 1.00 * 0.5 = 0.5
+    expect(guestExpectedCount(g)).toBeCloseTo(0.5);
   });
 
   it("'pending' uses base probability as factor", () => {
