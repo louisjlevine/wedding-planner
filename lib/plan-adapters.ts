@@ -149,6 +149,59 @@ const BUDGET_BASELINES: Record<string, number> = {
   misc: 5,
 };
 
+function buildCategoryTip(
+  id: string,
+  scaledPct: number,
+  total: number,
+  answers: WeddingAnswers,
+  adjustments: AdaptiveAdjustment[]
+): string {
+  const amount = Math.round((scaledPct / 100) * total);
+  const fmt = (n: number) => n.toLocaleString();
+  const guests = answers.guestCount;
+  const perGuest = guests > 0 ? Math.round(amount / guests) : 0;
+  const isLuxury = total >= 100_000;
+  const isPriority = (p: string) => answers.priorities.includes(p as WeddingAnswers["priorities"][number]);
+  const adjustmentNote = adjustments.length > 0
+    ? ` (${adjustments.map((a) => a.reason.toLowerCase()).join("; ")})`
+    : "";
+
+  switch (id) {
+    case "venue":
+      return `$${fmt(amount)} covers ceremony and reception space, tables, chairs, and basic venue setup for ${guests} guests. Look for all-in-one venues that bundle catering exclusivity or in-house setup to maximize value.${isPriority("venue") ? " Venue is a top priority — shortlist early and visit in person before committing." : ""}`;
+
+    case "catering":
+      return `$${fmt(amount)} covers food, beverages, service staff, and gratuity for ${guests} guests — roughly $${fmt(perGuest)}/person${adjustmentNote}. This typically includes passed appetizers during cocktail hour, a plated or buffet dinner, and a bar package. Confirm whether the venue charges a corkage or cake-cutting fee on top.`;
+
+    case "photography":
+      return `$${fmt(amount)} covers a lead photographer for full-day coverage, editing, and a digital gallery${adjustmentNote}. Adding videography typically costs $1,500–$3,500 extra. ${isLuxury ? "At this budget tier, consider a luxury film photographer or a lead + second shooter team." : `At $${fmt(amount)}, you can book an experienced professional with a strong portfolio — prioritize someone whose editing style you love.`}`;
+
+    case "flowers":
+      return `$${fmt(amount)} covers a bridal bouquet, bridesmaid bouquets, boutonnieres, a ceremony arch or altar arrangement, and table centerpieces for ${guests} guests${isPriority("flowers") ? " (flowers are a top priority for you)" : ""}. Choosing seasonal, locally-sourced blooms and greenery-forward designs can meaningfully stretch this budget.`;
+
+    case "music":
+      return `$${fmt(amount)} covers ceremony music and reception entertainment for ${guests} guests${isPriority("music") ? " (music is a top priority for you)" : ""}. A DJ typically runs $1,500–$3,000 all-in; a live band $4,000–$10,000+. This allocation gives you strong DJ options or a small live ensemble for cocktail hour.`;
+
+    case "attire":
+      return `$${fmt(amount)} covers the wedding dress or suit, alterations, bridesmaids dresses or groomsmen attire, and hair and makeup for the wedding party. Gowns can take 4–6 months to arrive — order early. Alterations alone typically run $300–$800, so build that into your dress budget.`;
+
+    case "stationery":
+      return `$${fmt(amount)} covers save-the-dates, invitations, envelopes, and postage for ${guests} guests, plus day-of items like menus, programs, and place cards. Budget an extra $${fmt(Math.round(guests * 0.65))} for return postage if you include RSVP cards.`;
+
+    case "transport":
+      return `$${fmt(amount)} covers transportation on the wedding day — typically a getaway car for the couple${guests > 75 ? ` and shuttle service between the venue and hotel for your ${guests} guests` : ` and a classic or luxury car for the couple's exit`}. A guest shuttle runs $500–$1,200 for a half day and can simplify parking for out-of-town guests.`;
+
+    case "rings":
+      return `$${fmt(amount)} covers both wedding bands. Classic gold or white gold bands typically start at $300–$800 each; platinum and diamond bands run higher. Alternative metals like titanium or tungsten are a fraction of the cost and wear extremely well.`;
+
+    case "misc":
+      return `A $${fmt(amount)} buffer for gratuities ($20–$50/vendor), vendor meals (required by most caterers for $25–$75/head), day-of coordinator tips, and any last-minute surprises. With ${guests} guests across a full vendor team, this buffer rarely goes unspent — it's an essential safety net.`;
+
+    default:
+      return "";
+  }
+}
+
 export function buildBudgetCategories(
   answers: WeddingAnswers
 ): BudgetCategory[] {
@@ -162,7 +215,6 @@ export function buildBudgetCategories(
     id: string;
     name: string;
     pct: number;
-    tip?: string;
     adjustments: AdaptiveAdjustment[];
   }> = [
     {
@@ -175,7 +227,6 @@ export function buildBudgetCategories(
       id: "catering",
       name: "Catering & Bar",
       pct: foodPriority ? 28 : BUDGET_BASELINES.catering,
-      tip: foodPriority ? "Food is a top priority — budget boosted 5%" : undefined,
       adjustments: foodPriority
         ? [{ reason: "Food listed as a top priority", delta: 5 }]
         : [],
@@ -184,11 +235,6 @@ export function buildBudgetCategories(
       id: "photography",
       name: "Photography & Video",
       pct: photoPriority ? 15 : BUDGET_BASELINES.photography,
-      tip: photoPriority
-        ? "Photography is a top priority — budget boosted 5%"
-        : isLuxury
-        ? "Consider a luxury film photographer for this budget level"
-        : undefined,
       adjustments: photoPriority
         ? [{ reason: "Photography listed as a top priority", delta: 5 }]
         : isLuxury
@@ -216,7 +262,7 @@ export function buildBudgetCategories(
       percentage: pct,
       amount: Math.round((pct / 100) * total),
       spent: 0,
-      tip: c.tip,
+      tip: buildCategoryTip(c.id, pct, total, answers, c.adjustments),
       baselinePercentage: BUDGET_BASELINES[c.id] ?? c.pct,
       adjustments: c.adjustments,
     };

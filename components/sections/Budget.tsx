@@ -179,7 +179,11 @@ function BudgetRow({
         />
       </div>
 
-      {cat.tip && <p className="text-xs text-[var(--accent)]">{cat.tip}</p>}
+      {cat.tip && (
+        <p className={`text-xs ${cat.adjustments && cat.adjustments.some((a) => a.delta !== 0) ? "text-[var(--accent)]" : "text-gray-500"}`}>
+          {cat.tip}
+        </p>
+      )}
 
       {showWhy && (
         <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5 text-xs text-gray-600 space-y-1">
