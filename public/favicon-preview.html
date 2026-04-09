@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Playfair+Display:wght@700&family=Oswald:wght@600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #d1d5db;
+      display: flex;
+      gap: 60px;
+      padding: 60px 48px;
+      font-family: system-ui, sans-serif;
+      align-items: flex-start;
+    }
+    .option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .option-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #374151;
+    }
+    .sizes {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .size-row {
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+    }
+    .desc {
+      font-size: 11px;
+      color: #6b7280;
+      text-align: center;
+      max-width: 150px;
+      line-height: 1.5;
+    }
+
+    /* ── BASE ICON STYLES ── */
+    .icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    /* ── OPTION 1: Bebas Neue, blue square ── */
+    .opt1 {
+      background: #005A9C;
+      color: white;
+      font-family: 'Bebas Neue', sans-serif;
+      letter-spacing: -0.02em;
+    }
+    .opt1.sz80 { width: 80px; height: 80px; font-size: 54px; }
+    .opt1.sz48 { width: 48px; height: 48px; font-size: 32px; }
+    .opt1.sz32 { width: 32px; height: 32px; font-size: 21px; }
+    .opt1.sz16 { width: 16px; height: 16px; font-size: 11px; }
+
+    /* ── OPTION 2: Playfair Display, dark bg ── */
+    .opt2 {
+      background: #1a1a2e;
+      color: #f5f0e8;
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    .opt2.sz80 { width: 80px; height: 80px; font-size: 48px; }
+    .opt2.sz48 { width: 48px; height: 48px; font-size: 29px; }
+    .opt2.sz32 { width: 32px; height: 32px; font-size: 19px; }
+    .opt2.sz16 { width: 16px; height: 16px; font-size: 10px; }
+
+    /* ── OPTION 3: Oswald, white bg, navy letters ── */
+    .opt3 {
+      background: #ffffff;
+      color: #002147;
+      font-family: 'Oswald', sans-serif;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .opt3.sz80 { width: 80px; height: 80px; font-size: 50px; }
+    .opt3.sz48 { width: 48px; height: 48px; font-size: 30px; }
+    .opt3.sz32 { width: 32px; height: 32px; font-size: 20px; }
+    .opt3.sz16 { width: 16px; height: 16px; font-size: 10px; }
+
+    .plus {
+      font-family: system-ui, sans-serif;
+      font-weight: 300;
+      font-size: 0.45em;
+      opacity: 0.7;
+      letter-spacing: 0;
+      vertical-align: middle;
+      position: relative;
+      top: -0.05em;
+      margin: 0 0.05em;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- OPTION 1: Bebas Neue -->
+  <div class="option">
+    <div class="option-label">Option 1</div>
+    <div class="sizes">
+      <div class="size-row">
+        <div class="icon opt1 sz80">LA</div>
+      </div>
+      <div class="size-row">
+        <div class="icon opt1 sz48">LA</div>
+        <div class="icon opt1 sz32">LA</div>
+        <div class="icon opt1 sz16">LA</div>
+      </div>
+    </div>
+    <div class="desc">Bebas Neue — bold condensed, Dodgers-adjacent feel</div>
+  </div>
+
+  <!-- OPTION 2: Playfair Display -->
+  <div class="option">
+    <div class="option-label">Option 2</div>
+    <div class="sizes">
+      <div class="size-row">
+        <div class="icon opt2 sz80">L<span class="plus">+</span>A</div>
+      </div>
+      <div class="size-row">
+        <div class="icon opt2 sz48">L<span class="plus">+</span>A</div>
+        <div class="icon opt2 sz32">L<span class="plus">+</span>A</div>
+        <div class="icon opt2 sz16">L<span class="plus">+</span>A</div>
+      </div>
+    </div>
+    <div class="desc">Playfair Display — elegant serif, classic monogram feel</div>
+  </div>
+
+  <!-- OPTION 3: Oswald -->
+  <div class="option">
+    <div class="option-label">Option 3</div>
+    <div class="sizes">
+      <div class="size-row">
+        <div class="icon opt3 sz80">LA</div>
+      </div>
+      <div class="size-row">
+        <div class="icon opt3 sz48">LA</div>
+        <div class="icon opt3 sz32">LA</div>
+        <div class="icon opt3 sz16">LA</div>
+      </div>
+    </div>
+    <div class="desc">Oswald — condensed sans on white, clean &amp; modern</div>
+  </div>
+
+</body>
+</html>

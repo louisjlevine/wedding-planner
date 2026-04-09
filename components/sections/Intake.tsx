@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/lib/plan-store";
 import type {
   WeddingAnswers,
@@ -77,7 +78,7 @@ function defaultSeason(): { season: Season; year: number } {
   const d = new Date();
   d.setFullYear(d.getFullYear() + 1);
   const month = d.getMonth() + 1; // 1-12
-  let season: Season =
+  const season: Season =
     month <= 2 || month === 12 ? "Winter" :
     month <= 5 ? "Spring" :
     month <= 8 ? "Summer" : "Autumn";
@@ -123,6 +124,13 @@ function StepLabel({ step }: { step: number }) {
 
 export function Intake() {
   const setAnswers = usePlanStore((s) => s.setAnswers);
+  const router = useRouter();
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
 
   const [step, setStep] = useState<Step>(0);
   const [partnerName, setPartnerName] = useState("");
@@ -199,9 +207,17 @@ export function Intake() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm w-full max-w-lg p-8 animate-fade-in">
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-[var(--accent)] mb-2">
-            Wedding Planner
-          </p>
+          <div className="flex items-start justify-between">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[var(--accent)] mb-2">
+              Wedding Planner
+            </p>
+            <button
+              onClick={handleLogout}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
           <h1 className="text-2xl font-bold text-gray-900">Let&apos;s plan your day</h1>
           <p className="text-sm text-gray-500 mt-1">
             Tell us about your wedding so we can personalise everything.

@@ -473,7 +473,7 @@ export function Research() {
   useEffect(() => {
     if (triggerResearchFor) {
       const match = TYPES.find((t) => t.type === triggerResearchFor);
-      if (match) setActiveType(match.type);
+      if (match) setActiveType(match.type); // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, [triggerResearchFor]);
 

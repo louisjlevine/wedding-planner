@@ -59,7 +59,7 @@ After every major deployment, perform a security scan covering the following and
 
 5. **Rate limiting** — `/api/research`, `/api/advisor`, `/api/research-chat`, `/api/recommendations`, and `/api/vendor-description` must enforce a per-IP rate limit to prevent cost-explosion attacks. Target: ≤ 20 AI calls / hour / IP.
 
-6. **Security headers** — `next.config.ts` must set `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`, and `Referrer-Policy` on all responses.
+6. **Security headers** — `next.config.ts` must set `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`, `Referrer-Policy`, and `Permissions-Policy` on all responses.
 
 7. **CORS** — API routes must only accept requests from the app's own origin. Verify `Access-Control-Allow-Origin` is not wildcard in production.
 
@@ -85,3 +85,104 @@ After every major deployment, perform a security scan covering the following and
 ```
 
 Open a Linear issue for any finding that cannot be resolved before deployment. Tag it `security` and do not close it until verified fixed in production.
+
+---
+
+## Test plan & pre-release gate
+
+### Running tests
+
+```bash
+npm test                  # run full suite once (CI / pre-commit)
+npm run test:watch        # interactive watch mode (development)
+npm run test:coverage     # run with V8 coverage report
+npm run pre-release       # full pre-release gate (tests + lint + audit + security checks)
+```
+
+### Test suite layout
+
+```
+tests/
+├── setup.ts                        # global setup (suppress console.error noise)
+├── unit/
+│   ├── adapters.test.ts            # buildTimeline, buildBudgetCategories, buildInitialTasks
+│   ├── guest-probability.test.ts   # getBaseProbability, guestExpectedCount, estimatedAttendance
+│   └── research-prompts.test.ts    # buildResearchPrompt — all types + context flags
+├── api/
+│   ├── research.test.ts            # input validation, type allowlist, error safety
+│   ├── recommendations.test.ts     # JSON parsing, URL filtering, status normalisation
+│   ├── vendor-description.test.ts  # SSRF guard (isPrivateUrl) + route behaviour
+│   └── feedback.test.ts            # zod validation, length limits, error safety
+├── security/
+│   └── middleware.test.ts          # rate limiting, bot UA blocking, CORS, session auth
+└── integration/
+    └── pre-release.test.ts         # structural checks: security headers, gitignore,
+                                    # secret scan, middleware coverage, tsc --noEmit
+```
+
+### What each layer covers
+
+| Layer | Coverage |
+|---|---|
+| **Unit** | All pure adapter logic and adaptive rules. Every branch (outdoor, mountain, luxury, small guest count, priority boosts). |
+| **API** | Input validation on every public route. Mocked Anthropic SDK — no real API calls. URL safety (https-only filter). JSON resilience (code-block extraction). |
+| **Security** | All 8 bot UA patterns blocked. Session cookie required on API routes. Login rate-limited at 5 req/min. CORS preflight and origin blocking. |
+| **Integration** | File existence, secret hygiene, TypeScript compilation, security header presence in config. |
+
+### Mock pattern (required for Anthropic routes)
+
+Always use a class-based mock — arrow functions can't be `new`-ed:
+
+```typescript
+vi.mock("@anthropic-ai/sdk", () => {
+  class MockAnthropic {
+    messages = { create: vi.fn().mockResolvedValue({ content: [{ type: "text", text: "..." }] }) };
+  }
+  return { default: MockAnthropic };
+});
+```
+
+For tests that need to control the AI response per-test, use `vi.hoisted()`:
+
+```typescript
+const { mockCreate } = vi.hoisted(() => ({ mockCreate: vi.fn() }));
+vi.mock("@anthropic-ai/sdk", () => {
+  class MockAnthropic { messages = { create: mockCreate }; }
+  return { default: MockAnthropic };
+});
+// Then per test: mockCreate.mockResolvedValue(...)
+```
+
+### Pre-release gate (`npm run pre-release`)
+
+The `scripts/pre-release.sh` script runs 8 checks in order and auto-fixes what it can:
+
+| Step | Check | Auto-fix |
+|---|---|---|
+| 1 | `npm audit` — no High/Critical CVEs | `npm audit fix` attempted |
+| 2 | Git history — no API key literals | None (manual rotation required) |
+| 3 | `.env.local` not tracked by git | Adds `.env` patterns to `.gitignore` |
+| 4 | `tsc --noEmit` — no TypeScript errors | None |
+| 5 | ESLint — no errors | `eslint --fix` applied first |
+| 6 | Security headers present in `next.config.ts` | None |
+| 7 | SSRF guard present and all IP ranges covered | None |
+| 8 | Full Vitest test suite passes | None |
+
+Exits 0 only when all checks pass. Exits 1 with a summary of remaining issues.
+
+### Known security fixes (2026-04)
+
+**IPv6 loopback SSRF** — `isPrivateUrl()` in `app/api/vendor-description/route.ts`
+originally checked `h === "::1"` but `new URL("http://[::1]").hostname` returns `"[::1]"`
+(brackets included). Fixed to also check `h === "[::1]"`. Test in
+`tests/api/vendor-description.test.ts → "blocks ::1 (IPv6 loopback)"` guards regression.
+
+**`Permissions-Policy` header** — added to `next.config.ts` to disable camera, microphone,
+geolocation, and payment APIs. Both the integration test and `pre-release.sh` verify its presence.
+
+### ESLint notes
+
+Next.js 16 ships `eslint-plugin-react-hooks` v7 which includes `react-hooks/purity`
+(flags `Date.now()` in render) and `react-hooks/set-state-in-effect`. Legitimate uses in
+`Topbar.tsx`, `Overview.tsx`, `Budget.tsx`, and `Research.tsx` are suppressed with
+`// eslint-disable-line` inline comments rather than disabling the rule globally.

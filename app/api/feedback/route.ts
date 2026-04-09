@@ -10,6 +10,7 @@ const bodySchema = z.object({
 
 const LINEAR_API = "https://api.linear.app/graphql";
 const LINEAR_TEAM_ID = "a97e2f10-88d5-4d48-bfab-ad0e9a853b1e";
+const LINEAR_PROJECT_ID = "feaa16e6-50a0-4510-b29a-cbd077b1b1eb";
 
 // Priority map: Claude returns a string, we map to Linear's int (0=none,1=urgent,2=high,3=normal,4=low)
 const PRIORITY_MAP: Record<string, number> = {
@@ -28,11 +29,12 @@ async function createLinearIssue(
   if (!apiKey) throw new Error("LINEAR_API_KEY not configured");
 
   const mutation = `
-    mutation CreateIssue($title: String!, $description: String!, $teamId: String!, $priority: Int!) {
+    mutation CreateIssue($title: String!, $description: String!, $teamId: String!, $projectId: String!, $priority: Int!) {
       issueCreate(input: {
         title: $title,
         description: $description,
         teamId: $teamId,
+        projectId: $projectId,
         priority: $priority
       }) {
         success
@@ -50,7 +52,7 @@ async function createLinearIssue(
     },
     body: JSON.stringify({
       query: mutation,
-      variables: { title, description, teamId: LINEAR_TEAM_ID, priority },
+      variables: { title, description, teamId: LINEAR_TEAM_ID, projectId: LINEAR_PROJECT_ID, priority },
     }),
   });
 

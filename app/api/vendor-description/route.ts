@@ -11,7 +11,7 @@ function isPrivateUrl(urlString: string): boolean {
     const url = new URL(urlString);
     if (url.protocol !== "https:" && url.protocol !== "http:") return true;
     const h = url.hostname;
-    if (h === "localhost" || h === "::1") return true;
+    if (h === "localhost" || h === "::1" || h === "[::1]") return true;
     if (/^127\./.test(h)) return true;
     if (/^10\./.test(h)) return true;
     if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;

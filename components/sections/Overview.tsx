@@ -46,13 +46,15 @@ const PRIORITIES: { value: WeddingPriority; label: string }[] = [
 
 function EditDetailsPanel({ onClose }: { onClose: () => void }) {
   const { answers, updateAnswers } = usePlanStore();
-  if (!answers) return null;
 
-  const { season: initSeason, year: initYear } = dateToSeason(answers.date ?? "");
+  // Derive initial values before hooks — falls back to safe defaults when answers is null
+  const { season: initSeason, year: initYear } = dateToSeason(answers?.date ?? "");
   const [season, setSeason]       = useState<Season>(initSeason);
   const [year, setYear]           = useState(initYear);
-  const [guestCount, setGuestCount] = useState((answers.guestCount ?? 100).toString());
-  const [priorities, setPriorities] = useState<WeddingPriority[]>([...(answers.priorities ?? [])]);
+  const [guestCount, setGuestCount] = useState((answers?.guestCount ?? 100).toString());
+  const [priorities, setPriorities] = useState<WeddingPriority[]>([...(answers?.priorities ?? [])]);
+
+  if (!answers) return null;
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear + i);
@@ -171,7 +173,7 @@ export function Overview() {
   const confirmedGuests = guests.filter((g) => g.rsvp === "yes").length;
   const bookedVendors   = vendors.filter((v) => v.status === "booked").length;
   const daysUntil = Math.ceil(
-    (new Date(answers.date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    (new Date(answers.date).getTime() - Date.now()) / (1000 * 60 * 60 * 24) // eslint-disable-line react-hooks/purity
   );
   const nextItems = timeline
     .filter((t) => !t.done && t.targetDate >= new Date().toISOString().split("T")[0])
@@ -276,7 +278,7 @@ export function Overview() {
               {flags.map((item, i) => (
                 <li key={i} className="flex items-start gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] mt-1.5 shrink-0" />
-                  <p className="text-sm text-gray-700">{"flag" in item ? item.flag : ""}</p>
+                  <p className="text-sm text-gray-700">{"flag" in item ? item.flag : null}</p>
                 </li>
               ))}
             </ul>

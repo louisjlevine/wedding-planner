@@ -140,7 +140,7 @@ export function useServerSync() {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [store]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [store]);  
 
   return { syncStatus, syncError, forcePush };
 }

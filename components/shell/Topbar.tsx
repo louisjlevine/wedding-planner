@@ -50,7 +50,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
   const daysUntil = answers?.date
     ? Math.ceil(
-        (new Date(answers.date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        (new Date(answers.date).getTime() - Date.now()) / (1000 * 60 * 60 * 24) // eslint-disable-line react-hooks/purity
       )
     : null;
 

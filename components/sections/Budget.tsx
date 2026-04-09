@@ -33,15 +33,15 @@ function BudgetRow({
 
   // Keep drafts in sync when parent updates (e.g. after a different field commits)
   useEffect(() => {
-    if (!editingAmt)   setDraftAmt(cat.amount.toString());
+    if (!editingAmt)   setDraftAmt(cat.amount.toString()); // eslint-disable-line react-hooks/set-state-in-effect
   }, [cat.amount, editingAmt]);
 
   useEffect(() => {
-    if (!editingPct)   setDraftPct(cat.percentage.toString());
+    if (!editingPct)   setDraftPct(cat.percentage.toString()); // eslint-disable-line react-hooks/set-state-in-effect
   }, [cat.percentage, editingPct]);
 
   useEffect(() => {
-    if (!editingSpent) setDraftSpent(cat.spent.toString());
+    if (!editingSpent) setDraftSpent(cat.spent.toString()); // eslint-disable-line react-hooks/set-state-in-effect
   }, [cat.spent, editingSpent]);
 
   useEffect(() => { if (editingAmt)   amtRef.current?.select(); },   [editingAmt]);
@@ -277,7 +277,7 @@ export function Budget() {
 
       <Panel title="Budget breakdown">
         <p className="text-xs text-gray-400 mb-4">
-          Click a dollar amount to set allocation by $, click a % to set by percentage. Click "spent" to track actuals.
+          Click a dollar amount to set allocation by $, click a % to set by percentage. Click &ldquo;spent&rdquo; to track actuals.
         </p>
         <div className="space-y-5">
           {budgetCategories.map((cat) => (

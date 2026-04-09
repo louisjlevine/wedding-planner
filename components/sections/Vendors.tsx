@@ -264,6 +264,63 @@ function EditVendorForm({
   );
 }
 
+// ── Setup instructions panel ──────────────────────────────────────────────────
+
+function SetupPanel({ onClose }: { onClose: () => void }) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://your-app.com";
+  const importEndpoint = `${appUrl}/api/vendors/import`;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-800">Import setup</h3>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+      </div>
+
+      {/* iOS Shortcut */}
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">iOS Shortcut</p>
+        <p className="text-xs text-gray-600 mb-3">
+          Add a &ldquo;Save to Wedding Planner&rdquo; option to your iOS share sheet. While browsing a vendor site in Safari, tap Share → the shortcut → done.
+        </p>
+        <ol className="text-xs text-gray-600 space-y-1.5 list-decimal list-inside">
+          <li>Open the <strong>Shortcuts</strong> app and tap <strong>+</strong> to create a new shortcut</li>
+          <li>Tap <strong>Add Action</strong> → search <strong>&ldquo;URL&rdquo;</strong> → add <strong>Get URLs from Input</strong></li>
+          <li>Add action: <strong>Get Contents of URL</strong> and configure:
+            <ul className="mt-1 ml-4 space-y-0.5 list-disc">
+              <li>URL: <code className="bg-gray-100 px-1 rounded">{importEndpoint}</code></li>
+              <li>Method: <strong>POST</strong></li>
+              <li>Headers: <code className="bg-gray-100 px-1 rounded">Authorization: Bearer YOUR_IMPORT_TOKEN</code></li>
+              <li>Request Body: <strong>JSON</strong> → key <code className="bg-gray-100 px-1 rounded">url</code>, value: <em>URLs from previous step</em></li>
+            </ul>
+          </li>
+          <li>Add action: <strong>Show Notification</strong> → set text to <em>Name from Get Contents result</em></li>
+          <li>Tap the shortcut name → enable <strong>&ldquo;Show in Share Sheet&rdquo;</strong> → set types to <strong>URLs</strong></li>
+        </ol>
+        <p className="text-xs text-gray-400 mt-2">Set <code className="bg-gray-100 px-1 rounded">IMPORT_TOKEN</code> in your Railway env vars to any long random string, then paste the same value in the shortcut.</p>
+      </div>
+
+      <div className="border-t border-gray-100" />
+
+      {/* Email forwarding */}
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Email forwarding (Resend)</p>
+        <p className="text-xs text-gray-600 mb-3">
+          Forward any vendor email — or send a message with their URL — to a dedicated address and the vendor is imported automatically.
+        </p>
+        <ol className="text-xs text-gray-600 space-y-1.5 list-decimal list-inside">
+          <li>In Resend dashboard → <strong>Domains</strong> → your domain → <strong>Inbound Routing</strong></li>
+          <li>Add rule: any email to <code className="bg-gray-100 px-1 rounded">add@yourdomain.com</code> → <strong>Webhook</strong></li>
+          <li>Webhook URL: <code className="bg-gray-100 px-1 rounded">{appUrl}/api/vendors/email?secret=YOUR_INBOUND_WEBHOOK_SECRET</code></li>
+          <li>Set <code className="bg-gray-100 px-1 rounded">INBOUND_WEBHOOK_SECRET</code> in Railway to match the secret in the URL</li>
+          <li>Make sure <code className="bg-gray-100 px-1 rounded">IMPORT_TOKEN</code> is also set (the email route calls the import route internally)</li>
+        </ol>
+        <p className="text-xs text-gray-400 mt-2">Once live, forward any vendor email or send a plain message with the URL to your inbound address.</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Vendors page ─────────────────────────────────────────────────────────
 
 export function Vendors() {
@@ -274,6 +331,10 @@ export function Vendors() {
 
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const [form, setForm] = useState({
     category: "Venue", name: "", contact: "", website: "", price: "", notes: "",
     rentalPeriod: "", overtimeRate: "",
@@ -287,6 +348,30 @@ export function Vendors() {
 
   // Venue comparison table pop-out
   const [showVenueTable, setShowVenueTable] = useState(false);
+
+  async function handleImportUrl() {
+    const url = importUrl.trim();
+    if (!url) return;
+    setImporting(true);
+    setImportError(null);
+    try {
+      const res = await fetch("/api/vendors/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      setImportUrl("");
+      window.location.reload();
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   function handleAdd() {
     if (!form.name.trim()) return;
@@ -422,6 +507,12 @@ export function Vendors() {
             </button>
           )}
           <button
+            onClick={() => setShowSetup((s) => !s)}
+            className="px-3 py-2 text-xs text-gray-500 border border-gray-200 rounded-lg hover:border-gray-300 hover:text-gray-700 transition-colors"
+          >
+            Import setup
+          </button>
+          <button
             onClick={() => setAdding(true)}
             className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
           >
@@ -429,6 +520,34 @@ export function Vendors() {
           </button>
         </div>
       </div>
+
+      {/* URL import bar */}
+      <div className="flex gap-2">
+        <input
+          value={importUrl}
+          onChange={(e) => { setImportUrl(e.target.value); setImportError(null); }}
+          onKeyDown={(e) => e.key === "Enter" && handleImportUrl()}
+          placeholder="Paste a vendor URL to import automatically..."
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+        />
+        <button
+          onClick={handleImportUrl}
+          disabled={!importUrl.trim() || importing}
+          className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50 transition-colors shrink-0"
+        >
+          {importing ? (
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+              Importing…
+            </span>
+          ) : "Import"}
+        </button>
+      </div>
+      {importError && (
+        <p className="text-xs text-red-500">{importError}</p>
+      )}
+
+      {showSetup && <SetupPanel onClose={() => setShowSetup(false)} />}
 
       {adding && (
         <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
