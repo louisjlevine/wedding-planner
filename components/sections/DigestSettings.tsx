@@ -291,16 +291,15 @@ export function DigestSettings() {
       </div>
 
       {/* Scheduling info */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          Automated weekly delivery
+      <div className="bg-green-50 border border-green-200 rounded-xl p-5">
+        <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2">
+          Automated weekly delivery active
         </p>
-        <p className="text-sm text-gray-600">
-          To send automatically every week, add a Vercel Cron Job in{" "}
-          <code className="font-mono bg-gray-100 px-1 rounded text-xs">vercel.json</code> that
-          calls <code className="font-mono bg-gray-100 px-1 rounded text-xs">POST /api/email-digest</code> with
-          your stored plan data. The preferred send day selected above tells you which day to
-          schedule the cron.
+        <p className="text-sm text-green-800">
+          A digest will be sent automatically every{" "}
+          <span className="font-medium">{DAY_NAMES[form.sendDay]}</span> at 9 AM UTC via Vercel
+          Cron. Requires <code className="font-mono bg-green-100 px-1 rounded text-xs">RESEND_API_KEY</code>{" "}
+          and at least one opted-in email address to deliver.
         </p>
       </div>
     </div>
