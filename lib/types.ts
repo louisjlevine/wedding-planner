@@ -57,6 +57,7 @@ export interface Vendor {
   website?: string;
   price?: number;
   status: "considering" | "contacted" | "booked" | "rejected";
+  tags?: string[];
   notes?: string;
   // Venue-specific fields
   rentalPeriod?: string;  // e.g. "8 hours", "full day"
