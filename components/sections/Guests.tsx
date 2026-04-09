@@ -9,6 +9,7 @@ import {
   RELATIONSHIP_LABELS,
   LOCATION_LABELS,
 } from "@/lib/guest-probability";
+import type ExcelJS from "exceljs";
 import type { Guest, GuestRelationship, GuestLocation, GuestSide } from "@/lib/types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -22,49 +23,106 @@ const LOCATIONS: GuestLocation[] = ["local", "out_of_town"];
 const SIDES: GuestSide[] = ["bride", "groom", "both"];
 const SIDE_LABELS: Record<GuestSide, string> = { bride: "Bride's side", groom: "Groom's side", both: "Both sides" };
 
-// ── CSV helpers ───────────────────────────────────────────────────────────────
+// ── Excel helpers ─────────────────────────────────────────────────────────────
 
-const CSV_COLUMNS = ["name","email","phone","address","relationship","location","side","plusone","dietary","table","rsvp","notes"] as const;
+const XLSX_COLUMNS = [
+  { header: "Name",         key: "name",        width: 25 },
+  { header: "Email",        key: "email",       width: 30 },
+  { header: "Phone",        key: "phone",       width: 15 },
+  { header: "Address",      key: "address",     width: 35 },
+  { header: "Relationship", key: "relationship",width: 18 },
+  { header: "Location",     key: "location",    width: 15 },
+  { header: "Side",         key: "side",        width: 15 },
+  { header: "Total Guests", key: "totalGuests", width: 13 },
+  { header: "Dietary",      key: "dietary",     width: 20 },
+  { header: "Table",        key: "table",       width: 12 },
+  { header: "RSVP",         key: "rsvp",        width: 12 },
+  { header: "Notes",        key: "notes",       width: 30 },
+];
 
-const CSV_TEMPLATE_ROW = ["Jane Smith","jane@example.com","555-0100","123 Main St, Denver CO 80202","family","local","bride","no","vegetarian","Table 1","pending","Childhood friend"];
+// Column letters for dropdown columns (1-indexed: A=1)
+const COL = { relationship: "E", location: "F", side: "G", rsvp: "K" };
 
-export function downloadCSVTemplate() {
-  const rows = [CSV_COLUMNS.join(","), CSV_TEMPLATE_ROW.join(",")];
-  const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+async function buildXLSX(rows: Record<string, string | number>[]) {
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Guests");
+
+  ws.columns = XLSX_COLUMNS as ExcelJS.Column[];
+
+  // Style header row
+  ws.getRow(1).eachCell((cell) => {
+    cell.font = { bold: true };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD4537E" } };
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  });
+
+  for (const row of rows) ws.addRow(row);
+
+  // Add dropdown validation for rows 2–200
+  for (let r = 2; r <= 200; r++) {
+    ws.getCell(`${COL.relationship}${r}`).dataValidation = {
+      type: "list", allowBlank: true,
+      formulae: ['"Family,Close friend,Friend,Acquaintance"'],
+      showErrorMessage: false,
+    };
+    ws.getCell(`${COL.location}${r}`).dataValidation = {
+      type: "list", allowBlank: true,
+      formulae: ['"Local,Out of town"'],
+      showErrorMessage: false,
+    };
+    ws.getCell(`${COL.side}${r}`).dataValidation = {
+      type: "list", allowBlank: true,
+      formulae: ['"Bride\'s side,Groom\'s side,Both sides"'],
+      showErrorMessage: false,
+    };
+    ws.getCell(`${COL.rsvp}${r}`).dataValidation = {
+      type: "list", allowBlank: true,
+      formulae: ['"pending,yes,no,maybe"'],
+      showErrorMessage: false,
+    };
+  }
+
+  return wb.xlsx.writeBuffer();
+}
+
+function triggerDownload(buffer: ArrayBuffer, filename: string) {
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   a.href     = url;
-  a.download = "guest-list-template.csv";
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-export function exportGuestsCSV(guests: Guest[]) {
-  const escape = (v: string) => v.includes(",") ? `"${v}"` : v;
-  const rows: string[] = [CSV_COLUMNS.join(",")];
-  for (const g of guests) {
-    rows.push([
-      escape(g.name),
-      escape(g.email      ?? ""),
-      "",
-      escape(g.address    ?? ""),
-      escape(g.relationship  ?? ""),
-      escape(g.guestLocation ?? ""),
-      escape(g.side ?? ""),
-      g.plusOne ? "yes" : "no",
-      escape(g.dietary ?? ""),
-      escape(g.table   ?? ""),
-      escape(g.rsvp),
-      "",
-    ].join(","));
-  }
-  const blob = new Blob([rows.join("\n")], { type: "text/csv" });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
-  a.href     = url;
-  a.download = "guest-list.csv";
-  a.click();
-  URL.revokeObjectURL(url);
+export async function downloadXLSXTemplate() {
+  const buffer = await buildXLSX([{
+    name: "Jane Smith", email: "jane@example.com", phone: "555-0100",
+    address: "123 Main St, Denver CO 80202", relationship: "Family",
+    location: "Local", side: "Bride's side", totalGuests: 1,
+    dietary: "vegetarian", table: "Table 1", rsvp: "pending", notes: "Childhood friend",
+  }]);
+  triggerDownload(buffer as ArrayBuffer, "guest-list-template.xlsx");
+}
+
+export async function exportGuestsXLSX(guests: Guest[]) {
+  const rows = guests.map((g) => ({
+    name:         g.name,
+    email:        g.email         ?? "",
+    phone:        "",
+    address:      g.address       ?? "",
+    relationship: g.relationship  ? RELATIONSHIP_LABELS[g.relationship] : "",
+    location:     g.guestLocation ? LOCATION_LABELS[g.guestLocation]   : "",
+    side:         g.side          ? SIDE_LABELS[g.side]                 : "",
+    totalGuests:  g.totalGuests,
+    dietary:      g.dietary ?? "",
+    table:        g.table   ?? "",
+    rsvp:         g.rsvp,
+    notes:        "",
+  }));
+  const buffer = await buildXLSX(rows);
+  triggerDownload(buffer as ArrayBuffer, "guest-list.xlsx");
 }
 
 // ── CSV / vCard import helpers ────────────────────────────────────────────────
@@ -82,7 +140,7 @@ function parseCSV(text: string): Partial<Guest>[] {
       relationship: ["relationship", "relation", "type"],
       guestlocation:["location", "guestlocation", "city"],
       side:         ["side", "family_side", "familyside"],
-      plusone:      ["plusone", "plus_one", "guest"],
+      totalguests:  ["totalguests", "total_guests", "plusone", "plus_one", "guest"],
       dietary:      ["dietary", "diet", "food"],
       table:        ["table", "tablenumber", "seat"],
     };
@@ -122,7 +180,7 @@ function parseCSV(text: string): Partial<Guest>[] {
       address:      col(row, "address") || undefined,
       dietary:      col(row, "dietary") || undefined,
       table:        col(row, "table")   || undefined,
-      plusOne:      ["yes","true","1","x"].includes(col(row, "plusone").toLowerCase()),
+      totalGuests:  Math.max(1, parseInt(col(row, "totalguests"), 10) || (["yes","true","1","x"].includes(col(row, "totalguests").toLowerCase()) ? 2 : 1)),
       relationship: rel,
       guestLocation: loc,
       side,
@@ -146,7 +204,7 @@ function parseVCard(text: string): Partial<Guest>[] {
       name,
       email:   get("EMAIL") || undefined,
       address: address       || undefined,
-      plusOne: false,
+      totalGuests: 1,
       rsvp: "pending" as const,
     };
   }).filter(Boolean) as Partial<Guest>[];
@@ -170,7 +228,7 @@ function EditGuestForm({
     relationship:  guest.relationship  ?? ("" as GuestRelationship | ""),
     guestLocation: guest.guestLocation ?? ("" as GuestLocation | ""),
     side:          guest.side          ?? ("" as GuestSide | ""),
-    plusOne:       guest.plusOne,
+    totalGuests:   guest.totalGuests ?? 1,
     dietary:       guest.dietary ?? "",
     table:         guest.table   ?? "",
     rsvp:          guest.rsvp,
@@ -240,11 +298,12 @@ function EditGuestForm({
           placeholder="123 Main St, Denver CO 80202"
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
       </div>
-      <label className="flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" checked={d.plusOne} onChange={(e) => setD((x) => ({ ...x, plusOne: e.target.checked }))}
-          className="rounded border-gray-300" />
-        Plus one
-      </label>
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block">Total guests</label>
+        <input type="number" min={1} max={20} value={d.totalGuests}
+          onChange={(e) => setD((x) => ({ ...x, totalGuests: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+          className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+      </div>
       <div className="flex gap-2">
         <button onClick={() => onSave({
           name:          d.name.trim() || guest.name,
@@ -253,7 +312,7 @@ function EditGuestForm({
           relationship:  d.relationship  || undefined,
           guestLocation: d.guestLocation || undefined,
           side:          d.side          || undefined,
-          plusOne:       d.plusOne,
+          totalGuests:   d.totalGuests,
           dietary:       d.dietary  || undefined,
           table:         d.table    || undefined,
           rsvp:          d.rsvp,
@@ -276,7 +335,7 @@ export function Guests() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sideFilter, setSideFilter] = useState<GuestSide | "all">("all");
   const [form, setForm] = useState({
-    name: "", email: "", address: "", plusOne: false, dietary: "", table: "",
+    name: "", email: "", address: "", totalGuests: 1, dietary: "", table: "",
     relationship: "" as GuestRelationship | "",
     guestLocation: "" as GuestLocation | "",
     side: "" as GuestSide | "",
@@ -297,7 +356,7 @@ export function Guests() {
       name:          form.name,
       email:         form.email         || undefined,
       address:       form.address       || undefined,
-      plusOne:       form.plusOne,
+      totalGuests:   form.totalGuests,
       rsvp:          "pending",
       dietary:       form.dietary       || undefined,
       table:         form.table         || undefined,
@@ -305,7 +364,7 @@ export function Guests() {
       guestLocation: form.guestLocation || undefined,
       side:          form.side          || undefined,
     });
-    setForm({ name: "", email: "", address: "", plusOne: false, dietary: "", table: "", relationship: "", guestLocation: "", side: "" });
+    setForm({ name: "", email: "", address: "", totalGuests: 1, dietary: "", table: "", relationship: "", guestLocation: "", side: "" });
     setAdding(false);
   }
 
@@ -345,7 +404,7 @@ export function Guests() {
           name:          g.name,
           email:         g.email,
           address:       g.address       ?? existing.address,
-          plusOne:       g.plusOne       ?? existing.plusOne,
+          totalGuests:   g.totalGuests   ?? existing.totalGuests,
           dietary:       g.dietary       ?? existing.dietary,
           table:         g.table         ?? existing.table,
           relationship:  g.relationship  ?? existing.relationship,
@@ -358,7 +417,7 @@ export function Guests() {
           name:          g.name,
           email:         g.email,
           address:       g.address,
-          plusOne:       g.plusOne ?? false,
+          totalGuests:   g.totalGuests ?? 1,
           rsvp:          "pending",
           dietary:       g.dietary,
           table:         g.table,
@@ -392,8 +451,8 @@ export function Guests() {
           name:    g.name ?? "Unknown",
           email:   g.email,
           address: g.address,
-          plusOne: false,
-          rsvp:    "pending",
+          totalGuests: 1,
+          rsvp:        "pending",
         });
       });
     };
@@ -408,10 +467,10 @@ export function Guests() {
     : guests.filter((g) => g.side === sideFilter || (sideFilter === "both" && g.side === "both"));
 
   const counts = {
-    yes:     filteredGuests.filter((g) => g.rsvp === "yes").length,
-    no:      filteredGuests.filter((g) => g.rsvp === "no").length,
-    maybe:   filteredGuests.filter((g) => g.rsvp === "maybe").length,
-    pending: filteredGuests.filter((g) => g.rsvp === "pending").length,
+    yes:     filteredGuests.filter((g) => g.rsvp === "yes").reduce((s, g) => s + g.totalGuests, 0),
+    no:      filteredGuests.filter((g) => g.rsvp === "no").reduce((s, g) => s + g.totalGuests, 0),
+    maybe:   filteredGuests.filter((g) => g.rsvp === "maybe").reduce((s, g) => s + g.totalGuests, 0),
+    pending: filteredGuests.filter((g) => g.rsvp === "pending").reduce((s, g) => s + g.totalGuests, 0),
   };
   const estimated = estimatedAttendance(filteredGuests);
 
@@ -424,11 +483,11 @@ export function Guests() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Guests</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {guests.length} invited &middot; {counts.yes} confirmed &middot; {counts.pending} pending
+            {guests.reduce((s, g) => s + g.totalGuests, 0)} invited &middot; {counts.yes} confirmed &middot; {counts.pending} pending
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <button onClick={downloadCSVTemplate}
+          <button onClick={() => downloadXLSXTemplate()}
             className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
             Download template
           </button>
@@ -437,9 +496,9 @@ export function Guests() {
             Import CSV
           </button>
           {guests.length > 0 && (
-            <button onClick={() => exportGuestsCSV(guests)}
+            <button onClick={() => exportGuestsXLSX(guests)}
               className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
-              Export CSV
+              Export
             </button>
           )}
           <button onClick={() => vcfInputRef.current?.click()}
@@ -526,7 +585,7 @@ export function Guests() {
                   {g.relationship && <span className="text-xs text-gray-400">{RELATIONSHIP_LABELS[g.relationship]}</span>}
                   {g.guestLocation && <span className="text-xs text-gray-400">{LOCATION_LABELS[g.guestLocation]}</span>}
                   {g.side         && <span className="text-xs text-gray-400">{SIDE_LABELS[g.side]}</span>}
-                  {g.plusOne      && <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">+1</span>}
+                  {(g.totalGuests ?? 1) > 1 && <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">×{g.totalGuests}</span>}
                 </div>
               );
             })}
@@ -622,11 +681,12 @@ export function Guests() {
               placeholder="123 Main St, Denver CO 80202"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
           </div>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked={form.plusOne} onChange={(e) => setForm((f) => ({ ...f, plusOne: e.target.checked }))}
-              className="rounded border-gray-300" />
-            Plus one
-          </label>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Total guests</label>
+            <input type="number" min={1} max={20} value={form.totalGuests}
+              onChange={(e) => setForm((f) => ({ ...f, totalGuests: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+              className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+          </div>
           <div className="flex gap-2">
             <button onClick={handleAdd}
               className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
@@ -670,7 +730,7 @@ export function Guests() {
               Add your first guest
             </button>
           </div>
-          <p className="text-xs text-gray-300 mt-1">CSV columns: name, email, address, relationship, location, plusone, dietary, table</p>
+          <p className="text-xs text-gray-300 mt-1">CSV columns: name, email, address, relationship, location, totalguests, dietary, table</p>
         </div>
       )}
 
@@ -697,7 +757,7 @@ export function Guests() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-semibold text-gray-900">{guest.name}</p>
-                  {guest.plusOne && <Badge variant="blue">+1</Badge>}
+                  {guest.totalGuests > 1 && <Badge variant="blue">×{guest.totalGuests}</Badge>}
                   <Badge variant={RSVP_VARIANTS[guest.rsvp]}>{guest.rsvp}</Badge>
                   {guest.relationship && (
                     <span className="text-xs text-gray-400">{RELATIONSHIP_LABELS[guest.relationship]}</span>

@@ -12,7 +12,7 @@ function makeGuest(overrides: Partial<Guest> = {}): Guest {
   return {
     id: "g1",
     name: "Test Person",
-    plusOne: false,
+    totalGuests: 1,
     rsvp: "pending",
     ...overrides,
   };
@@ -83,26 +83,25 @@ describe("guestExpectedCount", () => {
     expect(guestExpectedCount(g)).toBeCloseTo(0.75);
   });
 
-  it("adds plus-one factor (0.85x) for confirmed yes with plus-one", () => {
-    const g = makeGuest({ rsvp: "yes", plusOne: true });
-    // factor = 1.0, plus-one = 1.0 * 0.85 = 0.85 → total = 1.85
-    expect(guestExpectedCount(g)).toBeCloseTo(1.85);
+  it("returns 2.0 for a confirmed yes with totalGuests = 2", () => {
+    const g = makeGuest({ rsvp: "yes", totalGuests: 2 });
+    expect(guestExpectedCount(g)).toBeCloseTo(2.0);
   });
 
-  it("plus-one adds partial expected count for pending guest", () => {
-    const g = makeGuest({ rsvp: "pending", relationship: "friend", guestLocation: "local", plusOne: true });
-    // factor = 0.75, plus-one = 0.75 * 0.85 = 0.6375 → total = 1.3875
-    expect(guestExpectedCount(g)).toBeCloseTo(1.3875);
+  it("totalGuests scales expected count for pending guest", () => {
+    const g = makeGuest({ rsvp: "pending", relationship: "friend", guestLocation: "local", totalGuests: 2 });
+    // factor = 0.75, totalGuests = 2 → total = 1.5
+    expect(guestExpectedCount(g)).toBeCloseTo(1.5);
   });
 
-  it("'no' RSVP with plus-one still returns 0", () => {
-    const g = makeGuest({ rsvp: "no", plusOne: true });
+  it("'no' RSVP with totalGuests > 1 still returns 0", () => {
+    const g = makeGuest({ rsvp: "no", totalGuests: 2 });
     expect(guestExpectedCount(g)).toBe(0);
   });
 
-  it("never exceeds 2.0 for a single guest entry", () => {
-    const g = makeGuest({ rsvp: "yes", plusOne: true });
-    expect(guestExpectedCount(g)).toBeLessThanOrEqual(2.0);
+  it("totalGuests = 3 scales expected count proportionally", () => {
+    const g = makeGuest({ rsvp: "yes", totalGuests: 3 });
+    expect(guestExpectedCount(g)).toBeCloseTo(3.0);
   });
 });
 
@@ -138,12 +137,12 @@ describe("estimatedAttendance", () => {
     expect(Number.isInteger(result)).toBe(true);
   });
 
-  it("sums expected counts for all guests", () => {
+  it("sums expected counts for all guests including totalGuests", () => {
     const guests = [
       makeGuest({ id: "g1", rsvp: "yes" }),
-      makeGuest({ id: "g2", rsvp: "yes", plusOne: true }),
+      makeGuest({ id: "g2", rsvp: "yes", totalGuests: 2 }),
     ];
-    // 1.0 + 1.85 = 2.85 → rounds to 3
+    // 1.0 + 2.0 = 3.0 → rounds to 3
     expect(estimatedAttendance(guests)).toBe(3);
   });
 });

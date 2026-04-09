@@ -92,7 +92,7 @@ export interface Guest {
   name: string;
   email?: string;
   address?: string;
-  plusOne: boolean;
+  totalGuests: number;
   rsvp: "pending" | "yes" | "no" | "maybe";
   dietary?: string;
   table?: string;

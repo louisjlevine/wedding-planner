@@ -18,7 +18,7 @@ export function getBaseProbability(guest: Guest): number {
   return DEFAULT_PROB;
 }
 
-/** Expected headcount contribution from a single guest entry (0–2 incl. plus-one) */
+/** Expected headcount contribution from a single guest entry (accounts for totalGuests) */
 export function guestExpectedCount(guest: Guest): number {
   const p = getBaseProbability(guest);
   let factor: number;
@@ -28,8 +28,7 @@ export function guestExpectedCount(guest: Guest): number {
     case "maybe": factor = p * 0.5; break;
     default:      factor = p;       break; // pending
   }
-  const plusOneFactor = guest.plusOne ? factor * 0.85 : 0; // +1s slightly less likely
-  return factor + plusOneFactor;
+  return factor * guest.totalGuests;
 }
 
 /** Total estimated headcount across all guests */
