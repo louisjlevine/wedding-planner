@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 import { usePlanStore } from "@/lib/plan-store";
-import { Badge } from "@/components/ui/Badge";
 import type { Vendor } from "@/lib/types";
 import type { ResearchType } from "@/lib/research-prompts";
 
-const STATUS_VARIANTS: Record<Vendor["status"], "gray" | "yellow" | "green" | "red"> = {
-  considering: "gray",
-  contacted:   "yellow",
-  booked:      "green",
-  rejected:    "red",
+const STATUS_SELECT_STYLES: Record<Vendor["status"], string> = {
+  considering: "bg-gray-100 text-gray-600",
+  contacted:   "bg-yellow-50 text-yellow-700",
+  booked:      "bg-green-50 text-green-700",
+  rejected:    "bg-red-50 text-red-700",
 };
 
 const CATEGORIES = [
@@ -483,7 +482,17 @@ export function Vendors() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold text-gray-900">{vendor.name}</p>
-                      <Badge variant={STATUS_VARIANTS[vendor.status]}>{vendor.status}</Badge>
+                      <select
+                        value={vendor.status}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => updateVendor(vendor.id, { status: e.target.value as Vendor["status"] })}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--accent)] ${STATUS_SELECT_STYLES[vendor.status]}`}
+                      >
+                        <option value="considering">Considering</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="booked">Booked</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
                     </div>
                     {vendor.website && (
                       <a
@@ -518,19 +527,6 @@ export function Vendors() {
                     className="flex flex-row sm:flex-col items-center sm:items-end gap-2 shrink-0"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={vendor.status}
-                        onChange={(e) => updateVendor(vendor.id, { status: e.target.value as Vendor["status"] })}
-                        className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[var(--accent)]"
-                      >
-                        <option value="considering">Considering</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="booked">Booked</option>
-                        <option value="rejected">Rejected</option>
-                      </select>
-                    </div>
-
                     <div className="flex items-center gap-2">
                       {canFindSimilar && (
                         <button
