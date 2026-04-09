@@ -113,6 +113,7 @@ export interface BudgetCategory {
   amount: number;
   spent: number;
   tip?: string;
+  description?: string; // what this category covers, context-aware
   baselinePercentage: number; // industry default % before any adaptive adjustments
   adjustments: AdaptiveAdjustment[]; // list of rules that changed the baseline
 }
