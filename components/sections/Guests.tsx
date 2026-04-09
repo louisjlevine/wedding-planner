@@ -5,6 +5,7 @@ import { usePlanStore } from "@/lib/plan-store";
 import { Badge } from "@/components/ui/Badge";
 import {
   getBaseProbability,
+  guestExpectedCount,
   estimatedAttendance,
   RELATIONSHIP_LABELS,
   LOCATION_LABELS,
@@ -288,6 +289,53 @@ function parseVCard(text: string): Partial<Guest>[] {
   }).filter(Boolean) as Partial<Guest>[];
 }
 
+// ── Side-split helpers ────────────────────────────────────────────────────────
+
+type SideSplit = Record<"bride" | "groom" | "both" | "unknown", number>;
+
+function sideSplitCount(gs: Guest[]): SideSplit {
+  return {
+    bride:   gs.filter((g) => g.side === "bride").reduce((s, g) => s + g.totalGuests, 0),
+    groom:   gs.filter((g) => g.side === "groom").reduce((s, g) => s + g.totalGuests, 0),
+    both:    gs.filter((g) => g.side === "both").reduce((s, g) => s + g.totalGuests, 0),
+    unknown: gs.filter((g) => !g.side).reduce((s, g) => s + g.totalGuests, 0),
+  };
+}
+
+function sideSplitEstimated(gs: Guest[]): SideSplit {
+  return {
+    bride:   Math.round(gs.filter((g) => g.side === "bride").reduce((s, g) => s + guestExpectedCount(g), 0)),
+    groom:   Math.round(gs.filter((g) => g.side === "groom").reduce((s, g) => s + guestExpectedCount(g), 0)),
+    both:    Math.round(gs.filter((g) => g.side === "both").reduce((s, g) => s + guestExpectedCount(g), 0)),
+    unknown: Math.round(gs.filter((g) => !g.side).reduce((s, g) => s + guestExpectedCount(g), 0)),
+  };
+}
+
+function SideTooltip({ split }: { split: SideSplit }) {
+  const rows: [string, number][] = [
+    ["Bride's side", split.bride],
+    ["Groom's side", split.groom],
+    ["Both sides",   split.both],
+    ["Unknown",      split.unknown],
+  ];
+  const hasAny = rows.some(([, v]) => v > 0);
+  if (!hasAny) return null;
+  return (
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 z-50 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl whitespace-nowrap pointer-events-none">
+      <div className="space-y-1">
+        {rows.map(([label, val]) => (
+          <div key={label} className="flex items-center justify-between gap-4">
+            <span className="text-gray-300">{label}</span>
+            <span className="font-semibold tabular-nums">{val}</span>
+          </div>
+        ))}
+      </div>
+      {/* Down-pointing arrow */}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+    </div>
+  );
+}
+
 // ── Inline edit form ──────────────────────────────────────────────────────────
 
 function EditGuestForm({
@@ -559,11 +607,19 @@ export function Guests() {
     ? guests
     : guests.filter((g) => g.side === sideFilter || (sideFilter === "both" && g.side === "both"));
 
+  const byRsvp = (s: Guest["rsvp"]) => filteredGuests.filter((g) => g.rsvp === s);
   const counts = {
-    yes:     filteredGuests.filter((g) => g.rsvp === "yes").reduce((s, g) => s + g.totalGuests, 0),
-    no:      filteredGuests.filter((g) => g.rsvp === "no").reduce((s, g) => s + g.totalGuests, 0),
-    maybe:   filteredGuests.filter((g) => g.rsvp === "maybe").reduce((s, g) => s + g.totalGuests, 0),
-    pending: filteredGuests.filter((g) => g.rsvp === "pending").reduce((s, g) => s + g.totalGuests, 0),
+    yes:     byRsvp("yes").reduce((s, g) => s + g.totalGuests, 0),
+    no:      byRsvp("no").reduce((s, g) => s + g.totalGuests, 0),
+    maybe:   byRsvp("maybe").reduce((s, g) => s + g.totalGuests, 0),
+    pending: byRsvp("pending").reduce((s, g) => s + g.totalGuests, 0),
+  };
+  const splits = {
+    yes:       sideSplitCount(byRsvp("yes")),
+    no:        sideSplitCount(byRsvp("no")),
+    maybe:     sideSplitCount(byRsvp("maybe")),
+    pending:   sideSplitCount(byRsvp("pending")),
+    estimated: sideSplitEstimated(filteredGuests),
   };
   const estimated = estimatedAttendance(filteredGuests);
 
@@ -629,15 +685,25 @@ export function Guests() {
       {/* Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {(["yes","no","maybe","pending"] as Guest["rsvp"][]).map((status) => (
-          <div key={status} className="bg-white border border-gray-200 rounded-xl p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">{counts[status]}</p>
-            <p className="text-xs text-gray-400 capitalize mt-0.5">{status}</p>
+          <div key={status} className="relative group">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 text-center cursor-default select-none">
+              <p className="text-2xl font-bold text-gray-900">{counts[status]}</p>
+              <p className="text-xs text-gray-400 capitalize mt-0.5">{status}</p>
+            </div>
+            <div className="hidden group-hover:block">
+              <SideTooltip split={splits[status]} />
+            </div>
           </div>
         ))}
         {guests.length > 0 && (
-          <div className="bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-xl p-4 text-center">
-            <p className="text-2xl font-bold text-[var(--accent)]">{estimated}</p>
-            <p className="text-xs text-[var(--accent)]/70 mt-0.5">Est. attending</p>
+          <div className="relative group">
+            <div className="bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-xl p-4 text-center cursor-default select-none">
+              <p className="text-2xl font-bold text-[var(--accent)]">{estimated}</p>
+              <p className="text-xs text-[var(--accent)]/70 mt-0.5">Est. attending</p>
+            </div>
+            <div className="hidden group-hover:block">
+              <SideTooltip split={splits.estimated} />
+            </div>
           </div>
         )}
       </div>
