@@ -420,7 +420,7 @@ export function Guests() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Guests</h1>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -475,7 +475,7 @@ export function Guests() {
       )}
 
       {/* Metrics */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {(["yes","no","maybe","pending"] as Guest["rsvp"][]).map((status) => (
           <div key={status} className="bg-white border border-gray-200 rounded-xl p-4 text-center">
             <p className="text-2xl font-bold text-gray-900">{counts[status]}</p>

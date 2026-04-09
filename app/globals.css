@@ -4,6 +4,11 @@
   --accent: #D4537E;
 }
 
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   background: #ffffff;
   color: #111827;
