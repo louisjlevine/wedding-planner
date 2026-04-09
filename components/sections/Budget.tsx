@@ -183,6 +183,11 @@ function BudgetRow({
 
       {showWhy && (
         <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5 text-xs text-gray-600 space-y-1">
+          {cat.description && (
+            <p className="text-gray-600 leading-relaxed pb-1.5 border-b border-gray-200 mb-1.5">
+              {cat.description}
+            </p>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-gray-500">Industry default</span>
             <span className="tabular-nums font-medium">{cat.baselinePercentage}%</span>
