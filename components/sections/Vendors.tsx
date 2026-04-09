@@ -1,9 +1,187 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { usePlanStore } from "@/lib/plan-store";
-import type { Vendor } from "@/lib/types";
+import type { Vendor, VendorAttachment } from "@/lib/types";
 import type { ResearchType } from "@/lib/research-prompts";
+
+// ── Attachment helpers ───────────────────────────────────────────────────────
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_IMAGE_DIMENSION = 1200;
+
+function resizeImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (!file.type.startsWith("image/")) {
+        resolve(reader.result as string);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION) {
+          resolve(reader.result as string);
+          return;
+        }
+        const ratio = Math.min(MAX_IMAGE_DIMENSION / width, MAX_IMAGE_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL(file.type, 0.85));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function processFiles(files: FileList): Promise<VendorAttachment[]> {
+  const results: VendorAttachment[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (file.size > MAX_FILE_SIZE) continue;
+    const dataUrl = file.type.startsWith("image/")
+      ? await resizeImage(file)
+      : await new Promise<string>((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result as string);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+    results.push({
+      id: `att-${Date.now()}-${i}`,
+      fileName: file.name,
+      mimeType: file.type,
+      dataUrl,
+      addedAt: new Date().toISOString(),
+    });
+  }
+  return results;
+}
+
+// ── Attachment list component ────────────────────────────────────────────────
+
+function AttachmentList({
+  attachments,
+  onRemove,
+}: {
+  attachments: VendorAttachment[];
+  onRemove?: (id: string) => void;
+}) {
+  const [preview, setPreview] = useState<string | null>(null);
+
+  if (attachments.length === 0) return null;
+
+  return (
+    <>
+      {preview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setPreview(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview} alt="Preview" className="max-w-full max-h-[80vh] rounded-xl shadow-2xl" />
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {attachments.map((att) => {
+          const isImage = att.mimeType.startsWith("image/");
+          return (
+            <div key={att.id} className="relative group">
+              {isImage ? (
+                <button type="button" onClick={() => setPreview(att.dataUrl)} className="block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={att.dataUrl}
+                    alt={att.fileName}
+                    className="w-16 h-16 object-cover rounded-lg border border-gray-200 hover:border-[var(--accent)] transition-colors"
+                  />
+                </button>
+              ) : (
+                <div className="w-16 h-16 rounded-lg border border-gray-200 flex flex-col items-center justify-center bg-gray-50 px-1">
+                  <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                  </svg>
+                  <span className="text-[9px] text-gray-400 truncate w-full text-center mt-0.5">{att.fileName}</span>
+                </div>
+              )}
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={() => onRemove(att.id)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  x
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// ── File upload button ───────────────────────────────────────────────────────
+
+function AttachmentUpload({
+  onFiles,
+}: {
+  onFiles: (files: FileList) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="flex gap-2">
+      <input
+        ref={fileRef}
+        type="file"
+        multiple
+        accept="image/*,.pdf,.doc,.docx,.txt"
+        capture={undefined}
+        onChange={(e) => { if (e.target.files?.length) onFiles(e.target.files); e.target.value = ""; }}
+        className="hidden"
+      />
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        className="inline-flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+        </svg>
+        Attach file
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          // Create a separate input with capture="environment" for camera
+          const input = document.createElement("input");
+          input.type = "file";
+          input.accept = "image/*";
+          input.capture = "environment";
+          input.onchange = () => { if (input.files?.length) onFiles(input.files); };
+          input.click();
+        }}
+        className="inline-flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+        </svg>
+        Photo
+      </button>
+    </div>
+  );
+}
 
 const STATUS_DOT: Record<Vendor["status"], string> = {
   considering: "bg-gray-400",
@@ -142,8 +320,34 @@ function EditVendorForm({
     rentalPeriod:  vendor.rentalPeriod  ?? "",
     overtimeRate:  vendor.overtimeRate  ?? "",
   });
+  const [attachments, setAttachments] = useState<VendorAttachment[]>(vendor.attachments ?? []);
+  const [cleaningUp, setCleaningUp] = useState(false);
 
   const isVenue = draft.category === "Venue";
+
+  const handleCleanupNotes = useCallback(async () => {
+    if (!draft.notes.trim() || cleaningUp) return;
+    setCleaningUp(true);
+    try {
+      const res = await fetch("/api/vendors/cleanup-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: draft.notes, vendorName: draft.name, category: draft.category }),
+      });
+      if (!res.ok) throw new Error();
+      const { cleaned } = await res.json();
+      if (cleaned) setDraft((d) => ({ ...d, notes: cleaned }));
+    } catch {
+      // silently fail — user still has original notes
+    } finally {
+      setCleaningUp(false);
+    }
+  }, [draft.notes, draft.name, draft.category, cleaningUp]);
+
+  async function handleFiles(files: FileList) {
+    const newAtts = await processFiles(files);
+    setAttachments((prev) => [...prev, ...newAtts]);
+  }
 
   function commit() {
     onSave({
@@ -157,6 +361,7 @@ function EditVendorForm({
       tags:         draft.tags.length  ? draft.tags : undefined,
       rentalPeriod: isVenue ? (draft.rentalPeriod || undefined) : undefined,
       overtimeRate: isVenue ? (draft.overtimeRate || undefined) : undefined,
+      attachments:  attachments.length ? attachments : undefined,
     });
   }
 
@@ -246,10 +451,44 @@ function EditVendorForm({
         )}
       </div>
       <div>
-        <label className="text-xs text-gray-500 mb-1 block">Notes</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-gray-500">Notes</label>
+          {draft.notes.trim() && (
+            <button
+              type="button"
+              onClick={handleCleanupNotes}
+              disabled={cleaningUp}
+              className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-[var(--accent)] disabled:opacity-50 transition-colors"
+            >
+              {cleaningUp ? (
+                <>
+                  <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                  Cleaning up…
+                </>
+              ) : (
+                <>
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+                  </svg>
+                  Clean up
+                </>
+              )}
+            </button>
+          )}
+        </div>
         <textarea value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
-          rows={2} placeholder="Any notes..."
+          rows={3} placeholder="Any notes..."
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] resize-none" />
+      </div>
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Attachments</label>
+        <AttachmentList
+          attachments={attachments}
+          onRemove={(id) => setAttachments((prev) => prev.filter((a) => a.id !== id))}
+        />
+        <div className="mt-2">
+          <AttachmentUpload onFiles={handleFiles} />
+        </div>
       </div>
       <div className="flex gap-2">
         <button onClick={commit}
@@ -339,6 +578,7 @@ export function Vendors() {
     category: "Venue", name: "", contact: "", website: "", price: "", notes: "",
     rentalPeriod: "", overtimeRate: "",
   });
+  const [addFormAttachments, setAddFormAttachments] = useState<VendorAttachment[]>([]);
 
   // Per-vendor loading state for "Find similar"
   const [findingFor, setFindingFor] = useState<string | null>(null);
@@ -387,8 +627,10 @@ export function Vendors() {
       status:       "considering",
       rentalPeriod: isVenue ? (form.rentalPeriod || undefined) : undefined,
       overtimeRate: isVenue ? (form.overtimeRate || undefined) : undefined,
+      attachments:  addFormAttachments.length ? addFormAttachments : undefined,
     });
     setForm({ category: "Venue", name: "", contact: "", website: "", price: "", notes: "", rentalPeriod: "", overtimeRate: "" });
+    setAddFormAttachments([]);
     setAdding(false);
   }
 
@@ -632,6 +874,19 @@ export function Vendors() {
               </>
             )}
           </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1.5 block">Attachments</label>
+            <AttachmentList
+              attachments={addFormAttachments}
+              onRemove={(id) => setAddFormAttachments((prev) => prev.filter((a) => a.id !== id))}
+            />
+            <div className="mt-2">
+              <AttachmentUpload onFiles={async (files) => {
+                const newAtts = await processFiles(files);
+                setAddFormAttachments((prev) => [...prev, ...newAtts]);
+              }} />
+            </div>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={handleAdd}
@@ -747,6 +1002,26 @@ export function Vendors() {
                     )}
                     {vendor.notes && (
                       <p className="text-xs text-gray-400 mt-1 italic line-clamp-2">{vendor.notes}</p>
+                    )}
+                    {vendor.attachments && vendor.attachments.length > 0 && (
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        {vendor.attachments.slice(0, 4).map((att) => (
+                          att.mimeType.startsWith("image/") ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={att.id} src={att.dataUrl} alt={att.fileName}
+                              className="w-8 h-8 object-cover rounded border border-gray-200" />
+                          ) : (
+                            <div key={att.id} className="w-8 h-8 rounded border border-gray-200 bg-gray-50 flex items-center justify-center">
+                              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                              </svg>
+                            </div>
+                          )
+                        ))}
+                        {vendor.attachments.length > 4 && (
+                          <span className="text-[10px] text-gray-400">+{vendor.attachments.length - 4}</span>
+                        )}
+                      </div>
                     )}
                   </div>
 

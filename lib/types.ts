@@ -49,6 +49,14 @@ export interface WeddingAnswers {
   stress: StressSource[];
 }
 
+export interface VendorAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  dataUrl: string;       // base64 data URL (images resized client-side)
+  addedAt: string;       // ISO date
+}
+
 export interface Vendor {
   id: string;
   category: string;
@@ -59,6 +67,7 @@ export interface Vendor {
   status: "considering" | "contacted" | "booked" | "rejected";
   tags?: string[];
   notes?: string;
+  attachments?: VendorAttachment[];
   // Venue-specific fields
   rentalPeriod?: string;  // e.g. "8 hours", "full day"
   overtimeRate?: string;  // e.g. "$250/hour"
