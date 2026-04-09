@@ -125,6 +125,84 @@ export async function exportGuestsXLSX(guests: Guest[]) {
   triggerDownload(buffer as ArrayBuffer, "guest-list.xlsx");
 }
 
+// ── XLSX import helper ────────────────────────────────────────────────────────
+
+async function parseXLSX(buffer: ArrayBuffer): Promise<Partial<Guest>[]> {
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer);
+  const ws = wb.worksheets[0];
+  if (!ws) return [];
+
+  // Build reverse lookup maps from label → internal value
+  const REL_REV: Record<string, GuestRelationship> = Object.fromEntries(
+    Object.entries(RELATIONSHIP_LABELS).map(([k, v]) => [v.toLowerCase(), k as GuestRelationship])
+  );
+  const LOC_REV: Record<string, GuestLocation> = Object.fromEntries(
+    Object.entries(LOCATION_LABELS).map(([k, v]) => [v.toLowerCase(), k as GuestLocation])
+  );
+  const SIDE_REV: Record<string, GuestSide> = Object.fromEntries(
+    Object.entries(SIDE_LABELS).map(([k, v]) => [v.toLowerCase(), k as GuestSide])
+  );
+
+  // Read header row to map column index → field name
+  const headerRow = ws.getRow(1);
+  const colMap: Record<number, string> = {};
+  headerRow.eachCell((cell, colNum) => {
+    colMap[colNum] = String(cell.value ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  });
+
+  const results: Partial<Guest>[] = [];
+  ws.eachRow((row, rowNum) => {
+    if (rowNum === 1) return;
+    const get = (key: string): string => {
+      const aliases: Record<string, string[]> = {
+        name:         ["name", "fullname"],
+        email:        ["email", "emailaddress"],
+        address:      ["address", "addr"],
+        relationship: ["relationship", "relation"],
+        location:     ["location", "guestlocation"],
+        side:         ["side", "familyside"],
+        totalguests:  ["totalguests", "total_guests", "plusone"],
+        dietary:      ["dietary", "diet"],
+        table:        ["table", "tablenumber"],
+        rsvp:         ["rsvp"],
+        notes:        ["notes"],
+      };
+      for (const alias of (aliases[key] ?? [key])) {
+        const colNum = Object.entries(colMap).find(([, v]) => v === alias)?.[0];
+        if (colNum) {
+          const val = row.getCell(Number(colNum)).value;
+          return val == null ? "" : String(val).trim();
+        }
+      }
+      return "";
+    };
+
+    const name = get("name");
+    if (!name) return;
+
+    const relRaw = get("relationship").toLowerCase();
+    const locRaw = get("location").toLowerCase();
+    const sideRaw = get("side").toLowerCase();
+    const rsvpRaw = get("rsvp").toLowerCase();
+
+    results.push({
+      name,
+      email:        get("email")   || undefined,
+      address:      get("address") || undefined,
+      dietary:      get("dietary") || undefined,
+      table:        get("table")   || undefined,
+      totalGuests:  Math.max(1, parseInt(get("totalguests"), 10) || 1),
+      relationship: REL_REV[relRaw]  ?? (relRaw.startsWith("fam") ? "family" : relRaw.includes("close") ? "close_friend" : relRaw.startsWith("friend") ? "friend" : relRaw.startsWith("acq") ? "acquaintance" : undefined),
+      guestLocation: LOC_REV[locRaw] ?? (locRaw.startsWith("local") ? "local" : locRaw.includes("out") ? "out_of_town" : undefined),
+      side:          SIDE_REV[sideRaw] ?? (sideRaw.startsWith("bride") ? "bride" : sideRaw.startsWith("groom") ? "groom" : sideRaw === "both" ? "both" : undefined),
+      rsvp:         (["yes","no","maybe","pending"].includes(rsvpRaw) ? rsvpRaw as Guest["rsvp"] : "pending"),
+    });
+  });
+  return results;
+}
+
 // ── CSV / vCard import helpers ────────────────────────────────────────────────
 
 function parseCSV(text: string): Partial<Guest>[] {
@@ -368,15 +446,14 @@ export function Guests() {
     setAdding(false);
   }
 
-  // ── CSV import — parse then preview ──────────────────────────────────────
+  // ── CSV / XLSX import — parse then preview ───────────────────────────────
 
-  function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const parsed = parseCSV(text);
+    const isXlsx = file.name.toLowerCase().endsWith(".xlsx");
+
+    const finish = (parsed: Partial<Guest>[]) => {
       const warnings: string[] = [];
       parsed.forEach((g, i) => {
         if (!g.name) warnings.push(`Row ${i + 2}: missing name — will be skipped`);
@@ -387,7 +464,23 @@ export function Guests() {
       setCsvPreview(parsed);
       setCsvWarnings(warnings);
     };
-    reader.readAsText(file);
+
+    if (isXlsx) {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const buffer = ev.target?.result as ArrayBuffer;
+        const parsed = await parseXLSX(buffer);
+        finish(parsed);
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        finish(parseCSV(text));
+      };
+      reader.readAsText(file);
+    }
     e.target.value = "";
   }
 
@@ -493,7 +586,7 @@ export function Guests() {
           </button>
           <button onClick={() => csvInputRef.current?.click()}
             className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors">
-            Import CSV
+            Import CSV / XLSX
           </button>
           {guests.length > 0 && (
             <button onClick={() => exportGuestsXLSX(guests)}
@@ -510,7 +603,7 @@ export function Guests() {
             Add guest
           </button>
         </div>
-        <input ref={csvInputRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleCsvFile} />
+        <input ref={csvInputRef} type="file" accept=".csv,.tsv,.txt,.xlsx" className="hidden" onChange={handleImportFile} />
         <input ref={vcfInputRef} type="file" accept=".vcf,.vcard"   className="hidden" onChange={handleVcfFile} />
       </div>
 
@@ -715,7 +808,7 @@ export function Guests() {
               onClick={() => csvInputRef.current?.click()}
               className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
             >
-              Import CSV
+              Import CSV / XLSX
             </button>
             <button
               onClick={() => vcfInputRef.current?.click()}
@@ -730,7 +823,7 @@ export function Guests() {
               Add your first guest
             </button>
           </div>
-          <p className="text-xs text-gray-300 mt-1">CSV columns: name, email, address, relationship, location, totalguests, dietary, table</p>
+          <p className="text-xs text-gray-300 mt-1">Accepts CSV or XLSX — columns: name, email, address, relationship, location, totalguests, dietary, table</p>
         </div>
       )}
 
