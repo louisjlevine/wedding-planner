@@ -489,7 +489,7 @@ export function Vendors() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Vendors</h1>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -497,7 +497,7 @@ export function Vendors() {
             {vendors.length} total
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           {venueVendors.length >= 2 && (
             <button
               onClick={() => setShowVenueTable(true)}
@@ -528,7 +528,7 @@ export function Vendors() {
           onChange={(e) => { setImportUrl(e.target.value); setImportError(null); }}
           onKeyDown={(e) => e.key === "Enter" && handleImportUrl()}
           placeholder="Paste a vendor URL to import automatically..."
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+          className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
         />
         <button
           onClick={handleImportUrl}
