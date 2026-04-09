@@ -761,21 +761,40 @@ export function Guests() {
         </div>
       )}
 
-      {/* Probability legend */}
+      {/* Attendance likelihood info icon */}
       {guests.length > 0 && (
-        <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
-          <p className="text-xs font-medium text-gray-500 mb-2">Attendance likelihood by relationship &amp; location</p>
-          <div className="flex flex-wrap gap-x-5 gap-y-1">
-            {RELATIONSHIPS.map((r) =>
-              LOCATIONS.map((l) => (
-                <span key={`${r}-${l}`} className="text-xs text-gray-400">
-                  <span className="font-medium text-gray-600">{RELATIONSHIP_LABELS[r]}</span>
-                  {" + "}{LOCATION_LABELS[l]}: {Math.round(
-                    { family: { local: 0.95, out_of_town: 0.75 }, close_friend: { local: 0.90, out_of_town: 0.65 }, friend: { local: 0.75, out_of_town: 0.45 }, acquaintance: { local: 0.50, out_of_town: 0.25 } }[r][l] * 100
-                  )}%
-                </span>
-              ))
-            )}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-400">Attendance likelihood</span>
+          <div className="relative group inline-flex">
+            <button className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold flex items-center justify-center hover:bg-gray-300 transition-colors leading-none">
+              i
+            </button>
+            <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 bg-gray-900 text-white text-xs rounded-lg px-3 py-2.5 shadow-xl whitespace-nowrap pointer-events-none">
+              <p className="font-semibold text-gray-300 mb-2">Estimated attendance by relationship &amp; location</p>
+              <table className="border-separate border-spacing-x-3 border-spacing-y-0.5">
+                <thead>
+                  <tr>
+                    <th className="text-left text-gray-400 font-normal" />
+                    {LOCATIONS.map((l) => (
+                      <th key={l} className="text-center text-gray-400 font-normal">{LOCATION_LABELS[l]}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {RELATIONSHIPS.map((r) => (
+                    <tr key={r}>
+                      <td className="text-gray-300">{RELATIONSHIP_LABELS[r]}</td>
+                      {LOCATIONS.map((l) => (
+                        <td key={l} className="text-center font-semibold">
+                          {Math.round({ family: { local: 0.95, out_of_town: 0.75 }, close_friend: { local: 0.90, out_of_town: 0.65 }, friend: { local: 0.75, out_of_town: 0.45 }, acquaintance: { local: 0.50, out_of_town: 0.25 } }[r][l] * 100)}%
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+            </div>
           </div>
         </div>
       )}
@@ -893,74 +912,106 @@ export function Guests() {
         </div>
       )}
 
-      {/* Guest rows */}
-      <div className="space-y-2">
-        {filteredGuests.map((guest) => {
-          if (editingId === guest.id) {
-            return (
-              <EditGuestForm
-                key={guest.id}
-                guest={guest}
-                onSave={(u) => { updateGuest(guest.id, u); setEditingId(null); }}
-                onCancel={() => setEditingId(null)}
-              />
-            );
-          }
+      {/* Guest table */}
+      {filteredGuests.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="text-left text-xs font-medium text-gray-400 px-4 py-2.5">Name</th>
+                <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5">RSVP</th>
+                <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5 hidden sm:table-cell">Relationship</th>
+                <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5 hidden md:table-cell">Location</th>
+                <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5 hidden md:table-cell">Side</th>
+                <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5 hidden lg:table-cell">Likelihood</th>
+                <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5 hidden lg:table-cell">Table</th>
+                <th className="w-8" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredGuests.map((guest) => {
+                const prob = getBaseProbability(guest);
+                const showProb = guest.rsvp === "pending" || guest.rsvp === "maybe";
 
-          const prob = getBaseProbability(guest);
-          const showProb = guest.rsvp === "pending" || guest.rsvp === "maybe";
+                if (editingId === guest.id) {
+                  return (
+                    <tr key={guest.id}>
+                      <td colSpan={8} className="p-3">
+                        <EditGuestForm
+                          guest={guest}
+                          onSave={(u) => { updateGuest(guest.id, u); setEditingId(null); }}
+                          onCancel={() => setEditingId(null)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                }
 
-          return (
-            <div key={guest.id}
-              className="bg-white border border-gray-200 rounded-xl px-5 py-3 flex items-center justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-semibold text-gray-900">{guest.name}</p>
-                  {guest.totalGuests > 1 && <Badge variant="blue">×{guest.totalGuests}</Badge>}
-                  <Badge variant={RSVP_VARIANTS[guest.rsvp]}>{guest.rsvp}</Badge>
-                  {guest.relationship && (
-                    <span className="text-xs text-gray-400">{RELATIONSHIP_LABELS[guest.relationship]}</span>
-                  )}
-                  {guest.guestLocation && (
-                    <span className="text-xs text-gray-400">{LOCATION_LABELS[guest.guestLocation]}</span>
-                  )}
-                  {guest.side && (
-                    <span className="text-xs text-gray-400">{SIDE_LABELS[guest.side]}</span>
-                  )}
-                  {showProb && (
-                    <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                      {Math.round(prob * 100)}% likely
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                  {guest.email   && <p className="text-xs text-gray-400">{guest.email}</p>}
-                  {guest.address && <p className="text-xs text-gray-400 truncate max-w-xs">{guest.address}</p>}
-                  {guest.table   && <p className="text-xs text-gray-400">Table: {guest.table}</p>}
-                  {guest.dietary && <p className="text-xs text-gray-400">{guest.dietary}</p>}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button onClick={() => setEditingId(guest.id)}
-                  className="text-xs text-gray-400 hover:text-gray-700 transition-colors">
-                  edit
-                </button>
-                <select value={guest.rsvp} onChange={(e) => updateGuest(guest.id, { rsvp: e.target.value as Guest["rsvp"] })}
-                  className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[var(--accent)]">
-                  <option value="pending">Pending</option>
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                  <option value="maybe">Maybe</option>
-                </select>
-                <button onClick={() => removeGuest(guest.id)}
-                  className="text-xs text-gray-300 hover:text-red-400 transition-colors">
-                  remove
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                return (
+                  <tr
+                    key={guest.id}
+                    onClick={() => setEditingId(guest.id)}
+                    className="cursor-pointer hover:bg-gray-50 transition-colors"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">{guest.name}</span>
+                        {guest.totalGuests > 1 && <Badge variant="blue">×{guest.totalGuests}</Badge>}
+                      </div>
+                      {(guest.email || guest.dietary) && (
+                        <div className="flex gap-2 mt-0.5">
+                          {guest.email   && <span className="text-xs text-gray-400">{guest.email}</span>}
+                          {guest.dietary && <span className="text-xs text-gray-400">{guest.dietary}</span>}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <select
+                        value={guest.rsvp}
+                        onChange={(e) => updateGuest(guest.id, { rsvp: e.target.value as Guest["rsvp"] })}
+                        className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[var(--accent)]"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                        <option value="maybe">Maybe</option>
+                      </select>
+                    </td>
+                    <td className="px-3 py-3 text-xs text-gray-500 hidden sm:table-cell">
+                      {guest.relationship ? RELATIONSHIP_LABELS[guest.relationship] : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-3 text-xs text-gray-500 hidden md:table-cell">
+                      {guest.guestLocation ? LOCATION_LABELS[guest.guestLocation] : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-3 text-xs text-gray-500 hidden md:table-cell">
+                      {guest.side ? SIDE_LABELS[guest.side] : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-3 text-xs hidden lg:table-cell">
+                      {showProb
+                        ? <span className="font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{Math.round(prob * 100)}%</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-3 text-xs text-gray-500 hidden lg:table-cell">
+                      {guest.table || <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="pr-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => removeGuest(guest.id)}
+                        className="text-gray-300 hover:text-red-400 transition-colors p-1"
+                        title="Remove guest"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
