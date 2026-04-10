@@ -87,15 +87,22 @@ function BudgetRow({
 
   return (
     <div className="space-y-2">
-      {/* Line 1: category name + why? */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-800 flex-1 min-w-0 truncate">{cat.name}</span>
+      {/* Line 1: category name + description + how? */}
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-medium text-gray-800">{cat.name}</span>
+          {cat.description && (
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed line-clamp-2">
+              {cat.description}
+            </p>
+          )}
+        </div>
         <button
           onClick={() => setShowWhy((v) => !v)}
-          className="text-[10px] text-gray-400 hover:text-[var(--accent)] transition-colors leading-none border border-gray-200 hover:border-[var(--accent)] rounded px-1.5 py-0.5 shrink-0"
+          className="text-[10px] text-gray-400 hover:text-[var(--accent)] transition-colors leading-none border border-gray-200 hover:border-[var(--accent)] rounded px-1.5 py-0.5 shrink-0 mt-0.5"
           title="Show how this allocation was calculated"
         >
-          {showWhy ? "hide" : "why?"}
+          {showWhy ? "hide" : "how?"}
         </button>
       </div>
 
@@ -183,11 +190,6 @@ function BudgetRow({
 
       {showWhy && (
         <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5 text-xs text-gray-600 space-y-1">
-          {cat.description && (
-            <p className="text-gray-600 leading-relaxed pb-1.5 border-b border-gray-200 mb-1.5">
-              {cat.description}
-            </p>
-          )}
           <div className="flex items-center justify-between">
             <span className="text-gray-500">Industry default</span>
             <span className="tabular-nums font-medium">{cat.baselinePercentage}%</span>
@@ -277,7 +279,7 @@ export function Budget() {
 
       <Panel title="Budget breakdown">
         <p className="text-xs text-gray-400 mb-4">
-          Click a dollar amount to set allocation by $, click a % to set by percentage. Click &ldquo;spent&rdquo; to track actuals.
+          Click a dollar amount to set allocation by $, click a % to set by percentage. Click &ldquo;spent&rdquo; to track actuals. Click &ldquo;how?&rdquo; to see how each percentage was calculated.
         </p>
         <div className="space-y-5">
           {budgetCategories.map((cat) => (
