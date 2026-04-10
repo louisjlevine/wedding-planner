@@ -95,9 +95,14 @@ function BudgetRow({
           className="text-[10px] text-gray-400 hover:text-[var(--accent)] transition-colors leading-none border border-gray-200 hover:border-[var(--accent)] rounded px-1.5 py-0.5 shrink-0"
           title="Show how this allocation was calculated"
         >
-          {showWhy ? "hide" : "why?"}
+          {showWhy ? "hide" : "how?"}
         </button>
       </div>
+
+      {/* Always-visible description — what this category covers */}
+      {cat.description && (
+        <p className="text-xs text-gray-500 leading-relaxed -mt-0.5">{cat.description}</p>
+      )}
 
       {/* Line 2: dollar | % | spent (pushed right) */}
       <div className="flex items-center gap-4">
@@ -183,11 +188,6 @@ function BudgetRow({
 
       {showWhy && (
         <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5 text-xs text-gray-600 space-y-1">
-          {cat.description && (
-            <p className="text-gray-600 leading-relaxed pb-1.5 border-b border-gray-200 mb-1.5">
-              {cat.description}
-            </p>
-          )}
           <div className="flex items-center justify-between">
             <span className="text-gray-500">Industry default</span>
             <span className="tabular-nums font-medium">{cat.baselinePercentage}%</span>
