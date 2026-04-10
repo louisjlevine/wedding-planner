@@ -210,11 +210,15 @@ const CATEGORY_TO_RESEARCH: Partial<Record<string, ResearchType>> = {
 // ── Combined status + tags selector ──────────────────────────────────────────
 
 function StatusTagsSelector({
-  vendor,
+  id,
+  status,
+  tags,
   onUpdate,
 }: {
-  vendor: Vendor;
-  onUpdate: (updates: Partial<Vendor>) => void;
+  id: string;
+  status: Vendor["status"];
+  tags: string[];
+  onUpdate: (updates: { status?: Vendor["status"]; tags?: string[] }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -228,16 +232,14 @@ function StatusTagsSelector({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const tags = vendor.tags ?? [];
-
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
       <button
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-[var(--accent)] transition-colors"
       >
-        <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[vendor.status]}`} />
-        <span className="capitalize">{vendor.status}</span>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[status]}`} />
+        <span className="capitalize">{status}</span>
         {tags.length > 0 && (
           <span className="text-gray-400 font-normal">· {tags.join(", ")}</span>
         )}
@@ -255,12 +257,12 @@ function StatusTagsSelector({
                 <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[s]}`} />
                 <input
                   type="radio"
-                  name={`status-${vendor.id}`}
-                  checked={vendor.status === s}
+                  name={`status-${id}`}
+                  checked={status === s}
                   onChange={() => onUpdate({ status: s })}
                   className="sr-only"
                 />
-                <span className={`text-xs capitalize ${vendor.status === s ? "font-semibold text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
+                <span className={`text-xs capitalize ${status === s ? "font-semibold text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
                   {s}
                 </span>
               </label>
@@ -398,40 +400,14 @@ function EditVendorForm({
             placeholder="0"
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">Status</label>
-          <select value={draft.status} onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value as Vendor["status"] }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
-            <option value="considering">Considering</option>
-            <option value="contacted">Contacted</option>
-            <option value="booked">Booked</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
         <div className="col-span-2">
-          <label className="text-xs text-gray-500 mb-1.5 block">Tags</label>
-          <div className="flex flex-wrap gap-2">
-            {TAGS.map((tag) => {
-              const active = draft.tags.includes(tag);
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setDraft((d) => ({
-                    ...d,
-                    tags: active ? d.tags.filter((t) => t !== tag) : [...d.tags, tag],
-                  }))}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                    active
-                      ? "bg-[var(--accent)] text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {tag}
-                </button>
-              );
-            })}
-          </div>
+          <label className="text-xs text-gray-500 mb-1.5 block">Status &amp; Tags</label>
+          <StatusTagsSelector
+            id={vendor.id}
+            status={draft.status}
+            tags={draft.tags}
+            onUpdate={(updates) => setDraft((d) => ({ ...d, ...updates }))}
+          />
         </div>
         {isVenue && (
           <>
@@ -1030,7 +1006,9 @@ export function Vendors() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <StatusTagsSelector
-                      vendor={vendor}
+                      id={vendor.id}
+                      status={vendor.status}
+                      tags={vendor.tags ?? []}
                       onUpdate={(updates) => updateVendor(vendor.id, updates)}
                     />
 
