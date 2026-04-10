@@ -135,63 +135,90 @@ export function buildTimeline(answers: WeddingAnswers): TimelineItem[] {
 
 // ── Budget ────────────────────────────────────────────────────────────────────
 
-function buildCategoryDescriptions(answers: WeddingAnswers): Record<string, string> {
+function buildCategoryDescriptions(
+  answers: WeddingAnswers,
+  amounts: Record<string, number>
+): Record<string, string> {
   const { guestCount, budget, priorities } = answers;
   const isLuxury = budget >= 100_000;
-  const cateringPerHead = guestCount > 0 ? Math.round((budget * 0.23) / guestCount) : 0;
-  const centerpieces = Math.ceil(guestCount / 8);
-  const bouquets = Math.max(2, Math.round(guestCount / 15));
+
+  const fmt = (n: number) => `$${n.toLocaleString()}`;
+
+  const venueAmt      = amounts.venue       ?? 0;
+  const cateringAmt   = amounts.catering    ?? 0;
+  const photoAmt      = amounts.photography ?? 0;
+  const flowersAmt    = amounts.flowers     ?? 0;
+  const musicAmt      = amounts.music       ?? 0;
+  const attireAmt     = amounts.attire      ?? 0;
+  const stationeryAmt = amounts.stationery  ?? 0;
+  const transportAmt  = amounts.transport   ?? 0;
+  const ringsAmt      = amounts.rings       ?? 0;
+  const miscAmt       = amounts.misc        ?? 0;
+
+  const cateringPerHead   = guestCount > 0 ? Math.round(cateringAmt / guestCount) : 0;
+  const stationeryPerSet  = guestCount > 0 ? Math.round(stationeryAmt / guestCount) : 0;
+  const centerpieces      = Math.ceil(guestCount / 8);
+  const bouquets          = Math.max(2, Math.round(guestCount / 15));
 
   return {
     venue:
-      `Covers the rental fee for ceremony and reception spaces, including setup and breakdown time.` +
+      `Your ${fmt(venueAmt)} venue budget covers the rental fee for ceremony and reception spaces, including setup and breakdown time.` +
       (guestCount >= 150
         ? ` With ${guestCount} guests, capacity will be a primary filter — expect higher minimums at larger venues.`
         : guestCount < 50
-        ? ` Smaller guest count gives you access to intimate spaces like restaurants, estates, or galleries that larger groups can't use.`
-        : ` Includes cocktail hour space and reception hall for ${guestCount} guests.`),
+        ? ` With ${guestCount} guests, this opens access to intimate spaces like restaurants, private estates, or galleries that larger groups can't use.`
+        : ` This covers cocktail hour space and reception hall for ${guestCount} guests.`),
+
     catering:
-      `Covers food service, bar, rentals (tables, chairs, linens if not included with venue), and staff gratuity for ${guestCount} guests.` +
+      `Your ${fmt(cateringAmt)} catering budget covers food service, bar, rentals (tables, chairs, linens if not included with venue), and staff gratuity for ${guestCount} guests` +
+      (cateringPerHead > 0 ? ` — roughly ${fmt(cateringPerHead)}/person before gratuity.` : `.`) +
       (isLuxury
-        ? ` At this budget level, consider a plated multi-course meal or elevated family-style service with premium bar selections.`
-        : cateringPerHead > 0
-        ? ` Estimated ~$${cateringPerHead}/person before gratuity — buffet or family-style service can stretch the budget further than plated.`
-        : ``),
+        ? ` At this level, consider a plated multi-course meal or elevated family-style service with premium bar selections.`
+        : ` Buffet or family-style service can stretch this budget further than a plated dinner.`),
+
     photography:
-      `Covers lead photographer` +
+      `Your ${fmt(photoAmt)} photography budget covers` +
       (priorities.includes("photography")
-        ? `, second shooter, and videographer. Photography is one of your top priorities, so investing here ensures you have premium coverage of every moment.`
-        : ` and optional second shooter or videographer. Full-day packages typically include 8 hours of coverage plus edited digital files delivered within 6–12 weeks.`) +
+        ? ` a lead photographer, second shooter, and videographer. Photography is one of your top priorities, so this investment ensures premium full-day coverage of every moment.`
+        : ` a lead photographer and optional second shooter or videographer. Full-day packages (8 hours) plus edited digital files are standard.`) +
       ` Top photographers book 12–18 months in advance.`,
+
     flowers:
-      `Covers bridal bouquet, approximately ${bouquets} bridesmaid bouquets, boutonnieres for the wedding party, ceremony arch or altar arrangements, and roughly ${centerpieces} reception table centerpieces for ${guestCount} guests.` +
+      `Your ${fmt(flowersAmt)} floral budget covers a bridal bouquet, approximately ${bouquets} bridesmaid bouquets, boutonnieres for the wedding party, ceremony arch or altar arrangements, and roughly ${centerpieces} reception table centerpieces for ${guestCount} guests.` +
       (isLuxury
-        ? ` Luxury installs like floral chandeliers, statement arches, or bespoke greenery walls can elevate the aesthetic significantly at this budget level.`
-        : ` Choosing seasonal, locally-grown flowers can reduce floral costs by 20–30%.`),
+        ? ` Luxury installs like floral chandeliers, statement arches, or bespoke greenery walls are well within range at this level.`
+        : ` Choosing seasonal, locally-grown flowers can reduce costs by 20–30%.`),
+
     music:
-      `Covers DJ or live band for ceremony and reception, including sound equipment and MC services.` +
+      `Your ${fmt(musicAmt)} music budget covers a DJ or live band for ceremony and reception, including sound equipment and MC services.` +
       (isLuxury
-        ? ` A live band ($5,000–$15,000+) creates an unmatched atmosphere. Consider a smaller jazz trio for cocktail hour and a full band for the reception.`
-        : ` A professional DJ ($1,500–$3,500) is the most cost-efficient option and can handle ceremony music, cocktail hour, and the full reception.`),
+        ? ` A live band ($5,000–$15,000+) creates an unmatched atmosphere — consider a jazz trio for cocktail hour and a full band for the reception.`
+        : ` A professional DJ ($1,500–$3,500) is the most cost-efficient option covering ceremony music, cocktail hour, and the full reception.`),
+
     attire:
-      `Covers the wedding dress or suit, alterations, accessories, veil, and hair & makeup for the wedding day.` +
-      ` Budget tip: alterations alone can run $300–$1,000, so factor this into your dress budget from the start.` +
-      (isLuxury ? ` Designer gowns and full bridal party styling are well within range at this budget level.` : ``),
+      `Your ${fmt(attireAmt)} attire budget covers the wedding dress or suit, alterations, accessories, veil, and hair & makeup for the wedding day.` +
+      ` Note: alterations alone can run $300–$1,000, so factor this in from the start.` +
+      (isLuxury ? ` Designer gowns and full bridal party styling are well within range at this level.` : ``),
+
     stationery:
-      `Covers save-the-dates, invitations, RSVP cards, and day-of items (programs, menus, place cards) for ${guestCount} guests.` +
-      ` Digital save-the-dates can reduce costs significantly. Printed suites typically run $3–$12 per invitation set depending on paper stock and printing method.`,
+      `Your ${fmt(stationeryAmt)} stationery budget covers save-the-dates, invitations, RSVP cards, and day-of items (programs, menus, place cards) for ${guestCount} guests` +
+      (stationeryPerSet > 0 ? ` — roughly ${fmt(stationeryPerSet)}/guest.` : `.`) +
+      ` Digital save-the-dates can reduce costs significantly. Printed suites typically run $3–$12 per set depending on paper stock and printing method.`,
+
     transport:
-      `Covers a getaway car for the couple and optional shuttle service for guests between venue, hotel, and parking areas.` +
+      `Your ${fmt(transportAmt)} transportation budget covers a getaway car for the couple and optional shuttle service for guests between venue, hotel, and parking areas.` +
       (guestCount >= 100
         ? ` With ${guestCount} guests, a shuttle greatly reduces parking headaches and ensures everyone arrives safely.`
-        : ` With a smaller guest count, shuttles may be optional — but a classic getaway car is a memorable touch.`),
+        : ` With a smaller guest count, a shuttle may be optional — but a classic getaway car is a memorable touch.`),
+
     rings:
-      `Covers wedding bands for both partners.` +
-      ` Simple gold or platinum bands start around $300–$600 each. Custom or diamond-set bands can range from $1,500–$5,000+.` +
-      (isLuxury ? ` At this budget, consider matching custom bands or incorporating stones from heirloom jewelry.` : ``),
+      `Your ${fmt(ringsAmt)} ring budget covers wedding bands for both partners.` +
+      ` Simple gold or platinum bands start around $300–$600 each; custom or diamond-set bands range from $1,500–$5,000+.` +
+      (isLuxury ? ` At this level, consider matching custom bands or incorporating stones from heirloom jewelry.` : ``),
+
     misc:
-      `Reserved for vendor gratuities (plan $20–$100 per vendor), day-of coordinator fees if not elsewhere, and unexpected costs.` +
-      ` Most couples spend 5–10% above initial estimates — this buffer prevents budget stress in the final weeks before the wedding.`,
+      `Your ${fmt(miscAmt)} buffer covers vendor gratuities (plan $20–$100 per vendor), day-of coordinator fees if not budgeted elsewhere, and unexpected costs.` +
+      ` Most couples spend 5–10% above initial estimates — this reserve prevents budget stress in the final weeks before the wedding.`,
   };
 }
 
@@ -217,8 +244,6 @@ export function buildBudgetCategories(
 
   const foodPriority = answers.priorities.includes("food");
   const photoPriority = answers.priorities.includes("photography");
-
-  const descriptions = buildCategoryDescriptions(answers);
 
   const base: Array<{
     id: string;
@@ -269,6 +294,15 @@ export function buildBudgetCategories(
   // Normalise percentages to 100
   const totalPct = base.reduce((sum, c) => sum + c.pct, 0);
   const scale = 100 / totalPct;
+
+  // Compute final dollar amounts first so descriptions can reference them
+  const amounts: Record<string, number> = {};
+  for (const c of base) {
+    const pct = Math.round(c.pct * scale * 10) / 10;
+    amounts[c.id] = Math.round((pct / 100) * total);
+  }
+
+  const descriptions = buildCategoryDescriptions(answers, amounts);
 
   return base.map((c) => {
     const pct = Math.round(c.pct * scale * 10) / 10;
