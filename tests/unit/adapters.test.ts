@@ -166,6 +166,93 @@ describe("buildBudgetCategories", () => {
       expect(cat.baselinePercentage).toBeGreaterThan(0);
     }
   });
+
+  it("all categories have a non-empty description", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    for (const cat of cats) {
+      expect(typeof cat.description).toBe("string");
+      expect((cat.description ?? "").length).toBeGreaterThan(20);
+    }
+  });
+
+  it("venue description mentions guest count", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    const venue = cats.find((c) => c.id === "venue")!;
+    expect(venue.description).toMatch(/100/); // BASE_ANSWERS.guestCount = 100
+  });
+
+  it("venue description mentions intimacy for small guest list (<50)", () => {
+    const answers = { ...BASE_ANSWERS, guestCount: 30 };
+    const cats = buildBudgetCategories(answers);
+    const venue = cats.find((c) => c.id === "venue")!;
+    expect(venue.description).toMatch(/intimate|flexib/i);
+  });
+
+  it("venue description warns about capacity for large guest list (>=150)", () => {
+    const answers = { ...BASE_ANSWERS, guestCount: 200 };
+    const cats = buildBudgetCategories(answers);
+    const venue = cats.find((c) => c.id === "venue")!;
+    expect(venue.description).toMatch(/200|capacity|minimum/i);
+  });
+
+  it("catering description mentions per-head estimate", () => {
+    const answers = { ...BASE_ANSWERS, budget: 50_000, guestCount: 100, priorities: ["venue", "music", "flowers"] as WeddingAnswers["priorities"] };
+    const cats = buildBudgetCategories(answers);
+    const catering = cats.find((c) => c.id === "catering")!;
+    expect(catering.description).toMatch(/\$\d+\/person|\d+.*per.*person/i);
+  });
+
+  it("photography description mentions second shooter when photography is a priority", () => {
+    const answers = { ...BASE_ANSWERS, priorities: ["photography", "venue", "music"] as WeddingAnswers["priorities"] };
+    const cats = buildBudgetCategories(answers);
+    const photo = cats.find((c) => c.id === "photography")!;
+    expect(photo.description).toMatch(/second shooter|videographer/i);
+    expect(photo.description).toMatch(/top priorit/i);
+  });
+
+  it("flowers description includes bouquet and centerpiece counts", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    const flowers = cats.find((c) => c.id === "flowers")!;
+    expect(flowers.description).toMatch(/bouquet/i);
+    expect(flowers.description).toMatch(/centerpiece/i);
+  });
+
+  it("music description mentions live band for luxury budget", () => {
+    const answers = { ...BASE_ANSWERS, budget: 150_000 };
+    const cats = buildBudgetCategories(answers);
+    const music = cats.find((c) => c.id === "music")!;
+    expect(music.description).toMatch(/live band|jazz/i);
+  });
+
+  it("music description mentions DJ for standard budget", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    const music = cats.find((c) => c.id === "music")!;
+    expect(music.description).toMatch(/DJ/i);
+  });
+
+  it("attire description mentions alterations cost", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    const attire = cats.find((c) => c.id === "attire")!;
+    expect(attire.description).toMatch(/alteration/i);
+  });
+
+  it("stationery description mentions guest count", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    const stationery = cats.find((c) => c.id === "stationery")!;
+    expect(stationery.description).toMatch(/100/); // BASE_ANSWERS.guestCount = 100
+  });
+
+  it("misc description explains buffer purpose", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    const misc = cats.find((c) => c.id === "misc")!;
+    expect(misc.description).toMatch(/gratu|buffer|unexpected/i);
+  });
+
+  it("rings description mentions price range", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    const rings = cats.find((c) => c.id === "rings")!;
+    expect(rings.description).toMatch(/\$\d+/);
+  });
 });
 
 // ── buildInitialTasks ─────────────────────────────────────────────────────────
