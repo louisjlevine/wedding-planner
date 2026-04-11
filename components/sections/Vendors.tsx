@@ -399,39 +399,14 @@ function EditVendorForm({
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
         <div>
-          <label className="text-xs text-gray-500 mb-1 block">Status</label>
-          <select value={draft.status} onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value as Vendor["status"] }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
-            <option value="considering">Considering</option>
-            <option value="contacted">Contacted</option>
-            <option value="booked">Booked</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-        <div className="col-span-2">
-          <label className="text-xs text-gray-500 mb-1.5 block">Tags</label>
-          <div className="flex flex-wrap gap-2">
-            {TAGS.map((tag) => {
-              const active = draft.tags.includes(tag);
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setDraft((d) => ({
-                    ...d,
-                    tags: active ? d.tags.filter((t) => t !== tag) : [...d.tags, tag],
-                  }))}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                    active
-                      ? "bg-[var(--accent)] text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {tag}
-                </button>
-              );
-            })}
-          </div>
+          <label className="text-xs text-gray-500 mb-1 block">Status & Tags</label>
+          <StatusTagsSelector
+            vendor={{ ...vendor, status: draft.status, tags: draft.tags }}
+            onUpdate={(updates) => {
+              if (updates.status !== undefined) setDraft((d) => ({ ...d, status: updates.status! }));
+              if (updates.tags !== undefined) setDraft((d) => ({ ...d, tags: updates.tags ?? [] }));
+            }}
+          />
         </div>
         {isVenue && (
           <>
