@@ -398,19 +398,25 @@ function EditVendorForm({
             placeholder="0"
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">Status</label>
-          <select value={draft.status} onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value as Vendor["status"] }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
-            <option value="considering">Considering</option>
-            <option value="contacted">Contacted</option>
-            <option value="booked">Booked</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
         <div className="col-span-2">
-          <label className="text-xs text-gray-500 mb-1.5 block">Tags</label>
+          <label className="text-xs text-gray-500 mb-1.5 block">Status &amp; Tags</label>
           <div className="flex flex-wrap gap-2">
+            {(["considering", "contacted", "booked", "rejected"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, status: s }))}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  draft.status === s
+                    ? "bg-[var(--accent)] text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full shrink-0 ${draft.status === s ? "bg-white/80" : STATUS_DOT[s]}`} />
+                <span className="capitalize">{s}</span>
+              </button>
+            ))}
+            <span className="w-px bg-gray-200 self-stretch mx-1" />
             {TAGS.map((tag) => {
               const active = draft.tags.includes(tag);
               return (
