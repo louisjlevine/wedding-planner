@@ -249,32 +249,52 @@ function StatusTagsSelector({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 z-20 min-w-[170px]">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Status</p>
-          <div className="space-y-1.5 mb-3">
-            {(["considering", "contacted", "booked", "rejected"] as const).map((s) => (
-              <label key={s} className="flex items-center gap-2 cursor-pointer group">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[s]}`} />
-                <input
-                  type="radio"
-                  name={`status-${id}`}
-                  checked={status === s}
-                  onChange={() => onUpdate({ status: s })}
-                  className="sr-only"
-                />
-                <span className={`text-xs capitalize ${status === s ? "font-semibold text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
-                  {s}
-                </span>
-              </label>
-            ))}
+        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 z-20 min-w-[180px]">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Status</p>
+          <div className="space-y-0.5 mb-3">
+            {(["considering", "contacted", "booked", "rejected"] as const).map((s) => {
+              const selected = status === s;
+              return (
+                <label
+                  key={s}
+                  className={`flex items-center gap-2 cursor-pointer rounded-lg px-2 py-1.5 transition-colors ${
+                    selected ? "bg-[var(--accent)]/10" : "hover:bg-gray-50"
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[s]}`} />
+                  <input
+                    type="radio"
+                    name={`status-${id}`}
+                    checked={selected}
+                    onChange={() => onUpdate({ status: s })}
+                    className="sr-only"
+                  />
+                  <span className={`text-xs capitalize flex-1 ${selected ? "font-semibold text-[var(--accent)]" : "text-gray-500"}`}>
+                    {s}
+                  </span>
+                  {selected && (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-[var(--accent)] shrink-0">
+                      <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </label>
+              );
+            })}
           </div>
 
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tags</p>
-          <div className="space-y-1.5">
+          <hr className="border-gray-100 mb-2.5" />
+
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Tags</p>
+          <div className="space-y-0.5">
             {TAGS.map((tag) => {
               const active = tags.includes(tag);
               return (
-                <label key={tag} className="flex items-center gap-2 cursor-pointer group">
+                <label
+                  key={tag}
+                  className={`flex items-center gap-2 cursor-pointer rounded-lg px-2 py-1.5 transition-colors ${
+                    active ? "bg-[var(--accent)]/10" : "hover:bg-gray-50"
+                  }`}
+                >
                   <input
                     type="checkbox"
                     checked={active}
@@ -284,9 +304,9 @@ function StatusTagsSelector({
                         : tags.filter((t) => t !== tag);
                       onUpdate({ tags: newTags });
                     }}
-                    className="w-3 h-3 accent-[var(--accent)] cursor-pointer"
+                    className="w-3 h-3 accent-[var(--accent)] cursor-pointer shrink-0"
                   />
-                  <span className={`text-xs ${active ? "font-semibold text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
+                  <span className={`text-xs flex-1 ${active ? "font-semibold text-[var(--accent)]" : "text-gray-500"}`}>
                     {tag}
                   </span>
                 </label>
