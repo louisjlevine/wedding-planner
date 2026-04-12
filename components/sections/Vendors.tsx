@@ -257,12 +257,17 @@ function StatusTagsSelector({
                   type="radio"
                   name={`status-${vendor.id}`}
                   checked={vendor.status === s}
-                  onChange={() => onUpdate({ status: s })}
+                  onChange={() => { onUpdate({ status: s }); setOpen(false); }}
                   className="sr-only"
                 />
-                <span className={`text-xs capitalize ${vendor.status === s ? "font-semibold text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
+                <span className={`text-xs capitalize flex-1 ${vendor.status === s ? "font-semibold text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
                   {s}
                 </span>
+                {vendor.status === s && (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-gray-700 shrink-0">
+                    <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
               </label>
             ))}
           </div>
