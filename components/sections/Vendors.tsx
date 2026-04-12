@@ -238,9 +238,11 @@ function StatusTagsSelector({
       >
         <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[vendor.status]}`} />
         <span className="capitalize">{vendor.status}</span>
-        {tags.length > 0 && (
-          <span className="text-gray-400 font-normal">· {tags.join(", ")}</span>
-        )}
+        {tags.map((tag) => (
+          <span key={tag} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-medium leading-none">
+            {tag}
+          </span>
+        ))}
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-gray-400 ml-0.5">
           <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

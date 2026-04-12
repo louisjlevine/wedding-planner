@@ -51,10 +51,13 @@ describe("Secret hygiene", () => {
   });
 
   it("no API key literals in tracked source files", () => {
+    // Build the pattern at runtime so this test file doesn't contain the
+    // literal string and accidentally match itself via git grep.
+    const apiKeyPattern = ["sk", "ant"].join("-") + "-";
     let result = "";
     try {
       result = execSync(
-        "git grep -r 'sk-ant-' -- '*.ts' '*.tsx' '*.js' '*.json' 2>/dev/null || true",
+        `git grep -r '${apiKeyPattern}' -- '*.ts' '*.tsx' '*.js' '*.json' 2>/dev/null || true`,
         { cwd: ROOT }
       ).toString();
     } catch {
