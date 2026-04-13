@@ -596,6 +596,7 @@ export function Vendors() {
 
   // Category filter — "All" means no filter
   const [filterCategory, setFilterCategory] = useState<string>("All");
+  const [hideRejected, setHideRejected] = useState(false);
 
   // Venue comparison table pop-out
   const [showVenueTable, setShowVenueTable] = useState(false);
@@ -678,7 +679,9 @@ export function Vendors() {
   // Categories that actually have vendors (for filter pills)
   const presentCategories = CATEGORIES.filter((c) => vendors.some((v) => v.category === c));
 
-  const grouped = vendors.reduce<Record<string, Vendor[]>>((acc, v) => {
+  const filteredVendors = vendors.filter((v) => !hideRejected || v.status !== "rejected");
+
+  const grouped = filteredVendors.reduce<Record<string, Vendor[]>>((acc, v) => {
     if (!acc[v.category]) acc[v.category] = [];
     acc[v.category].push(v);
     return acc;
@@ -916,9 +919,9 @@ export function Vendors() {
       )}
 
       {/* Category filter pills — only shown when there are vendors */}
-      {vendors.length > 0 && presentCategories.length > 1 && (
-        <div className="flex flex-wrap gap-1.5">
-          {["All", ...presentCategories].map((cat) => (
+      {vendors.length > 0 && (presentCategories.length > 1 || vendors.some((v) => v.status === "rejected")) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {presentCategories.length > 1 && ["All", ...presentCategories].map((cat) => (
             <button
               key={cat}
               onClick={() => setFilterCategory(cat)}
@@ -931,6 +934,18 @@ export function Vendors() {
               {cat}
             </button>
           ))}
+          {vendors.some((v) => v.status === "rejected") && (
+            <button
+              onClick={() => setHideRejected((h) => !h)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                hideRejected
+                  ? "bg-gray-800 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {hideRejected ? "Show rejected" : "Hide rejected"}
+            </button>
+          )}
         </div>
       )}
 
