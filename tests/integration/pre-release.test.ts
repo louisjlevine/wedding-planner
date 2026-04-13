@@ -129,6 +129,27 @@ describe("Required files exist", () => {
   }
 });
 
+// ── Sidebar nav — all tabs present ───────────────────────────────────────────
+
+describe("Sidebar nav — all tabs present", () => {
+  const sidebar = readFile("components/shell/Sidebar.tsx");
+
+  const expectedTabs = [
+    "overview",
+    "advisor",
+    "research",
+    "budget",
+    "timeline",
+    "vendors",
+    "guests",
+    "digest",
+  ];
+
+  for (const tab of expectedTabs) {
+    it(`includes "${tab}" tab`, () => expect(sidebar).toContain(`"${tab}"`));
+  }
+});
+
 // ── TypeScript compiles without errors ────────────────────────────────────────
 
 describe("TypeScript — compilation", () => {
