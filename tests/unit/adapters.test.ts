@@ -166,6 +166,73 @@ describe("buildBudgetCategories", () => {
       expect(cat.baselinePercentage).toBeGreaterThan(0);
     }
   });
+
+  it("all categories have a non-empty description", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    for (const cat of cats) {
+      expect(cat.description).toBeTruthy();
+      expect(cat.description!.length).toBeGreaterThan(20);
+    }
+  });
+
+  it("every description includes the allocated dollar amount", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    for (const cat of cats) {
+      // Each description should start with the ~$X,XXX amount prefix
+      expect(cat.description).toMatch(/^~\$[\d,]+/);
+    }
+  });
+
+  it("description amount matches the category amount", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    for (const cat of cats) {
+      const expected = `~$${cat.amount.toLocaleString()}`;
+      expect(cat.description).toMatch(expected);
+    }
+  });
+
+  it("venue description is context-aware for large guest count", () => {
+    const cats = buildBudgetCategories({ ...BASE_ANSWERS, guestCount: 200 });
+    const venue = cats.find((c) => c.id === "venue")!;
+    expect(venue.description).toMatch(/200/);
+    expect(venue.description).toMatch(/capacity/i);
+  });
+
+  it("venue description mentions flexibility for small guest count", () => {
+    const cats = buildBudgetCategories({ ...BASE_ANSWERS, guestCount: 30 });
+    const venue = cats.find((c) => c.id === "venue")!;
+    expect(venue.description).toMatch(/smaller/i);
+  });
+
+  it("catering description includes per-person cost estimate", () => {
+    const cats = buildBudgetCategories(BASE_ANSWERS);
+    const catering = cats.find((c) => c.id === "catering")!;
+    expect(catering.description).toMatch(/\/person/i);
+  });
+
+  it("flowers description mentions bouquet count and guest-scaled centerpieces", () => {
+    const cats = buildBudgetCategories({ ...BASE_ANSWERS, guestCount: 120 });
+    const flowers = cats.find((c) => c.id === "flowers")!;
+    // 120 guests → ~8 bouquets, ~15 centerpieces
+    expect(flowers.description).toMatch(/bouquet/i);
+    expect(flowers.description).toMatch(/centerpiece/i);
+  });
+
+  it("photography description notes priority when photography is a priority", () => {
+    const answers = { ...BASE_ANSWERS, priorities: ["photography", "venue", "food"] as WeddingAnswers["priorities"] };
+    const cats = buildBudgetCategories(answers);
+    const photo = cats.find((c) => c.id === "photography")!;
+    expect(photo.description).toMatch(/top priorit/i);
+  });
+
+  it("luxury budget descriptions include luxury-tier copy", () => {
+    const answers = { ...BASE_ANSWERS, budget: 150_000, priorities: ["venue", "music", "flowers"] as WeddingAnswers["priorities"] };
+    const cats = buildBudgetCategories(answers);
+    const flowers = cats.find((c) => c.id === "flowers")!;
+    expect(flowers.description).toMatch(/luxury/i);
+    const music = cats.find((c) => c.id === "music")!;
+    expect(music.description).toMatch(/live band/i);
+  });
 });
 
 // ── buildInitialTasks ─────────────────────────────────────────────────────────
