@@ -257,12 +257,17 @@ function StatusTagsSelector({
                   type="radio"
                   name={`status-${vendor.id}`}
                   checked={vendor.status === s}
-                  onChange={() => onUpdate({ status: s })}
+                  onChange={() => { onUpdate({ status: s }); setOpen(false); }}
                   className="sr-only"
                 />
-                <span className={`text-xs capitalize ${vendor.status === s ? "font-semibold text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
+                <span className={`text-xs capitalize flex-1 ${vendor.status === s ? "font-semibold text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
                   {s}
                 </span>
+                {vendor.status === s && (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-[var(--accent)] shrink-0">
+                    <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
               </label>
             ))}
           </div>
@@ -398,19 +403,25 @@ function EditVendorForm({
             placeholder="0"
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">Status</label>
-          <select value={draft.status} onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value as Vendor["status"] }))}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
-            <option value="considering">Considering</option>
-            <option value="contacted">Contacted</option>
-            <option value="booked">Booked</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
         <div className="col-span-2">
-          <label className="text-xs text-gray-500 mb-1.5 block">Tags</label>
-          <div className="flex flex-wrap gap-2">
+          <label className="text-xs text-gray-500 mb-1.5 block">Status &amp; Tags</label>
+          <div className="flex flex-wrap items-center gap-2">
+            {(["considering", "contacted", "booked", "rejected"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, status: s }))}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  draft.status === s
+                    ? "bg-[var(--accent)] text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full shrink-0 ${draft.status === s ? "bg-white/80" : STATUS_DOT[s]}`} />
+                <span className="capitalize">{s}</span>
+              </button>
+            ))}
+            <span className="text-gray-300 select-none">|</span>
             {TAGS.map((tag) => {
               const active = draft.tags.includes(tag);
               return (
