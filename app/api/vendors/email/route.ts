@@ -1,14 +1,16 @@
 /**
- * Inbound email webhook — receives emails forwarded via Resend Inbound Routing.
+ * Inbound email webhook — receives email.received events from Resend.
  *
- * Setup (one-time):
- * 1. In Resend dashboard → Domains → your domain → Inbound Routing
- * 2. Add rule: deliver to (catch-all or specific address) → webhook
- * 3. Webhook URL: https://your-domain.com/api/vendors/email?secret=<INBOUND_WEBHOOK_SECRET>
- * 4. Set INBOUND_WEBHOOK_SECRET in your env vars (any random string, 32+ chars)
+ * Setup (one-time, run once):
+ *   curl -X POST https://api.resend.com/webhooks \
+ *     -H "Authorization: Bearer <RESEND_API_KEY>" \
+ *     -H "Content-Type: application/json" \
+ *     -d '{"endpoint":"https://<your-app>/api/vendors/email?secret=<INBOUND_WEBHOOK_SECRET>","events":["email.received"]}'
  *
- * Usage: forward any vendor email — or send a message containing their URL — to
- * your designated address and the vendor is imported automatically.
+ * Then set env vars: INBOUND_WEBHOOK_SECRET, IMPORT_TOKEN, NEXT_PUBLIC_APP_URL, RESEND_API_KEY
+ *
+ * Usage: send any email containing vendor URLs to add@plan.louisjlevine.com
+ * and the vendor is imported automatically.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -20,14 +22,11 @@ export const dynamic = "force-dynamic";
 function extractUrls(text: string): string[] {
   const seen = new Set<string>();
   const results: string[] = [];
-  // Match http(s):// URLs
   const matches = text.match(/https?:\/\/[^\s"'<>)\]]+/g) ?? [];
   for (const raw of matches) {
-    // Trim trailing punctuation that may have been included
     const url = raw.replace(/[.,;!?]+$/, "");
     try {
       const parsed = new URL(url);
-      // Skip common non-vendor domains
       const skip = [
         "mailto:", "unsubscribe", "tracking", "click.", "open.",
         "resend.com", "sendgrid", "mailchimp", "constantcontact",
@@ -42,14 +41,30 @@ function extractUrls(text: string): string[] {
       continue;
     }
   }
-  // Limit to first 3 to avoid runaway API usage
   return results.slice(0, 3);
+}
+
+// ── Fetch full email body from Resend API ─────────────────────────────────────
+
+async function fetchEmailBody(emailId: string): Promise<string> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return "";
+  try {
+    const res = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return "";
+    const data = await res.json() as { text?: string; html?: string; subject?: string };
+    return `${data.subject ?? ""}\n${data.text ?? ""}`;
+  } catch {
+    return "";
+  }
 }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  // Verify webhook secret from query param (set in Resend dashboard webhook URL)
   const secret = req.nextUrl.searchParams.get("secret");
   const expected = process.env.INBOUND_WEBHOOK_SECRET;
 
@@ -64,26 +79,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Resend inbound email fields
-  const text =
-    typeof body.text === "string" ? body.text :
-    typeof body.plain === "string" ? body.plain : "";
+  // Handle Resend email.received event format
+  const eventType = typeof body.type === "string" ? body.type : "";
+  const data = (body.data ?? {}) as Record<string, unknown>;
+  const emailId = typeof data.email_id === "string" ? data.email_id : "";
+  const from = typeof data.from === "string" ? data.from : "";
+  const subject = typeof data.subject === "string" ? data.subject : "";
 
-  const subject = typeof body.subject === "string" ? body.subject : "";
-  const from = typeof body.from === "string" ? body.from : "";
+  if (eventType !== "email.received" || !emailId) {
+    console.log(`[vendors/email] Ignoring event: ${eventType}`);
+    return NextResponse.json({ imported: 0, message: "Not an inbound email event" });
+  }
 
   console.log(`[vendors/email] Received email from ${from}: "${subject}"`);
 
-  // Combine subject + body to catch URLs wherever they appear
-  const fullText = `${subject}\n${text}`;
-  const urls = extractUrls(fullText);
+  // Fetch full email body (webhook payload only contains metadata)
+  const fullText = await fetchEmailBody(emailId);
+  const urls = extractUrls(fullText || subject);
 
   if (urls.length === 0) {
     console.log("[vendors/email] No vendor URLs found in email");
     return NextResponse.json({ imported: 0, message: "No URLs found" });
   }
 
-  // Call the import endpoint for each URL (internal call using IMPORT_TOKEN)
   const importToken = process.env.IMPORT_TOKEN;
   if (!importToken) {
     console.error("[vendors/email] IMPORT_TOKEN not configured");
@@ -104,9 +122,9 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({ url }),
       });
       if (res.ok) {
-        const data = await res.json() as { vendor?: { name?: string } };
-        results.push({ url, ok: true, name: data.vendor?.name });
-        console.log(`[vendors/email] Imported: ${data.vendor?.name} (${url})`);
+        const resData = await res.json() as { vendor?: { name?: string } };
+        results.push({ url, ok: true, name: resData.vendor?.name });
+        console.log(`[vendors/email] Imported: ${resData.vendor?.name} (${url})`);
       } else {
         results.push({ url, ok: false });
         console.warn(`[vendors/email] Import failed for ${url}: ${res.status}`);
