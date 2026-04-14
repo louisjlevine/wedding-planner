@@ -31,9 +31,9 @@ jobs:
         run: |
           claude -p "You are working in a GitHub Actions runner with access to a Next.js wedding planner codebase.
 
-          Step 1 — Find the issue: Query the Linear GraphQL API to find the highest-priority open issue in the 'Wedding Website' project. Use curl with the LINEAR_API_KEY environment variable as a Bearer token against https://api.linear.app/graphql.
+          Step 1 — Find the issue: Query the Linear GraphQL API to find the highest-priority issue in the 'Wedding Website' project whose state type is exactly "unstarted" (To Do). Use curl with the LINEAR_API_KEY environment variable as a Bearer token against https://api.linear.app/graphql. Include a filter on state: { type: { eq: "unstarted" } } in your query. If no unstarted issues are returned, print "No To Do issues found — exiting." and stop immediately without making any changes.
 
-          Step 2 — Implement it: Read the relevant files in this repo, then implement the changes described by the issue.
+          Step 2 — Implement it: Confirm the issue state type is "unstarted" before proceeding. Then read the relevant files in this repo and implement the changes described by the issue.
 
           Step 3 — Commit and push: Create a new branch named linear/<issue-identifier>-<slug>, commit all changes with a descriptive message referencing the issue, and push the branch. Use the GITHUB_TOKEN for authentication: set the remote URL to https://x-access-token:\${GITHUB_TOKEN}@github.com/louisjlevine/wedding-planner.git before pushing.
 
