@@ -585,7 +585,7 @@ function SetupPanel({ onClose }: { onClose: () => void }) {
       <div>
         <p className="font-semibold text-gray-500 uppercase tracking-wide mb-2">Email via wedding@louisjlevine.com</p>
         <p className="text-gray-600 mb-3">
-          Forward any vendor email to <strong>wedding@louisjlevine.com</strong> and it&rsquo;s automatically imported. Uses a subdomain so your main <em>@louisjlevine.com</em> email is completely unaffected.
+          Forward or BCC any vendor email to <strong>add@plan.louisjlevine.com</strong> and it&rsquo;s automatically imported. Only a subdomain MX record is needed — your main Titan email is completely unaffected.
         </p>
 
         <p className="font-medium text-gray-700 mb-1">Step 1 — WordPress.com DNS (one-time)</p>
@@ -593,8 +593,8 @@ function SetupPanel({ onClose }: { onClose: () => void }) {
           <li>WordPress.com → <strong>My Sites</strong> → <strong>Upgrades</strong> → <strong>Domains</strong> → click <em>louisjlevine.com</em></li>
           <li><strong>DNS Records</strong> → <strong>Add Record</strong> → Type: <strong>MX</strong></li>
           <li>Name/Host: <code className="bg-gray-100 px-1 rounded">plan</code> &nbsp;|&nbsp; Value: <code className="bg-gray-100 px-1 rounded">inbound.resend.com</code> &nbsp;|&nbsp; Priority: <code className="bg-gray-100 px-1 rounded">10</code> → Save</li>
-          <li>Still on the domain page → <strong>Email Forwarding</strong> → <strong>Add Forward</strong>: <code className="bg-gray-100 px-1 rounded">wedding</code> forwards to <code className="bg-gray-100 px-1 rounded">add@plan.louisjlevine.com</code></li>
         </ol>
+        <p className="text-gray-400 mb-3">No email forwarding rule needed — Titan&rsquo;s forwarding only works within the same domain. Just use <code className="bg-gray-100 px-1 rounded">add@plan.louisjlevine.com</code> directly.</p>
 
         <p className="font-medium text-gray-700 mb-1">Step 2 — Resend inbound routing (one-time, free tier)</p>
         <ol className="text-gray-600 space-y-1 list-decimal list-inside mb-3">
