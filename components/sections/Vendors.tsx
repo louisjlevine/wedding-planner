@@ -625,7 +625,8 @@ export function Vendors() {
     answers, setResearchNotes, setTriggerResearchFor, setActiveTab,
   } = usePlanStore();
 
-  // Poll for externally-imported vendors every 30s (e.g. from email/shortcut)
+  // Poll for externally-imported vendors (e.g. from email/shortcut).
+  // Runs immediately on mount, then every 30s.
   useEffect(() => {
     async function pollVendors() {
       try {
@@ -639,6 +640,7 @@ export function Vendors() {
         // silent — polling is best-effort
       }
     }
+    pollVendors(); // immediate on mount
     const id = setInterval(pollVendors, 30_000);
     return () => clearInterval(id);
   }, [mergeVendors]);
