@@ -27,11 +27,27 @@ function extractUrls(text: string): string[] {
     const url = raw.replace(/[.,;!?]+$/, "");
     try {
       const parsed = new URL(url);
-      const skip = [
-        "mailto:", "unsubscribe", "tracking", "click.", "open.",
-        "resend.com", "sendgrid", "mailchimp", "constantcontact",
+      // Skip known non-vendor domains: email providers, calendars, booking tools, trackers
+      const skipHostnames = [
+        "outlook.com", "outlook.live.com", "outlook.office.com", "outlook.office365.com",
+        "office365.com", "office.com", "microsoft.com", "microsoftonline.com",
+        "google.com", "gmail.com", "googlemail.com", "googleapis.com",
+        "calendar.google.com", "meet.google.com", "docs.google.com",
+        "calendly.com", "acuityscheduling.com", "squareup.com", "square.site",
+        "zoom.us", "zoomgov.com",
+        "apple.com", "icloud.com",
+        "yahoo.com", "aol.com",
+        "resend.com", "sendgrid.net", "sendgrid.com",
+        "mailchimp.com", "constantcontact.com", "klaviyo.com",
+        "facebook.com", "instagram.com", "twitter.com", "x.com", "linkedin.com",
+        "yelp.com", "tripadvisor.com",
       ];
-      if (skip.some((s) => url.includes(s))) continue;
+      const skipSubstrings = ["unsubscribe", "tracking", "click.", "open.", "mailto:"];
+      const hostname = parsed.hostname.replace(/^www\./, "");
+      if (
+        skipHostnames.some((h) => hostname === h || hostname.endsWith(`.${h}`)) ||
+        skipSubstrings.some((s) => url.includes(s))
+      ) continue;
       const key = parsed.hostname + parsed.pathname;
       if (!seen.has(key)) {
         seen.add(key);
