@@ -621,9 +621,27 @@ function SetupPanel({ onClose }: { onClose: () => void }) {
 
 export function Vendors() {
   const {
-    vendors, addVendor, updateVendor, removeVendor,
+    vendors, addVendor, updateVendor, removeVendor, mergeVendors,
     answers, setResearchNotes, setTriggerResearchFor, setActiveTab,
   } = usePlanStore();
+
+  // Poll for externally-imported vendors every 30s (e.g. from email/shortcut)
+  useEffect(() => {
+    async function pollVendors() {
+      try {
+        const res = await fetch("/api/sync");
+        if (!res.ok) return;
+        const data = await res.json() as { vendors?: unknown[] };
+        if (Array.isArray(data.vendors) && data.vendors.length > 0) {
+          mergeVendors(data.vendors as import("@/lib/types").Vendor[]);
+        }
+      } catch {
+        // silent — polling is best-effort
+      }
+    }
+    const id = setInterval(pollVendors, 30_000);
+    return () => clearInterval(id);
+  }, [mergeVendors]);
 
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

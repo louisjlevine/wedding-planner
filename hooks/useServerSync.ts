@@ -61,10 +61,30 @@ export function useServerSync() {
 
   async function saveToServer(payload: object) {
     setSyncStatus("saving");
+    // Fetch current server state so we can merge vendors (external imports
+    // may have added vendors between the last pull and this push).
+    let merged = payload;
+    try {
+      const getRes = await fetch("/api/sync");
+      if (getRes.ok) {
+        const serverData = await getRes.json() as Record<string, unknown>;
+        const localVendors = (payload as Record<string, unknown>).vendors;
+        const serverVendors = serverData.vendors;
+        if (Array.isArray(localVendors) && Array.isArray(serverVendors)) {
+          const byId = new Map(localVendors.map((v: Record<string, unknown>) => [v.id, v]));
+          (serverVendors as Record<string, unknown>[]).forEach((v) => {
+            if (!byId.has(v.id)) byId.set(v.id, v);
+          });
+          merged = { ...payload, vendors: Array.from(byId.values()) };
+        }
+      }
+    } catch {
+      // Non-fatal — fall back to plain push
+    }
     const res = await fetch("/api/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(merged),
     });
     if (!res.ok) {
       const body = await res.text();

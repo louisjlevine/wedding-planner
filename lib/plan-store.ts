@@ -43,6 +43,7 @@ interface PlanState {
   addVendor: (vendor: Vendor) => void;
   updateVendor: (id: string, updates: Partial<Vendor>) => void;
   removeVendor: (id: string) => void;
+  mergeVendors: (incoming: Vendor[]) => void;
 
   addTask: (task: Task) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
@@ -124,6 +125,14 @@ export const usePlanStore = create<PlanState>()(
 
       addVendor: (vendor) =>
         set((state) => ({ vendors: [...state.vendors, vendor] })),
+
+      // Merge incoming vendors from server — adds new ones (by id), updates existing
+      mergeVendors: (incoming) =>
+        set((state) => {
+          const localById = new Map(state.vendors.map((v) => [v.id, v]));
+          incoming.forEach((v) => localById.set(v.id, v));
+          return { vendors: Array.from(localById.values()) };
+        }),
 
       updateVendor: (id, updates) =>
         set((state) => ({
