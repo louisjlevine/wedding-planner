@@ -247,7 +247,7 @@ function StatusTagsSelector({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 z-20 min-w-[170px]">
+        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 z-50 min-w-[170px]">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Status</p>
           <div className="space-y-1.5 mb-3">
             {(["considering", "contacted", "booked", "rejected"] as const).map((s) => (
@@ -308,10 +308,12 @@ function EditVendorForm({
   vendor,
   onSave,
   onCancel,
+  onAutoSave,
 }: {
   vendor: Vendor;
   onSave: (updates: Partial<Vendor>) => void;
   onCancel: () => void;
+  onAutoSave: (updates: Partial<Vendor>) => void;
 }) {
   const [draft, setDraft] = useState({
     name:          vendor.name,
@@ -329,6 +331,39 @@ function EditVendorForm({
   const [cleaningUp, setCleaningUp] = useState(false);
 
   const isVenue = draft.category === "Venue";
+
+  const buildUpdates = useCallback((): Partial<Vendor> => ({
+    name:         draft.name.trim() || vendor.name,
+    category:     draft.category,
+    contact:      draft.contact      || undefined,
+    website:      draft.website      || undefined,
+    price:        draft.price        ? parseInt(draft.price) : undefined,
+    notes:        draft.notes        || undefined,
+    status:       draft.status,
+    tags:         draft.tags.length  ? draft.tags : undefined,
+    rentalPeriod: isVenue ? (draft.rentalPeriod || undefined) : undefined,
+    overtimeRate: isVenue ? (draft.overtimeRate || undefined) : undefined,
+    attachments:  attachments.length ? attachments : undefined,
+  }), [draft, attachments, isVenue, vendor.name]);
+
+  // Auto-save to store 800ms after any change so mobile tab-close doesn't lose data
+  useEffect(() => {
+    const timer = setTimeout(() => onAutoSave(buildUpdates()), 800);
+    return () => clearTimeout(timer);
+  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [draft, attachments]); // intentionally omit buildUpdates/onAutoSave to avoid infinite loop
+
+  // Flush immediately when user switches away (mobile Chrome close / tab switch)
+  useEffect(() => {
+    const flush = () => { if (document.visibilityState === "hidden") onAutoSave(buildUpdates()); };
+    document.addEventListener("visibilitychange", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", flush);
+      window.removeEventListener("pagehide", flush);
+    };
+  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [buildUpdates]);
 
   const handleCleanupNotes = useCallback(async () => {
     if (!draft.notes.trim() || cleaningUp) return;
@@ -355,19 +390,7 @@ function EditVendorForm({
   }
 
   function commit() {
-    onSave({
-      name:         draft.name.trim() || vendor.name,
-      category:     draft.category,
-      contact:      draft.contact      || undefined,
-      website:      draft.website      || undefined,
-      price:        draft.price        ? parseInt(draft.price) : undefined,
-      notes:        draft.notes        || undefined,
-      status:       draft.status,
-      tags:         draft.tags.length  ? draft.tags : undefined,
-      rentalPeriod: isVenue ? (draft.rentalPeriod || undefined) : undefined,
-      overtimeRate: isVenue ? (draft.overtimeRate || undefined) : undefined,
-      attachments:  attachments.length ? attachments : undefined,
-    });
+    onSave(buildUpdates());
   }
 
   return (
@@ -597,6 +620,7 @@ export function Vendors() {
   // Category filter — "All" means no filter
   const [filterCategory, setFilterCategory] = useState<string>("All");
   const [hideRejected, setHideRejected] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Venue comparison table pop-out
   const [showVenueTable, setShowVenueTable] = useState(false);
@@ -679,13 +703,25 @@ export function Vendors() {
   // Categories that actually have vendors (for filter pills)
   const presentCategories = CATEGORIES.filter((c) => vendors.some((v) => v.category === c));
 
-  const filteredVendors = vendors.filter((v) => !hideRejected || v.status !== "rejected");
+  const filteredVendors = vendors
+    .filter((v) => !hideRejected || v.status !== "rejected")
+    .filter((v) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        v.name.toLowerCase().includes(q) ||
+        v.website?.toLowerCase().includes(q) ||
+        v.notes?.toLowerCase().includes(q) ||
+        v.contact?.toLowerCase().includes(q)
+      );
+    });
 
   const grouped = filteredVendors.reduce<Record<string, Vendor[]>>((acc, v) => {
     if (!acc[v.category]) acc[v.category] = [];
     acc[v.category].push(v);
     return acc;
   }, {});
+  Object.values(grouped).forEach((g) => g.sort((a, b) => a.name.localeCompare(b.name)));
 
   // Apply category filter
   const visibleEntries = Object.entries(grouped).filter(
@@ -918,6 +954,31 @@ export function Vendors() {
         </div>
       )}
 
+      {/* Search + filter row — only shown when there are vendors */}
+      {vendors.length > 0 && (
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+          </svg>
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search vendors…"
+            className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M2 2l10 10M12 2L2 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Category filter pills — only shown when there are vendors */}
       {vendors.length > 0 && (presentCategories.length > 1 || vendors.some((v) => v.status === "rejected")) && (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -947,6 +1008,10 @@ export function Vendors() {
             </button>
           )}
         </div>
+      )}
+
+      {vendors.length > 0 && filteredVendors.length === 0 && (
+        <p className="text-sm text-gray-400 text-center py-6">No vendors match your search.</p>
       )}
 
       {vendors.length === 0 && !adding && (
@@ -988,6 +1053,7 @@ export function Vendors() {
                     vendor={vendor}
                     onSave={(updates) => { updateVendor(vendor.id, updates); setEditingId(null); }}
                     onCancel={() => setEditingId(null)}
+                    onAutoSave={(updates) => updateVendor(vendor.id, updates)}
                   />
                 );
               }
