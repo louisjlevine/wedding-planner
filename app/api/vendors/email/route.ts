@@ -96,7 +96,10 @@ export async function POST(req: NextRequest) {
 
   // Fetch full email body (webhook payload only contains metadata)
   const fullText = await fetchEmailBody(emailId);
+  console.log(`[vendors/email] emailId=${emailId} bodyLength=${fullText.length} subject="${subject}"`);
+  console.log(`[vendors/email] body preview: ${fullText.slice(0, 200)}`);
   const urls = extractUrls(fullText || subject);
+  console.log(`[vendors/email] extracted URLs: ${JSON.stringify(urls)}`);
 
   if (urls.length === 0) {
     console.log("[vendors/email] No vendor URLs found in email");
