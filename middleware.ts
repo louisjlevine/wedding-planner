@@ -79,6 +79,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Webhook endpoints with their own auth (secret query param / Bearer token)
+  if (pathname === '/api/vendors/email' || pathname === '/api/vendors/import') {
+    return NextResponse.next()
+  }
+
   // Block bot User-Agents before doing anything else
   const ua = request.headers.get('user-agent') ?? ''
   if (!ua || BOT_UA_BLOCKLIST.some((p) => p.test(ua))) {
