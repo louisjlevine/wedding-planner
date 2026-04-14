@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret");
   const expected = process.env.INBOUND_WEBHOOK_SECRET;
 
+  console.log(`[vendors/email] secret=${JSON.stringify(secret)} expected=${JSON.stringify(expected)} match=${secret === expected}`);
   if (!expected || !secret || secret !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
