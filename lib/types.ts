@@ -57,6 +57,12 @@ export interface VendorAttachment {
   addedAt: string;       // ISO date
 }
 
+export interface VendorNote {
+  id: string;
+  text: string;
+  addedAt: string; // ISO date
+}
+
 export interface Vendor {
   id: string;
   category: string;
@@ -66,7 +72,8 @@ export interface Vendor {
   price?: number;
   status: "considering" | "contacted" | "booked" | "rejected";
   tags?: string[];
-  notes?: string;
+  notes?: string;           // legacy — still rendered if present
+  notesList?: VendorNote[];
   attachments?: VendorAttachment[];
   // Venue-specific fields
   rentalPeriod?: string;  // e.g. "8 hours", "full day"

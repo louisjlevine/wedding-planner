@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePlanStore } from "@/lib/plan-store";
-import type { Vendor, VendorAttachment } from "@/lib/types";
+import type { Vendor, VendorAttachment, VendorNote } from "@/lib/types";
 import type { ResearchType } from "@/lib/research-prompts";
 
 // ── Attachment helpers ───────────────────────────────────────────────────────
@@ -321,14 +321,19 @@ function EditVendorForm({
     contact:       vendor.contact       ?? "",
     website:       vendor.website       ?? "",
     price:         vendor.price?.toString() ?? "",
-    notes:         vendor.notes         ?? "",
     status:        vendor.status,
     tags:          vendor.tags          ?? [] as string[],
     rentalPeriod:  vendor.rentalPeriod  ?? "",
     overtimeRate:  vendor.overtimeRate  ?? "",
   });
+  // Seed notesList from structured list, falling back to legacy notes string
+  const [notesList, setNotesList] = useState<VendorNote[]>(() => {
+    if (vendor.notesList && vendor.notesList.length > 0) return vendor.notesList;
+    if (vendor.notes) return [{ id: `note-legacy-${vendor.id}`, text: vendor.notes, addedAt: vendor.id }];
+    return [];
+  });
+  const [newNoteText, setNewNoteText] = useState("");
   const [attachments, setAttachments] = useState<VendorAttachment[]>(vendor.attachments ?? []);
-  const [cleaningUp, setCleaningUp] = useState(false);
 
   const isVenue = draft.category === "Venue";
 
@@ -338,20 +343,21 @@ function EditVendorForm({
     contact:      draft.contact      || undefined,
     website:      draft.website      || undefined,
     price:        draft.price        ? parseInt(draft.price) : undefined,
-    notes:        draft.notes        || undefined,
+    notes:        undefined,          // always migrate legacy notes into notesList
+    notesList:    notesList.length   ? notesList : undefined,
     status:       draft.status,
     tags:         draft.tags.length  ? draft.tags : undefined,
     rentalPeriod: isVenue ? (draft.rentalPeriod || undefined) : undefined,
     overtimeRate: isVenue ? (draft.overtimeRate || undefined) : undefined,
     attachments:  attachments.length ? attachments : undefined,
-  }), [draft, attachments, isVenue, vendor.name]);
+  }), [draft, notesList, attachments, isVenue, vendor.name]);
 
   // Auto-save to store 800ms after any change so mobile tab-close doesn't lose data
   useEffect(() => {
     const timer = setTimeout(() => onAutoSave(buildUpdates()), 800);
     return () => clearTimeout(timer);
   // eslint-disable-line react-hooks/exhaustive-deps
-  }, [draft, attachments]); // intentionally omit buildUpdates/onAutoSave to avoid infinite loop
+  }, [draft, notesList, attachments]); // intentionally omit buildUpdates/onAutoSave to avoid infinite loop
 
   // Flush immediately when user switches away (mobile Chrome close / tab switch)
   useEffect(() => {
@@ -364,25 +370,6 @@ function EditVendorForm({
     };
   // eslint-disable-line react-hooks/exhaustive-deps
   }, [buildUpdates]);
-
-  const handleCleanupNotes = useCallback(async () => {
-    if (!draft.notes.trim() || cleaningUp) return;
-    setCleaningUp(true);
-    try {
-      const res = await fetch("/api/vendors/cleanup-notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes: draft.notes, vendorName: draft.name, category: draft.category }),
-      });
-      if (!res.ok) throw new Error();
-      const { cleaned } = await res.json();
-      if (cleaned) setDraft((d) => ({ ...d, notes: cleaned }));
-    } catch {
-      // silently fail — user still has original notes
-    } finally {
-      setCleaningUp(false);
-    }
-  }, [draft.notes, draft.name, draft.category, cleaningUp]);
 
   async function handleFiles(files: FileList) {
     const newAtts = await processFiles(files);
@@ -484,35 +471,54 @@ function EditVendorForm({
           </>
         )}
       </div>
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-xs text-gray-500">Notes</label>
-          {draft.notes.trim() && (
-            <button
-              type="button"
-              onClick={handleCleanupNotes}
-              disabled={cleaningUp}
-              className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-[var(--accent)] disabled:opacity-50 transition-colors"
-            >
-              {cleaningUp ? (
-                <>
-                  <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                  Cleaning up…
-                </>
-              ) : (
-                <>
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+      <div className="space-y-2">
+        <label className="text-xs text-gray-500 block">Notes</label>
+        {notesList.length > 0 && (
+          <div className="space-y-1.5">
+            {notesList.map((note) => (
+              <div key={note.id} className="flex gap-2 items-start group bg-gray-50 rounded-lg px-3 py-2">
+                <p className="text-xs text-gray-700 flex-1 leading-relaxed">{note.text}</p>
+                <button
+                  type="button"
+                  onClick={() => setNotesList((prev) => prev.filter((n) => n.id !== note.id))}
+                  className="text-gray-300 hover:text-red-400 transition-colors shrink-0 mt-0.5 opacity-0 group-hover:opacity-100"
+                  aria-label="Remove note"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M1 1l10 10M11 1L1 11" />
                   </svg>
-                  Clean up
-                </>
-              )}
-            </button>
-          )}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <input
+            value={newNoteText}
+            onChange={(e) => setNewNoteText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newNoteText.trim()) {
+                e.preventDefault();
+                setNotesList((prev) => [...prev, { id: `note-${Date.now()}`, text: newNoteText.trim(), addedAt: new Date().toISOString() }]);
+                setNewNoteText("");
+              }
+            }}
+            placeholder="Add a note and press Enter…"
+            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+          />
+          <button
+            type="button"
+            disabled={!newNoteText.trim()}
+            onClick={() => {
+              if (!newNoteText.trim()) return;
+              setNotesList((prev) => [...prev, { id: `note-${Date.now()}`, text: newNoteText.trim(), addedAt: new Date().toISOString() }]);
+              setNewNoteText("");
+            }}
+            className="px-3 py-2 text-xs border border-gray-200 rounded-lg text-gray-500 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40 transition-colors"
+          >
+            Add
+          </button>
         </div>
-        <textarea value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
-          rows={3} placeholder="Any notes..."
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] resize-none" />
       </div>
       <div>
         <label className="text-xs text-gray-500 mb-1.5 block">Attachments</label>
@@ -544,7 +550,7 @@ function SetupPanel({ onClose }: { onClose: () => void }) {
   const importEndpoint = `${appUrl}/api/vendors/import`;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-5">
+    <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-5 text-xs">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-800">Import setup</h3>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
@@ -552,43 +558,66 @@ function SetupPanel({ onClose }: { onClose: () => void }) {
 
       {/* iOS Shortcut */}
       <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">iOS Shortcut</p>
-        <p className="text-xs text-gray-600 mb-3">
-          Add a &ldquo;Save to Wedding Planner&rdquo; option to your iOS share sheet. While browsing a vendor site in Safari, tap Share → the shortcut → done.
+        <p className="font-semibold text-gray-500 uppercase tracking-wide mb-2">iOS Shortcut</p>
+        <p className="text-gray-600 mb-3">
+          Browse to any vendor site in Safari, tap Share → your shortcut → done. The vendor is added (or if it already exists, a new note is appended).
         </p>
-        <ol className="text-xs text-gray-600 space-y-1.5 list-decimal list-inside">
-          <li>Open the <strong>Shortcuts</strong> app and tap <strong>+</strong> to create a new shortcut</li>
-          <li>Tap <strong>Add Action</strong> → search <strong>&ldquo;URL&rdquo;</strong> → add <strong>Get URLs from Input</strong></li>
-          <li>Add action: <strong>Get Contents of URL</strong> and configure:
-            <ul className="mt-1 ml-4 space-y-0.5 list-disc">
+        <ol className="text-gray-600 space-y-1.5 list-decimal list-inside">
+          <li>Open the <strong>Shortcuts</strong> app → tap <strong>+</strong></li>
+          <li><strong>Add Action</strong> → search <strong>URL</strong> → add <strong>Get URLs from Input</strong></li>
+          <li>Add action <strong>Get Contents of URL</strong>:
+            <ul className="mt-1 ml-4 space-y-0.5 list-disc text-gray-500">
               <li>URL: <code className="bg-gray-100 px-1 rounded">{importEndpoint}</code></li>
               <li>Method: <strong>POST</strong></li>
-              <li>Headers: <code className="bg-gray-100 px-1 rounded">Authorization: Bearer YOUR_IMPORT_TOKEN</code></li>
-              <li>Request Body: <strong>JSON</strong> → key <code className="bg-gray-100 px-1 rounded">url</code>, value: <em>URLs from previous step</em></li>
+              <li>Header: <code className="bg-gray-100 px-1 rounded">Authorization: Bearer YOUR_IMPORT_TOKEN</code></li>
+              <li>Body: <strong>JSON</strong> — key <code className="bg-gray-100 px-1 rounded">url</code>, value: <em>URL from previous step</em></li>
             </ul>
           </li>
-          <li>Add action: <strong>Show Notification</strong> → set text to <em>Name from Get Contents result</em></li>
-          <li>Tap the shortcut name → enable <strong>&ldquo;Show in Share Sheet&rdquo;</strong> → set types to <strong>URLs</strong></li>
+          <li>Add <strong>Show Notification</strong> — text from the <em>name</em> field of the result</li>
+          <li>Shortcut name → <strong>Show in Share Sheet</strong> → set type to <strong>URLs</strong></li>
         </ol>
-        <p className="text-xs text-gray-400 mt-2">Set <code className="bg-gray-100 px-1 rounded">IMPORT_TOKEN</code> in your Railway env vars to any long random string, then paste the same value in the shortcut.</p>
+        <p className="text-gray-400 mt-2">Add <code className="bg-gray-100 px-1 rounded">IMPORT_TOKEN</code> to Railway env vars (any random 32-char string), then use the same value in the shortcut.</p>
       </div>
 
       <div className="border-t border-gray-100" />
 
-      {/* Email forwarding */}
+      {/* Email — GoDaddy + Resend */}
       <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Email forwarding (Resend)</p>
-        <p className="text-xs text-gray-600 mb-3">
-          Forward any vendor email — or send a message with their URL — to a dedicated address and the vendor is imported automatically.
+        <p className="font-semibold text-gray-500 uppercase tracking-wide mb-2">Email via wedding@louisjlevine.com</p>
+        <p className="text-gray-600 mb-3">
+          Forward any vendor email to <strong>wedding@louisjlevine.com</strong> — or send a message with their URL — and the vendor is imported automatically. Uses a subdomain so your main email is unaffected.
         </p>
-        <ol className="text-xs text-gray-600 space-y-1.5 list-decimal list-inside">
-          <li>In Resend dashboard → <strong>Domains</strong> → your domain → <strong>Inbound Routing</strong></li>
-          <li>Add rule: any email to <code className="bg-gray-100 px-1 rounded">add@yourdomain.com</code> → <strong>Webhook</strong></li>
-          <li>Webhook URL: <code className="bg-gray-100 px-1 rounded">{appUrl}/api/vendors/email?secret=YOUR_INBOUND_WEBHOOK_SECRET</code></li>
-          <li>Set <code className="bg-gray-100 px-1 rounded">INBOUND_WEBHOOK_SECRET</code> in Railway to match the secret in the URL</li>
-          <li>Make sure <code className="bg-gray-100 px-1 rounded">IMPORT_TOKEN</code> is also set (the email route calls the import route internally)</li>
+
+        <p className="font-medium text-gray-700 mb-1">Step 1 — GoDaddy DNS (one-time)</p>
+        <ol className="text-gray-600 space-y-1 list-decimal list-inside mb-3">
+          <li>GoDaddy → <strong>My Products</strong> → <strong>DNS</strong> for <em>louisjlevine.com</em></li>
+          <li>Add a new <strong>MX record</strong>:
+            <ul className="mt-1 ml-4 list-disc text-gray-500">
+              <li>Host: <code className="bg-gray-100 px-1 rounded">plan</code> (creates <em>plan.louisjlevine.com</em>)</li>
+              <li>Points to: <code className="bg-gray-100 px-1 rounded">inbound.resend.com</code></li>
+              <li>Priority: <code className="bg-gray-100 px-1 rounded">10</code></li>
+              <li>TTL: default</li>
+            </ul>
+          </li>
+          <li>Also add a GoDaddy <strong>email forward</strong>: <code className="bg-gray-100 px-1 rounded">wedding@louisjlevine.com</code> → <code className="bg-gray-100 px-1 rounded">add@plan.louisjlevine.com</code></li>
         </ol>
-        <p className="text-xs text-gray-400 mt-2">Once live, forward any vendor email or send a plain message with the URL to your inbound address.</p>
+
+        <p className="font-medium text-gray-700 mb-1">Step 2 — Resend inbound routing (one-time)</p>
+        <ol className="text-gray-600 space-y-1 list-decimal list-inside mb-3">
+          <li>Resend dashboard → <strong>Domains</strong> → <strong>Add Domain</strong> → enter <code className="bg-gray-100 px-1 rounded">plan.louisjlevine.com</code></li>
+          <li>Resend will show DNS verification records — add them in GoDaddy DNS too</li>
+          <li>Once verified, go to <strong>Inbound Routing</strong> → add rule: catch-all → <strong>Webhook</strong></li>
+          <li>Webhook URL: <code className="bg-gray-100 px-1 rounded">{appUrl}/api/vendors/email?secret=YOUR_INBOUND_WEBHOOK_SECRET</code></li>
+        </ol>
+
+        <p className="font-medium text-gray-700 mb-1">Step 3 — Railway env vars</p>
+        <ul className="text-gray-600 space-y-0.5 list-disc list-inside">
+          <li><code className="bg-gray-100 px-1 rounded">INBOUND_WEBHOOK_SECRET</code> — matches the secret in the webhook URL above</li>
+          <li><code className="bg-gray-100 px-1 rounded">IMPORT_TOKEN</code> — same token used by the iOS Shortcut</li>
+          <li><code className="bg-gray-100 px-1 rounded">NEXT_PUBLIC_APP_URL</code> — your Railway production URL</li>
+        </ul>
+
+        <p className="text-gray-400 mt-3">Once live: forward any vendor email to <strong>wedding@louisjlevine.com</strong>. If the vendor&rsquo;s domain already exists in your list, the email adds a new note instead of creating a duplicate.</p>
       </div>
     </div>
   );
@@ -1092,7 +1121,16 @@ export function Vendors() {
                         {vendor.overtimeRate && <span>OT: {vendor.overtimeRate}</span>}
                       </p>
                     )}
-                    {vendor.notes && (
+                    {/* Structured notes list (new) */}
+                    {vendor.notesList && vendor.notesList.length > 0 && (
+                      <div className="mt-1.5 space-y-1">
+                        {vendor.notesList.map((note) => (
+                          <p key={note.id} className="text-xs text-gray-500 bg-gray-50 rounded px-2 py-1 leading-relaxed">{note.text}</p>
+                        ))}
+                      </div>
+                    )}
+                    {/* Legacy single-text notes (only shown if no notesList) */}
+                    {!vendor.notesList?.length && vendor.notes && (
                       <p className="text-xs text-gray-400 mt-1 italic line-clamp-2">{vendor.notes}</p>
                     )}
                     {vendor.attachments && vendor.attachments.length > 0 && (

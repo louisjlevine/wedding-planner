@@ -208,25 +208,58 @@ Rules:
     extracted.category = "Other";
   }
 
-  const vendor = {
-    id: `vendor-${Date.now()}`,
-    category: extracted.category,
-    name: extracted.name || new URL(url).hostname,
-    contact: extracted.contact ?? undefined,
-    website: url,
-    price: typeof extracted.price === "number" ? Math.round(extracted.price) : undefined,
-    notes: extracted.notes || undefined,
-    status: "considering" as const,
-  };
+  // ── Domain matching: find existing vendor with same hostname ─────────────────
+
+  function extractDomain(u: string): string {
+    try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; }
+  }
+
+  const incomingDomain = extractDomain(url);
+
+  const newNote = extracted.notes
+    ? { id: `note-${Date.now()}`, text: extracted.notes, addedAt: new Date().toISOString() }
+    : null;
 
   try {
     const state = await readState();
-    const vendors = Array.isArray(state.vendors) ? state.vendors : [];
+    const vendors = Array.isArray(state.vendors) ? (state.vendors as Record<string, unknown>[]) : [];
+
+    // Try to find an existing vendor whose website shares the same domain
+    const matchIndex = incomingDomain
+      ? vendors.findIndex((v) => typeof v.website === "string" && extractDomain(v.website) === incomingDomain)
+      : -1;
+
+    if (matchIndex >= 0) {
+      // Merge into existing vendor: add note, backfill missing contact/price
+      const existing = vendors[matchIndex] as Record<string, unknown>;
+      const existingNotes = Array.isArray(existing.notesList) ? existing.notesList : [];
+      const updated = {
+        ...existing,
+        notesList: newNote ? [...existingNotes, newNote] : existingNotes,
+        // Backfill contact and price only if not already set
+        contact: existing.contact ?? (extracted.contact || undefined),
+        price: existing.price ?? (typeof extracted.price === "number" ? Math.round(extracted.price) : undefined),
+      };
+      const updatedVendors = vendors.map((v, i) => (i === matchIndex ? updated : v));
+      await writeState({ ...state, vendors: updatedVendors });
+      return NextResponse.json({ vendor: updated, matched: true });
+    }
+
+    // No match — create a new vendor
+    const vendor = {
+      id: `vendor-${Date.now()}`,
+      category: extracted.category,
+      name: extracted.name || new URL(url).hostname,
+      contact: extracted.contact ?? undefined,
+      website: url,
+      price: typeof extracted.price === "number" ? Math.round(extracted.price) : undefined,
+      notesList: newNote ? [newNote] : [],
+      status: "considering" as const,
+    };
     await writeState({ ...state, vendors: [...vendors, vendor] });
+    return NextResponse.json({ vendor, matched: false });
   } catch (err) {
     console.error("[vendors/import] DB write failed:", err);
     return NextResponse.json({ error: "Failed to save vendor" }, { status: 500 });
   }
-
-  return NextResponse.json({ vendor });
 }
