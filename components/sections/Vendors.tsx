@@ -588,11 +588,12 @@ function SetupPanel({ onClose }: { onClose: () => void }) {
           Forward any vendor email to <strong>wedding@louisjlevine.com</strong> and it&rsquo;s automatically imported. Uses a subdomain so your main <em>@louisjlevine.com</em> email is completely unaffected.
         </p>
 
-        <p className="font-medium text-gray-700 mb-1">Step 1 — GoDaddy DNS (one-time)</p>
+        <p className="font-medium text-gray-700 mb-1">Step 1 — WordPress.com DNS (one-time)</p>
         <ol className="text-gray-600 space-y-1 list-decimal list-inside mb-3">
-          <li>GoDaddy → <strong>DNS</strong> for <em>louisjlevine.com</em> → <strong>Add Record</strong></li>
-          <li>Type: <strong>MX</strong> &nbsp;|&nbsp; Host: <code className="bg-gray-100 px-1 rounded">plan</code> &nbsp;|&nbsp; Points to: <code className="bg-gray-100 px-1 rounded">inbound.resend.com</code> &nbsp;|&nbsp; Priority: <code className="bg-gray-100 px-1 rounded">10</code></li>
-          <li>Add a second record — Type: <strong>Email Forward</strong> &nbsp;|&nbsp; <code className="bg-gray-100 px-1 rounded">wedding@louisjlevine.com</code> → <code className="bg-gray-100 px-1 rounded">add@plan.louisjlevine.com</code></li>
+          <li>WordPress.com → <strong>My Sites</strong> → <strong>Upgrades</strong> → <strong>Domains</strong> → click <em>louisjlevine.com</em></li>
+          <li><strong>DNS Records</strong> → <strong>Add Record</strong> → Type: <strong>MX</strong></li>
+          <li>Name/Host: <code className="bg-gray-100 px-1 rounded">plan</code> &nbsp;|&nbsp; Value: <code className="bg-gray-100 px-1 rounded">inbound.resend.com</code> &nbsp;|&nbsp; Priority: <code className="bg-gray-100 px-1 rounded">10</code> → Save</li>
+          <li>Still on the domain page → <strong>Email Forwarding</strong> → <strong>Add Forward</strong>: <code className="bg-gray-100 px-1 rounded">wedding</code> forwards to <code className="bg-gray-100 px-1 rounded">add@plan.louisjlevine.com</code></li>
         </ol>
 
         <p className="font-medium text-gray-700 mb-1">Step 2 — Resend inbound routing (one-time, free tier)</p>
@@ -1084,7 +1085,7 @@ export function Vendors() {
                 <div
                   key={vendor.id}
                   onClick={() => setEditingId(vendor.id)}
-                  className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 cursor-pointer hover:border-[var(--accent)]/50 hover:-translate-y-0.5 transition-all duration-150"
+                  className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 cursor-pointer hover:border-[var(--accent)]/50 hover:shadow-md transition-[border-color,box-shadow] duration-150"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
