@@ -581,43 +581,36 @@ function SetupPanel({ onClose }: { onClose: () => void }) {
 
       <div className="border-t border-gray-100" />
 
-      {/* Email — GoDaddy + Resend */}
+      {/* Email — GoDaddy subdomain + Resend */}
       <div>
         <p className="font-semibold text-gray-500 uppercase tracking-wide mb-2">Email via wedding@louisjlevine.com</p>
         <p className="text-gray-600 mb-3">
-          Forward any vendor email to <strong>wedding@louisjlevine.com</strong> — or send a message with their URL — and the vendor is imported automatically. Uses a subdomain so your main email is unaffected.
+          Forward any vendor email to <strong>wedding@louisjlevine.com</strong> and it&rsquo;s automatically imported. Uses a subdomain so your main <em>@louisjlevine.com</em> email is completely unaffected.
         </p>
 
         <p className="font-medium text-gray-700 mb-1">Step 1 — GoDaddy DNS (one-time)</p>
         <ol className="text-gray-600 space-y-1 list-decimal list-inside mb-3">
-          <li>GoDaddy → <strong>My Products</strong> → <strong>DNS</strong> for <em>louisjlevine.com</em></li>
-          <li>Add a new <strong>MX record</strong>:
-            <ul className="mt-1 ml-4 list-disc text-gray-500">
-              <li>Host: <code className="bg-gray-100 px-1 rounded">plan</code> (creates <em>plan.louisjlevine.com</em>)</li>
-              <li>Points to: <code className="bg-gray-100 px-1 rounded">inbound.resend.com</code></li>
-              <li>Priority: <code className="bg-gray-100 px-1 rounded">10</code></li>
-              <li>TTL: default</li>
-            </ul>
-          </li>
-          <li>Also add a GoDaddy <strong>email forward</strong>: <code className="bg-gray-100 px-1 rounded">wedding@louisjlevine.com</code> → <code className="bg-gray-100 px-1 rounded">add@plan.louisjlevine.com</code></li>
+          <li>GoDaddy → <strong>DNS</strong> for <em>louisjlevine.com</em> → <strong>Add Record</strong></li>
+          <li>Type: <strong>MX</strong> &nbsp;|&nbsp; Host: <code className="bg-gray-100 px-1 rounded">plan</code> &nbsp;|&nbsp; Points to: <code className="bg-gray-100 px-1 rounded">inbound.resend.com</code> &nbsp;|&nbsp; Priority: <code className="bg-gray-100 px-1 rounded">10</code></li>
+          <li>Add a second record — Type: <strong>Email Forward</strong> &nbsp;|&nbsp; <code className="bg-gray-100 px-1 rounded">wedding@louisjlevine.com</code> → <code className="bg-gray-100 px-1 rounded">add@plan.louisjlevine.com</code></li>
         </ol>
 
-        <p className="font-medium text-gray-700 mb-1">Step 2 — Resend inbound routing (one-time)</p>
+        <p className="font-medium text-gray-700 mb-1">Step 2 — Resend inbound routing (one-time, free tier)</p>
         <ol className="text-gray-600 space-y-1 list-decimal list-inside mb-3">
-          <li>Resend dashboard → <strong>Domains</strong> → <strong>Add Domain</strong> → enter <code className="bg-gray-100 px-1 rounded">plan.louisjlevine.com</code></li>
-          <li>Resend will show DNS verification records — add them in GoDaddy DNS too</li>
-          <li>Once verified, go to <strong>Inbound Routing</strong> → add rule: catch-all → <strong>Webhook</strong></li>
-          <li>Webhook URL: <code className="bg-gray-100 px-1 rounded">{appUrl}/api/vendors/email?secret=YOUR_INBOUND_WEBHOOK_SECRET</code></li>
+          <li>resend.com → <strong>Domains</strong> → <strong>Add Domain</strong> → <code className="bg-gray-100 px-1 rounded">plan.louisjlevine.com</code></li>
+          <li>Add the DNS verification records Resend shows you into GoDaddy</li>
+          <li>Once verified: <strong>Inbound</strong> → <strong>Add Route</strong> → catch-all → <strong>Webhook</strong></li>
+          <li>Webhook URL: <code className="bg-gray-100 px-1 rounded">{appUrl}/api/vendors/email?secret=YOUR_SECRET</code></li>
         </ol>
 
         <p className="font-medium text-gray-700 mb-1">Step 3 — Railway env vars</p>
         <ul className="text-gray-600 space-y-0.5 list-disc list-inside">
-          <li><code className="bg-gray-100 px-1 rounded">INBOUND_WEBHOOK_SECRET</code> — matches the secret in the webhook URL above</li>
+          <li><code className="bg-gray-100 px-1 rounded">INBOUND_WEBHOOK_SECRET</code> — the secret in the webhook URL above</li>
           <li><code className="bg-gray-100 px-1 rounded">IMPORT_TOKEN</code> — same token used by the iOS Shortcut</li>
           <li><code className="bg-gray-100 px-1 rounded">NEXT_PUBLIC_APP_URL</code> — your Railway production URL</li>
         </ul>
 
-        <p className="text-gray-400 mt-3">Once live: forward any vendor email to <strong>wedding@louisjlevine.com</strong>. If the vendor&rsquo;s domain already exists in your list, the email adds a new note instead of creating a duplicate.</p>
+        <p className="text-gray-400 mt-3">Once live, forward any vendor email to <strong>wedding@louisjlevine.com</strong>. If that vendor&rsquo;s website is already in your list, the email adds a note instead of creating a duplicate.</p>
       </div>
     </div>
   );
