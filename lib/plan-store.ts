@@ -7,6 +7,7 @@ import type {
   Vendor,
   Task,
   Guest,
+  GuestSide,
   Note,
   ResearchSession,
   ResearchRecommendation,
@@ -86,6 +87,9 @@ interface PlanState {
   emailPrefs: EmailDigestPrefs | null;
   setEmailPrefs: (prefs: EmailDigestPrefs) => void;
 
+  guestSideFilter: GuestSide | "all";
+  setGuestSideFilter: (filter: GuestSide | "all") => void;
+
   setActiveTab: (tab: Tab) => void;
   importStore: (data: Partial<PlanState>) => void;
 }
@@ -111,6 +115,7 @@ export const usePlanStore = create<PlanState>()(
       activeTab: "overview",
       intakeComplete: false,
       emailPrefs: null,
+      guestSideFilter: "all",
 
       setAnswers: (answers) =>
         set({ answers, intakeComplete: true, activeTab: "advisor" }),
@@ -336,6 +341,8 @@ export const usePlanStore = create<PlanState>()(
         }),
 
       setEmailPrefs: (prefs) => set({ emailPrefs: prefs }),
+
+      setGuestSideFilter: (filter) => set({ guestSideFilter: filter }),
 
       setActiveTab: (tab) => set({ activeTab: tab }),
 
