@@ -7,6 +7,7 @@ import type {
   Vendor,
   Task,
   Guest,
+  GuestSide,
   Note,
   ResearchSession,
   ResearchRecommendation,
@@ -33,9 +34,11 @@ interface PlanState {
   dismissedRecommendations: Record<string, string[]>; // type → [lowercased title, ...]
   triggerResearchFor: string | null; // set by Vendors "Find similar" to auto-fetch
   timelineDoneIds: string[];
+  guestSideFilter: GuestSide | "all";
   activeTab: Tab;
   intakeComplete: boolean;
 
+  setGuestSideFilter: (filter: GuestSide | "all") => void;
   setAnswers: (answers: WeddingAnswers) => void;
   updateAnswers: (partial: Partial<WeddingAnswers>) => void;
   resetIntake: () => void;
@@ -108,9 +111,12 @@ export const usePlanStore = create<PlanState>()(
       dismissedRecommendations: {},
       triggerResearchFor: null,
       timelineDoneIds: [],
+      guestSideFilter: "all",
       activeTab: "overview",
       intakeComplete: false,
       emailPrefs: null,
+
+      setGuestSideFilter: (filter) => set({ guestSideFilter: filter }),
 
       setAnswers: (answers) =>
         set({ answers, intakeComplete: true, activeTab: "advisor" }),

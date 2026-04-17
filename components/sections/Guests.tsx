@@ -455,11 +455,10 @@ function EditGuestForm({
 // ── Main Guests page ──────────────────────────────────────────────────────────
 
 export function Guests() {
-  const { guests, addGuest, updateGuest, removeGuest } = usePlanStore();
+  const { guests, addGuest, updateGuest, removeGuest, guestSideFilter: sideFilter, setGuestSideFilter: setSideFilter } = usePlanStore();
 
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [sideFilter, setSideFilter] = useState<GuestSide | "all">("all");
   const [form, setForm] = useState({
     name: "", email: "", address: "", totalGuests: 1, dietary: "", table: "",
     relationship: "" as GuestRelationship | "",
