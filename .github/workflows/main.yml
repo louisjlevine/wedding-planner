@@ -1,17 +1,20 @@
-name: Wedding Planner — Linear Issue Worker
+name: CI
+
 on:
-  schedule:
-    - cron: '0 */4 * * *'
-  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  run:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: anthropics/claude-code-action@beta
+      - uses: actions/setup-node@v4
         with:
-          prompt: >
-            Find the highest-priority open issue in the "Wedding Website" Linear project.
-            Implement it, commit to a new branch, push, and move the issue to "In Review."
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test

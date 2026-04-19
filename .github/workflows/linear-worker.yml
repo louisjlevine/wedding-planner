@@ -8,37 +8,68 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
-  run:
+  implement-linear-issue:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
+      - uses: anthropics/claude-code-action@beta
+        with:
+          model: claude-sonnet-4-6
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          mcp_config: |
+            {
+              "mcpServers": {
+                "linear": {
+                  "type": "connector",
+                  "connectorId": "8c0518ab-9c19-4121-a304-3cb7c9c4b97c"
+                }
+              }
+            }
+          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep,mcp__linear__*"
+          prompt: |
+            You are an automated issue worker for the Wedding Planner project
+            (https://github.com/louisjlevine/wedding-planner).
 
-      - name: Run Claude Code
-        env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          claude -p "You are working in a GitHub Actions runner with access to a Next.js wedding planner codebase.
+            STEP 1 — CHECK FOR OPEN ISSUES:
+            Use the Linear MCP tools to list issues in the "Wedding Website" project.
+            Find the highest-priority open issue (lower priority value = higher priority:
+            1=Urgent, 2=High, 3=Medium, 4=Low).
 
-          Step 1 — Find the issue: Query the Linear GraphQL API to find the highest-priority issue in the 'Wedding Website' project whose state type is exactly "unstarted" (To Do). Use curl with the LINEAR_API_KEY environment variable as a Bearer token against https://api.linear.app/graphql. Include a filter on state: { type: { eq: "unstarted" } } in your query. If no unstarted issues are returned, print "No To Do issues found — exiting." and stop immediately without making any changes.
+            An issue is "open" ONLY if its status type is "unstarted" (Todo) or
+            "backlog" (Backlog), or "started" with status name "In Progress".
 
-          Step 2 — Implement it: Confirm the issue state type is "unstarted" before proceeding. Then read the relevant files in this repo and implement the changes described by the issue.
+            IMPORTANT GATE: If the highest-priority issue has status "In Review",
+            "Done", "Cancelled", "Duplicate", or any other closed/completed state,
+            print "No open issues found — skipping this run." and EXIT immediately
+            without making any changes. Do NOT proceed to Step 2.
 
-          Step 3 — Commit and push: Create a new branch named linear/<issue-identifier>-<slug>, commit all changes with a descriptive message referencing the issue, and push the branch. Use the GITHUB_TOKEN for authentication: set the remote URL to https://x-access-token:\${GITHUB_TOKEN}@github.com/louisjlevine/wedding-planner.git before pushing.
+            STEP 2 — IMPLEMENT THE ISSUE:
+            Read the full issue description with get_issue. Explore the codebase to
+            understand the architecture (read CLAUDE.md first). Implement the changes
+            described by the issue. Follow the project coding standards: Tailwind only,
+            no inline styles, pink accent #D4537E, no emoji in UI.
+            Run `npm test` to verify nothing breaks.
 
-          Step 4 — Open a PR: Create a pull request to main using the GitHub API (https://api.github.com/repos/louisjlevine/wedding-planner/pulls) with a summary of what was changed and why. Use GITHUB_TOKEN as the Bearer token.
+            STEP 3 — COMMIT AND PUSH:
+            Create a branch named linear/<issue-identifier>-<short-slug>.
+            Commit all changes with a message referencing the Linear issue ID.
+            Push the branch to origin using GITHUB_TOKEN for auth.
 
-          Step 5 — Update Linear: Move the issue to 'In Review' state using the Linear GraphQL API." \
-            --allowedTools "Bash,Read,Write,Edit,Glob,Grep" \
-            --dangerously-skip-permissions
+            STEP 4 — CREATE A PULL REQUEST:
+            Open a pull request targeting main. Include a summary of changes and a
+            link to the Linear issue URL in the PR body.
+
+            STEP 5 — UPDATE LINEAR STATUS:
+            Use the Linear MCP tools to move the issue to "In Review" status.
