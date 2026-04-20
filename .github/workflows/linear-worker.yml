@@ -26,55 +26,60 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - uses: anthropics/claude-code-action@beta
+        env:
+          LINEAR_ACCESS_TOKEN: ${{ secrets.LINEAR_ACCESS_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          mcp_config: |
-            {
-              "mcpServers": {
-                "linear": {
-                  "command": "npx",
-                  "args": ["-y", "linear-mcp"],
-                  "env": {
-                    "LINEAR_ACCESS_TOKEN": "${{ secrets.LINEAR_ACCESS_TOKEN }}"
-                  }
-                }
-              }
-            }
           mode: agent
-          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep,mcp__linear__*"
+          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep"
           direct_prompt: |
             You are an automated issue worker for the Wedding Planner project
             (https://github.com/louisjlevine/wedding-planner).
 
+            You have access to the Linear GraphQL API via the LINEAR_ACCESS_TOKEN
+            environment variable. Use curl to call https://api.linear.app/graphql.
+
             STEP 1 — CHECK FOR OPEN ISSUES:
-            Use the Linear MCP tools to list issues in the "Wedding Website" project.
-            Find the highest-priority open issue (lower priority value = higher priority:
-            1=Urgent, 2=High, 3=Medium, 4=Low).
+            Query the "Wedding Website" project issues using this curl pattern:
+              curl -s -X POST https://api.linear.app/graphql \
+                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{"query": "{ issues(filter: { project: { name: { eq: \"Wedding Website\" } }, state: { type: { in: [\"unstarted\", \"started\"] } } }, orderBy: priority) { nodes { id identifier title priority state { name type } description url } } }"}'
 
-            An issue is "open" ONLY if its status type is "unstarted" (Todo) or
-            "backlog" (Backlog), or "started" with status name "In Progress".
+            Find the highest-priority open issue (lower priority number = higher priority:
+            1=Urgent, 2=High, 3=Medium, 4=Low, 0=No priority — treat 0 as lowest).
 
-            IMPORTANT GATE: If the highest-priority issue has status "In Review",
-            "Done", "Cancelled", "Duplicate", or any other closed/completed state,
-            print "No open issues found — skipping this run." and EXIT immediately
-            without making any changes. Do NOT proceed to Step 2.
+            An issue is "open" ONLY if its state type is "unstarted" or "started"
+            AND the state name is NOT "In Review" or "Done" or "Cancelled".
+
+            If no open issues exist, print "No open issues found — skipping this run."
+            and stop immediately.
 
             STEP 2 — IMPLEMENT THE ISSUE:
-            Read the full issue description with get_issue. Explore the codebase to
-            understand the architecture (read CLAUDE.md first). Implement the changes
-            described by the issue. Follow the project coding standards: Tailwind only,
-            no inline styles, pink accent #D4537E, no emoji in UI.
+            Read the full issue description. Explore the codebase (read CLAUDE.md first).
+            Implement the changes described by the issue. Follow project coding standards:
+            Tailwind only, no inline styles, pink accent #D4537E, no emoji in UI.
             Run `npm test` to verify nothing breaks.
 
             STEP 3 — COMMIT AND PUSH:
             Create a branch named linear/<issue-identifier>-<short-slug>.
-            Commit all changes with a message referencing the Linear issue ID.
-            Push the branch to origin using GITHUB_TOKEN for auth.
+            Commit all changes with a message referencing the Linear issue identifier.
+            Push the branch to origin.
 
             STEP 4 — CREATE A PULL REQUEST:
             Open a pull request targeting main. Include a summary of changes and a
             link to the Linear issue URL in the PR body.
 
             STEP 5 — UPDATE LINEAR STATUS:
-            Use the Linear MCP tools to move the issue to "In Review" status.
+            Move the issue to "In Review" status using:
+              curl -s -X POST https://api.linear.app/graphql \
+                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{"query": "mutation { issueUpdate(id: \"<ISSUE_ID>\", input: { stateId: \"<IN_REVIEW_STATE_ID>\" }) { success } }"}'
+
+            To find the "In Review" state ID, first query:
+              curl -s -X POST https://api.linear.app/graphql \
+                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{"query": "{ workflowStates { nodes { id name type } } }"}'
