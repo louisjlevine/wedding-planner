@@ -348,6 +348,15 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
+      // Add error handling for storage failures
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error('[plan-store] Failed to rehydrate from localStorage:', error);
+          // Could show user notification here in the future
+        } else {
+          console.log('[plan-store] Rehydrated successfully');
+        }
+      },
     }
   )
 );

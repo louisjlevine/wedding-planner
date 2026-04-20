@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { usePlanStore } from "@/lib/plan-store";
 import type { Vendor, VendorAttachment, VendorNote } from "@/lib/types";
 import type { ResearchType } from "@/lib/research-prompts";
+import { checkStorageQuota, estimateDataSize, retryOperation } from "@/lib/storage-utils";
 
 // ── Attachment helpers ───────────────────────────────────────────────────────
 
@@ -49,36 +50,59 @@ async function processFiles(files: FileList): Promise<VendorAttachment[]> {
   
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
+    
+    // Enhanced file validation
     if (file.size > MAX_FILE_SIZE) {
-      skipped.push(`${file.name} (too large)`);
+      skipped.push(`${file.name} (too large - max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB)`);
+      continue;
+    }
+    
+    if (file.size === 0) {
+      skipped.push(`${file.name} (empty file)`);
+      continue;
+    }
+    
+    // Validate file types more strictly
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain'];
+    if (!allowedTypes.includes(file.type)) {
+      skipped.push(`${file.name} (unsupported type: ${file.type})`);
       continue;
     }
     
     try {
       const dataUrl = file.type.startsWith("image/")
-        ? await resizeImage(file)
-        : await new Promise<string>((res, rej) => {
+        ? await retryOperation(() => resizeImage(file), 2, 100)
+        : await retryOperation(() => new Promise<string>((res, rej) => {
             const r = new FileReader();
             r.onload = () => res(r.result as string);
             r.onerror = () => rej(new Error(`Failed to read ${file.name}`));
             r.readAsDataURL(file);
-          });
+          }), 2, 100);
+      
+      // Validate result
+      if (!dataUrl || !dataUrl.startsWith('data:')) {
+        throw new Error('Invalid file data URL');
+      }
+      
       results.push({
-        id: `att-${Date.now()}-${i}`,
+        id: `att-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
         fileName: file.name,
         mimeType: file.type,
         dataUrl,
         addedAt: new Date().toISOString(),
       });
     } catch (err) {
-      skipped.push(`${file.name} (processing failed)`);
+      skipped.push(`${file.name} (processing failed: ${err instanceof Error ? err.message : 'unknown error'})`);
       console.error('[processFiles] Failed to process file:', file.name, err);
     }
   }
   
   if (skipped.length > 0) {
     console.warn('[processFiles] Skipped files:', skipped);
-    // Could show a toast notification here in the future
+    // Throw error if all files failed to provide user feedback
+    if (results.length === 0) {
+      throw new Error(`All files failed to process: ${skipped.join(', ')}`);
+    }
   }
   
   return results;
@@ -382,8 +406,23 @@ function EditVendorForm({
     setSaveError(null);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay to batch rapid changes
-      onAutoSave(updates);
+      // Check storage quota before saving large updates
+      const dataSize = estimateDataSize(updates);
+      if (dataSize > 500 * 1024) { // > 500KB
+        const quotaInfo = await checkStorageQuota();
+        if (quotaInfo?.quotaExceeded) {
+          throw new Error('Storage quota exceeded. Try removing some photos or clearing browser data.');
+        }
+      }
+      
+      // Brief delay to batch rapid changes
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Retry auto-save with exponential backoff on failure
+      await retryOperation(async () => {
+        onAutoSave(updates);
+      }, 2, 500);
+      
       setSaveStatus('saved');
       
       // Clear saved status after 2s
@@ -393,6 +432,18 @@ function EditVendorForm({
       setSaveStatus('error');
       setSaveError(err instanceof Error ? err.message : 'Save failed');
       console.error('[Vendor] Auto-save failed:', err);
+      
+      // Attempt fallback save without retry after 5 seconds
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        try {
+          onAutoSave(updates);
+          setSaveStatus('saved');
+          setSaveError(null);
+        } catch {
+          // Silent fallback failure
+        }
+      }, 5000);
     }
   }, [onAutoSave]);
 
@@ -430,8 +481,31 @@ function EditVendorForm({
   async function handleFiles(files: FileList) {
     try {
       setSaveStatus('saving');
+      
+      // Check total size before processing
+      const totalSize = Array.from(files).reduce((sum, file) => sum + file.size, 0);
+      if (totalSize > 20 * 1024 * 1024) { // > 20MB total
+        throw new Error('Total file size too large. Try uploading fewer or smaller files.');
+      }
+      
+      // Check storage quota
+      const quotaInfo = await checkStorageQuota();
+      if (quotaInfo?.quotaExceeded) {
+        throw new Error('Storage quota exceeded. Try removing some photos or clearing browser data.');
+      }
+      
       const newAtts = await processFiles(files);
+      
+      // Final size check after processing (base64 encoding increases size)
+      const currentDataSize = estimateDataSize(attachments);
+      const newDataSize = estimateDataSize(newAtts);
+      
+      if (currentDataSize + newDataSize > 10 * 1024 * 1024) { // > 10MB total
+        throw new Error('Too many photos stored. Consider removing some older photos first.');
+      }
+      
       setAttachments((prev) => [...prev, ...newAtts]);
+      setSaveStatus('saved');
     } catch (err) {
       setSaveStatus('error');
       setSaveError(err instanceof Error ? err.message : 'File upload failed');

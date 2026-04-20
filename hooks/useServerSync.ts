@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePlanStore } from "@/lib/plan-store";
+import { retryOperation } from "@/lib/storage-utils";
 
 const DEBOUNCE_MS = 1500;
 
@@ -81,15 +82,20 @@ export function useServerSync() {
     } catch {
       // Non-fatal — fall back to plain push
     }
-    const res = await fetch("/api/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(merged),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`POST /api/sync ${res.status}: ${body}`);
-    }
+
+    // Retry server save with exponential backoff
+    await retryOperation(async () => {
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(merged),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`POST /api/sync ${res.status}: ${body}`);
+      }
+    }, 3, 1000);
+
     setSyncStatus("ok");
     console.log("[useServerSync] Saved to server ok");
   }
