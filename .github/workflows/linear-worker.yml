@@ -35,9 +35,9 @@ jobs:
               "mcpServers": {
                 "linear": {
                   "command": "npx",
-                  "args": ["-y", "@modelcontextprotocol/server-linear"],
+                  "args": ["-y", "linear-mcp"],
                   "env": {
-                    "LINEAR_API_KEY": "${{ secrets.LINEAR_API_KEY }}"
+                    "LINEAR_ACCESS_TOKEN": "${{ secrets.LINEAR_ACCESS_TOKEN }}"
                   }
                 }
               }
