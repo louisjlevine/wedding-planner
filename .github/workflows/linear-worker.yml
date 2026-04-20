@@ -34,8 +34,11 @@ jobs:
             {
               "mcpServers": {
                 "linear": {
-                  "type": "connector",
-                  "connectorId": "8c0518ab-9c19-4121-a304-3cb7c9c4b97c"
+                  "command": "npx",
+                  "args": ["-y", "@modelcontextprotocol/server-linear"],
+                  "env": {
+                    "LINEAR_API_KEY": "${{ secrets.LINEAR_API_KEY }}"
+                  }
                 }
               }
             }
