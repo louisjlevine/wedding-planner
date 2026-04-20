@@ -39,6 +39,7 @@ jobs:
                 }
               }
             }
+          mode: agent
           allowed_tools: "Bash,Read,Write,Edit,Glob,Grep,mcp__linear__*"
           direct_prompt: |
             You are an automated issue worker for the Wedding Planner project
