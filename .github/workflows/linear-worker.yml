@@ -9,6 +9,7 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  id-token: write
 
 jobs:
   implement-linear-issue:
@@ -28,6 +29,7 @@ jobs:
         with:
           model: claude-sonnet-4-6
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           mcp_config: |
             {
               "mcpServers": {
@@ -38,7 +40,7 @@ jobs:
               }
             }
           allowed_tools: "Bash,Read,Write,Edit,Glob,Grep,mcp__linear__*"
-          prompt: |
+          direct_prompt: |
             You are an automated issue worker for the Wedding Planner project
             (https://github.com/louisjlevine/wedding-planner).
 
