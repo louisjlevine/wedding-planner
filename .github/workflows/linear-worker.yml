@@ -27,17 +27,16 @@ jobs:
 
       - uses: anthropics/claude-code-action@beta
         with:
-          model: claude-sonnet-4-6
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           mcp_config: |
             {
               "mcpServers": {
                 "linear": {
                   "command": "npx",
-                  "args": ["-y", "@modelcontextprotocol/server-linear"],
+                  "args": ["-y", "linear-mcp"],
                   "env": {
-                    "LINEAR_API_KEY": "${{ secrets.LINEAR_API_KEY }}"
+                    "LINEAR_ACCESS_TOKEN": "${{ secrets.LINEAR_ACCESS_TOKEN }}"
                   }
                 }
               }
