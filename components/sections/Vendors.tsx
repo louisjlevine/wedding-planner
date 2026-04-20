@@ -45,25 +45,42 @@ function resizeImage(file: File): Promise<string> {
 
 async function processFiles(files: FileList): Promise<VendorAttachment[]> {
   const results: VendorAttachment[] = [];
+  const skipped: string[] = [];
+  
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    if (file.size > MAX_FILE_SIZE) continue;
-    const dataUrl = file.type.startsWith("image/")
-      ? await resizeImage(file)
-      : await new Promise<string>((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result as string);
-          r.onerror = rej;
-          r.readAsDataURL(file);
-        });
-    results.push({
-      id: `att-${Date.now()}-${i}`,
-      fileName: file.name,
-      mimeType: file.type,
-      dataUrl,
-      addedAt: new Date().toISOString(),
-    });
+    if (file.size > MAX_FILE_SIZE) {
+      skipped.push(`${file.name} (too large)`);
+      continue;
+    }
+    
+    try {
+      const dataUrl = file.type.startsWith("image/")
+        ? await resizeImage(file)
+        : await new Promise<string>((res, rej) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result as string);
+            r.onerror = () => rej(new Error(`Failed to read ${file.name}`));
+            r.readAsDataURL(file);
+          });
+      results.push({
+        id: `att-${Date.now()}-${i}`,
+        fileName: file.name,
+        mimeType: file.type,
+        dataUrl,
+        addedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      skipped.push(`${file.name} (processing failed)`);
+      console.error('[processFiles] Failed to process file:', file.name, err);
+    }
   }
+  
+  if (skipped.length > 0) {
+    console.warn('[processFiles] Skipped files:', skipped);
+    // Could show a toast notification here in the future
+  }
+  
   return results;
 }
 
@@ -315,6 +332,10 @@ function EditVendorForm({
   onCancel: () => void;
   onAutoSave: (updates: Partial<Vendor>) => void;
 }) {
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSaveRef = useRef<string>('');
   const [draft, setDraft] = useState({
     name:          vendor.name,
     category:      vendor.category,
@@ -352,28 +373,70 @@ function EditVendorForm({
     attachments:  attachments.length ? attachments : undefined,
   }), [draft, notesList, attachments, isVenue, vendor.name]);
 
-  // Auto-save to store 800ms after any change so mobile tab-close doesn't lose data
+  const performAutoSave = useCallback(async (updates: Partial<Vendor>) => {
+    const updatesStr = JSON.stringify(updates);
+    if (updatesStr === lastSaveRef.current) return; // No changes
+    
+    lastSaveRef.current = updatesStr;
+    setSaveStatus('saving');
+    setSaveError(null);
+    
+    try {
+      await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay to batch rapid changes
+      onAutoSave(updates);
+      setSaveStatus('saved');
+      
+      // Clear saved status after 2s
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (err) {
+      setSaveStatus('error');
+      setSaveError(err instanceof Error ? err.message : 'Save failed');
+      console.error('[Vendor] Auto-save failed:', err);
+    }
+  }, [onAutoSave]);
+
+  // Auto-save to store 300ms after any change so mobile tab-close doesn't lose data
   useEffect(() => {
-    const timer = setTimeout(() => onAutoSave(buildUpdates()), 800);
+    const timer = setTimeout(() => {
+      performAutoSave(buildUpdates());
+    }, 300);
     return () => clearTimeout(timer);
-  // eslint-disable-line react-hooks/exhaustive-deps
-  }, [draft, notesList, attachments]); // intentionally omit buildUpdates/onAutoSave to avoid infinite loop
+  }, [draft, notesList, attachments, performAutoSave, buildUpdates]);
 
   // Flush immediately when user switches away (mobile Chrome close / tab switch)
   useEffect(() => {
-    const flush = () => { if (document.visibilityState === "hidden") onAutoSave(buildUpdates()); };
+    const flush = () => { 
+      if (document.visibilityState === "hidden") {
+        setSaveStatus('saving');
+        onAutoSave(buildUpdates()); 
+      }
+    };
     document.addEventListener("visibilitychange", flush);
     window.addEventListener("pagehide", flush);
     return () => {
       document.removeEventListener("visibilitychange", flush);
       window.removeEventListener("pagehide", flush);
     };
-  // eslint-disable-line react-hooks/exhaustive-deps
-  }, [buildUpdates]);
+  }, [buildUpdates, onAutoSave]);
+
+  // Cleanup save timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, []);
 
   async function handleFiles(files: FileList) {
-    const newAtts = await processFiles(files);
-    setAttachments((prev) => [...prev, ...newAtts]);
+    try {
+      setSaveStatus('saving');
+      const newAtts = await processFiles(files);
+      setAttachments((prev) => [...prev, ...newAtts]);
+    } catch (err) {
+      setSaveStatus('error');
+      setSaveError(err instanceof Error ? err.message : 'File upload failed');
+      console.error('[Vendor] File processing failed:', err);
+    }
   }
 
   function commit() {
@@ -530,7 +593,7 @@ function EditVendorForm({
           <AttachmentUpload onFiles={handleFiles} />
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
         <button onClick={commit}
           className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
           Save
@@ -538,6 +601,35 @@ function EditVendorForm({
         <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
           Cancel
         </button>
+        
+        {/* Save status indicator */}
+        <div className="flex items-center gap-1.5 text-xs">
+          {saveStatus === 'saving' && (
+            <>
+              <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-gray-500">Saving...</span>
+            </>
+          )}
+          {saveStatus === 'saved' && (
+            <>
+              <svg className="w-3 h-3 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-green-600">Saved</span>
+            </>
+          )}
+          {saveStatus === 'error' && (
+            <>
+              <svg className="w-3 h-3 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span className="text-red-600">Error</span>
+              {saveError && (
+                <span className="text-red-500 max-w-32 truncate" title={saveError}>: {saveError}</span>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -625,10 +717,17 @@ export function Vendors() {
     answers, setResearchNotes, setTriggerResearchFor, setActiveTab,
   } = usePlanStore();
 
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
+  
   // Poll for externally-imported vendors (e.g. from email/shortcut).
-  // Runs immediately on mount, then every 30s.
+  // Runs immediately on mount, then every 30s, but pauses during editing to prevent conflicts.
   useEffect(() => {
     async function pollVendors() {
+      // Skip polling if user is actively editing to prevent data conflicts
+      if (editingId || adding) return;
+      
       try {
         const res = await fetch("/api/sync");
         if (!res.ok) return;
@@ -643,11 +742,7 @@ export function Vendors() {
     pollVendors(); // immediate on mount
     const id = setInterval(pollVendors, 30_000);
     return () => clearInterval(id);
-  }, [mergeVendors]);
-
-  const [adding, setAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [showSetup, setShowSetup] = useState(false);
+  }, [mergeVendors, editingId, adding]);
   const [importUrl, setImportUrl] = useState("");
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -684,7 +779,19 @@ export function Vendors() {
         throw new Error(data.error ?? `HTTP ${res.status}`);
       }
       setImportUrl("");
-      window.location.reload();
+      // Soft reload - refetch data instead of hard reload
+      try {
+        const syncRes = await fetch("/api/sync");
+        if (syncRes.ok) {
+          const syncData = await syncRes.json() as { vendors?: unknown[] };
+          if (Array.isArray(syncData.vendors)) {
+            mergeVendors(syncData.vendors as import("@/lib/types").Vendor[]);
+          }
+        }
+      } catch {
+        // Fall back to hard reload if sync fails
+        window.location.reload();
+      }
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -694,23 +801,29 @@ export function Vendors() {
 
   function handleAdd() {
     if (!form.name.trim()) return;
-    const isVenue = form.category === "Venue";
-    addVendor({
-      id:           `vendor-${Date.now()}`,
-      category:     form.category,
-      name:         form.name,
-      contact:      form.contact      || undefined,
-      website:      form.website      || undefined,
-      price:        form.price        ? parseInt(form.price) : undefined,
-      notes:        form.notes        || undefined,
-      status:       "considering",
-      rentalPeriod: isVenue ? (form.rentalPeriod || undefined) : undefined,
-      overtimeRate: isVenue ? (form.overtimeRate || undefined) : undefined,
-      attachments:  addFormAttachments.length ? addFormAttachments : undefined,
-    });
-    setForm({ category: "Venue", name: "", contact: "", website: "", price: "", notes: "", rentalPeriod: "", overtimeRate: "" });
-    setAddFormAttachments([]);
-    setAdding(false);
+    
+    try {
+      const isVenue = form.category === "Venue";
+      addVendor({
+        id:           `vendor-${Date.now()}`,
+        category:     form.category,
+        name:         form.name,
+        contact:      form.contact      || undefined,
+        website:      form.website      || undefined,
+        price:        form.price        ? parseInt(form.price) : undefined,
+        notes:        form.notes        || undefined,
+        status:       "considering",
+        rentalPeriod: isVenue ? (form.rentalPeriod || undefined) : undefined,
+        overtimeRate: isVenue ? (form.overtimeRate || undefined) : undefined,
+        attachments:  addFormAttachments.length ? addFormAttachments : undefined,
+      });
+      setForm({ category: "Venue", name: "", contact: "", website: "", price: "", notes: "", rentalPeriod: "", overtimeRate: "" });
+      setAddFormAttachments([]);
+      setAdding(false);
+    } catch (err) {
+      console.error('[Vendor] Failed to add vendor:', err);
+      // Could show an error message to user here in the future
+    }
   }
 
   async function handleFindSimilar(vendor: Vendor) {
