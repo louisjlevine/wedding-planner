@@ -13,6 +13,7 @@ import { Vendors } from "@/components/sections/Vendors";
 import { Guests } from "@/components/sections/Guests";
 import { Advisor } from "@/components/sections/Advisor";
 import { DigestSettings } from "@/components/sections/DigestSettings";
+import { Research } from "@/components/sections/Research";
 
 export function Layout() {
   const { intakeComplete, activeTab } = usePlanStore();
@@ -22,6 +23,7 @@ export function Layout() {
   const sections: Record<string, React.ReactNode> = {
     overview: <Overview />,
     advisor: <Advisor />,
+    research: <Research />,
     budget: <Budget />,
     timeline: <Timeline />,
     vendors: <Vendors />,
