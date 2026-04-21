@@ -751,6 +751,7 @@ export function Vendors() {
     rentalPeriod: "", overtimeRate: "",
   });
   const [addFormAttachments, setAddFormAttachments] = useState<VendorAttachment[]>([]);
+  const [addFormProcessing, setAddFormProcessing] = useState(false);
 
   // Per-vendor loading state for "Find similar"
   const [findingFor, setFindingFor] = useState<string | null>(null);
@@ -800,10 +801,11 @@ export function Vendors() {
   }
 
   function handleAdd() {
-    if (!form.name.trim()) return;
-    
+    if (!form.name.trim() || addFormProcessing) return;
+
     try {
       const isVenue = form.category === "Venue";
+      const noteText = form.notes.trim();
       addVendor({
         id:           `vendor-${Date.now()}`,
         category:     form.category,
@@ -811,7 +813,7 @@ export function Vendors() {
         contact:      form.contact      || undefined,
         website:      form.website      || undefined,
         price:        form.price        ? parseInt(form.price) : undefined,
-        notes:        form.notes        || undefined,
+        notesList:    noteText ? [{ id: `note-${Date.now()}`, text: noteText, addedAt: new Date().toISOString() }] : undefined,
         status:       "considering",
         rentalPeriod: isVenue ? (form.rentalPeriod || undefined) : undefined,
         overtimeRate: isVenue ? (form.overtimeRate || undefined) : undefined,
@@ -1088,17 +1090,23 @@ export function Vendors() {
             />
             <div className="mt-2">
               <AttachmentUpload onFiles={async (files) => {
-                const newAtts = await processFiles(files);
-                setAddFormAttachments((prev) => [...prev, ...newAtts]);
+                setAddFormProcessing(true);
+                try {
+                  const newAtts = await processFiles(files);
+                  setAddFormAttachments((prev) => [...prev, ...newAtts]);
+                } finally {
+                  setAddFormProcessing(false);
+                }
               }} />
             </div>
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleAdd}
-              className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
+              disabled={addFormProcessing}
+              className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors disabled:opacity-50"
             >
-              Add
+              {addFormProcessing ? "Processing…" : "Add"}
             </button>
             <button
               onClick={() => setAdding(false)}

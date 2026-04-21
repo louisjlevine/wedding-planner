@@ -77,7 +77,9 @@ export async function POST(req: NextRequest) {
       `Category: ${vendor.category}`,
       vendor.website ? `Website: ${vendor.website}` : null,
       vendor.price   ? `Estimated price: $${vendor.price.toLocaleString()}` : null,
-      vendor.notes   ? `Notes: ${vendor.notes}` : null,
+      vendor.notesList?.length
+        ? `Notes: ${vendor.notesList.map((n) => n.text).join(" | ")}`
+        : vendor.notes ? `Notes: ${vendor.notes}` : null,
     ].filter(Boolean).join("\n");
 
     const websiteSection = websiteContent
