@@ -1255,7 +1255,11 @@ export function Vendors() {
                       </button>
                     )}
                     <button
-                      onClick={() => removeVendor(vendor.id)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        removeVendor(vendor.id);
+                      }}
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 hover:bg-red-100 hover:border-red-300 transition-colors"
                     >
                       <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
