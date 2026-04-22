@@ -35,6 +35,7 @@ interface PlanState {
   timelineDoneIds: string[];
   activeTab: Tab;
   intakeComplete: boolean;
+  vendorFilterHideRejected: boolean;
 
   setAnswers: (answers: WeddingAnswers) => void;
   updateAnswers: (partial: Partial<WeddingAnswers>) => void;
@@ -87,6 +88,7 @@ interface PlanState {
   setEmailPrefs: (prefs: EmailDigestPrefs) => void;
 
   setActiveTab: (tab: Tab) => void;
+  setVendorFilterHideRejected: (hide: boolean) => void;
   importStore: (data: Partial<PlanState>) => void;
 }
 
@@ -111,6 +113,7 @@ export const usePlanStore = create<PlanState>()(
       activeTab: "overview",
       intakeComplete: false,
       emailPrefs: null,
+      vendorFilterHideRejected: false,
 
       setAnswers: (answers) =>
         set({ answers, intakeComplete: true, activeTab: "advisor" }),
@@ -338,6 +341,8 @@ export const usePlanStore = create<PlanState>()(
       setEmailPrefs: (prefs) => set({ emailPrefs: prefs }),
 
       setActiveTab: (tab) => set({ activeTab: tab }),
+
+      setVendorFilterHideRejected: (hide) => set({ vendorFilterHideRejected: hide }),
 
       importStore: (data) =>
         set((state) => ({

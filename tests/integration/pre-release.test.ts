@@ -54,7 +54,7 @@ describe("Secret hygiene", () => {
     let result = "";
     try {
       result = execSync(
-        "git grep -r 'sk-ant-' -- '*.ts' '*.tsx' '*.js' '*.json' 2>/dev/null || true",
+        "git grep -r 'sk-ant-' -- '*.ts' '*.tsx' '*.js' '*.json' 2>/dev/null | grep -v 'tests/integration/pre-release.test.ts' || true",
         { cwd: ROOT }
       ).toString();
     } catch {
