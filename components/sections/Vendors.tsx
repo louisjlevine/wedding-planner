@@ -1218,113 +1218,51 @@ export function Vendors() {
                 <div
                   key={vendor.id}
                   onClick={() => setEditingId(vendor.id)}
-                  className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 cursor-pointer hover:border-[var(--accent)]/50 hover:shadow-md transition-[border-color,box-shadow] duration-150"
+                  className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between gap-4 cursor-pointer hover:border-[var(--accent)]/50 hover:shadow-sm transition-[border-color,box-shadow] duration-150"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-gray-900">{vendor.name}</p>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${STATUS_DOT[vendor.status]}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{vendor.name}</p>
                     </div>
-                    {vendor.website && (
-                      <a
-                        href={vendor.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs text-[var(--accent)] hover:underline mt-0.5 block truncate"
-                      >
-                        {vendor.website.replace(/^https?:\/\//, "")}
-                      </a>
-                    )}
-                    {vendor.contact && (
-                      <p className="text-xs text-gray-400 mt-0.5">{vendor.contact}</p>
-                    )}
-                    {vendor.price && (
-                      <p className="text-xs text-gray-500 mt-0.5">Est. ${vendor.price.toLocaleString()}</p>
-                    )}
-                    {vendor.category === "Venue" && (vendor.rentalPeriod || vendor.overtimeRate) && (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {vendor.rentalPeriod && <span>{vendor.rentalPeriod}</span>}
-                        {vendor.rentalPeriod && vendor.overtimeRate && <span className="mx-1 text-gray-300">&middot;</span>}
-                        {vendor.overtimeRate && <span>OT: {vendor.overtimeRate}</span>}
-                      </p>
-                    )}
-                    {/* Structured notes list (new) */}
-                    {vendor.notesList && vendor.notesList.length > 0 && (
-                      <div className="mt-1.5 space-y-1">
-                        {vendor.notesList.map((note) => (
-                          <p key={note.id} className="text-xs text-gray-500 bg-gray-50 rounded px-2 py-1 leading-relaxed">{note.text}</p>
-                        ))}
-                      </div>
-                    )}
-                    {/* Legacy single-text notes (only shown if no notesList) */}
-                    {!vendor.notesList?.length && vendor.notes && (
-                      <p className="text-xs text-gray-400 mt-1 italic line-clamp-2">{vendor.notes}</p>
-                    )}
-                    {vendor.attachments && vendor.attachments.length > 0 && (
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        {vendor.attachments.slice(0, 4).map((att) => (
-                          att.mimeType.startsWith("image/") ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img key={att.id} src={att.dataUrl} alt={att.fileName}
-                              className="w-8 h-8 object-cover rounded border border-gray-200" />
-                          ) : (
-                            <div key={att.id} className="w-8 h-8 rounded border border-gray-200 bg-gray-50 flex items-center justify-center">
-                              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                              </svg>
-                            </div>
-                          )
-                        ))}
-                        {vendor.attachments.length > 4 && (
-                          <span className="text-[10px] text-gray-400">+{vendor.attachments.length - 4}</span>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   <div
-                    className="flex flex-row sm:flex-col items-center sm:items-end gap-2 shrink-0"
+                    className="flex items-center gap-2 shrink-0"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <StatusTagsSelector
-                      vendor={vendor}
-                      onUpdate={(updates) => updateVendor(vendor.id, updates)}
-                    />
-
-                    <div className="flex items-center gap-2">
-                      {canFindSimilar && (
-                        <button
-                          onClick={() => handleFindSimilar(vendor)}
-                          disabled={isLoading}
-                          className="inline-flex items-center gap-1.5 text-xs text-gray-400 border border-gray-200 rounded-lg px-2.5 py-1 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 transition-colors"
-                        >
-                          {isLoading ? (
-                            <>
-                              <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                              Finding…
-                            </>
-                          ) : (
-                            <>
-                              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                                <circle cx="6.5" cy="6.5" r="4.5" />
-                                <path d="M14 14l-3-3" />
-                                <path d="M6.5 4v5M4 6.5h5" />
-                              </svg>
-                              Find similar
-                            </>
-                          )}
-                        </button>
-                      )}
+                    {canFindSimilar && (
                       <button
-                        onClick={() => removeVendor(vendor.id)}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1 hover:bg-red-100 hover:border-red-300 transition-colors"
+                        onClick={() => handleFindSimilar(vendor)}
+                        disabled={isLoading}
+                        className="inline-flex items-center gap-1.5 text-xs text-gray-400 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 transition-colors"
                       >
-                        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9" />
-                        </svg>
-                        Remove
+                        {isLoading ? (
+                          <>
+                            <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                            Finding…
+                          </>
+                        ) : (
+                          <>
+                            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                              <circle cx="6.5" cy="6.5" r="4.5" />
+                              <path d="M14 14l-3-3" />
+                              <path d="M6.5 4v5M4 6.5h5" />
+                            </svg>
+                            Find similar
+                          </>
+                        )}
                       </button>
-                    </div>
+                    )}
+                    <button
+                      onClick={() => removeVendor(vendor.id)}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 hover:bg-red-100 hover:border-red-300 transition-colors"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9" />
+                      </svg>
+                      Remove
+                    </button>
                   </div>
                 </div>
               );
