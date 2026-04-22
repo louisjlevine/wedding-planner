@@ -715,6 +715,7 @@ export function Vendors() {
   const {
     vendors, addVendor, updateVendor, removeVendor, mergeVendors,
     answers, setResearchNotes, setTriggerResearchFor, setActiveTab,
+    vendorFilterHideRejected, setVendorFilterHideRejected,
   } = usePlanStore();
 
   const [adding, setAdding] = useState(false);
@@ -757,7 +758,6 @@ export function Vendors() {
 
   // Category filter — "All" means no filter
   const [filterCategory, setFilterCategory] = useState<string>("All");
-  const [hideRejected, setHideRejected] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Venue comparison table pop-out
@@ -860,7 +860,7 @@ export function Vendors() {
   const presentCategories = CATEGORIES.filter((c) => vendors.some((v) => v.category === c));
 
   const filteredVendors = vendors
-    .filter((v) => !hideRejected || v.status !== "rejected")
+    .filter((v) => !vendorFilterHideRejected || v.status !== "rejected")
     .filter((v) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
@@ -1153,14 +1153,14 @@ export function Vendors() {
           ))}
           {vendors.some((v) => v.status === "rejected") && (
             <button
-              onClick={() => setHideRejected((h) => !h)}
+              onClick={() => setVendorFilterHideRejected(!vendorFilterHideRejected)}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                hideRejected
+                vendorFilterHideRejected
                   ? "bg-gray-800 text-white"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
             >
-              {hideRejected ? "Show rejected" : "Hide rejected"}
+              {vendorFilterHideRejected ? "Show rejected" : "Hide rejected"}
             </button>
           )}
         </div>
@@ -1221,7 +1221,17 @@ export function Vendors() {
                   className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between gap-4 cursor-pointer hover:border-[var(--accent)]/50 hover:shadow-sm transition-[border-color,box-shadow] duration-150"
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${STATUS_DOT[vendor.status]}`} />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const statuses = ["considering", "contacted", "booked", "rejected"] as const;
+                        const currentIndex = statuses.indexOf(vendor.status);
+                        const nextStatus = statuses[(currentIndex + 1) % statuses.length];
+                        updateVendor(vendor.id, { status: nextStatus });
+                      }}
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 transition-all duration-150 hover:scale-125 hover:shadow-sm ${STATUS_DOT[vendor.status]}`}
+                      title={`Current status: ${vendor.status}. Click to change to next status.`}
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{vendor.name}</p>
                     </div>
