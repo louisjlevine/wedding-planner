@@ -36,6 +36,7 @@ interface PlanState {
   activeTab: Tab;
   intakeComplete: boolean;
   vendorFilterHideRejected: boolean;
+  deletedVendorIds: string[]; // track locally-deleted vendors to prevent re-import
 
   setAnswers: (answers: WeddingAnswers) => void;
   updateAnswers: (partial: Partial<WeddingAnswers>) => void;
@@ -114,6 +115,7 @@ export const usePlanStore = create<PlanState>()(
       intakeComplete: false,
       emailPrefs: null,
       vendorFilterHideRejected: false,
+      deletedVendorIds: [],
 
       setAnswers: (answers) =>
         set({ answers, intakeComplete: true, activeTab: "advisor" }),
@@ -127,13 +129,23 @@ export const usePlanStore = create<PlanState>()(
         set({ answers: null, intakeComplete: false, activeTab: "overview" }),
 
       addVendor: (vendor) =>
-        set((state) => ({ vendors: [...state.vendors, vendor] })),
+        set((state) => ({ 
+          vendors: [...state.vendors, vendor],
+          // Remove from deleted list if it was previously deleted and is being re-added
+          deletedVendorIds: state.deletedVendorIds.filter((id) => id !== vendor.id),
+        })),
 
       // Merge incoming vendors from server — adds new ones (by id), updates existing
+      // But skip any vendors that were locally deleted to prevent re-import
       mergeVendors: (incoming) =>
         set((state) => {
           const localById = new Map(state.vendors.map((v) => [v.id, v]));
-          incoming.forEach((v) => localById.set(v.id, v));
+          incoming.forEach((v) => {
+            // Skip vendors that were locally deleted
+            if (!state.deletedVendorIds.includes(v.id)) {
+              localById.set(v.id, v);
+            }
+          });
           return { vendors: Array.from(localById.values()) };
         }),
 
@@ -147,6 +159,7 @@ export const usePlanStore = create<PlanState>()(
       removeVendor: (id) =>
         set((state) => ({
           vendors: state.vendors.filter((v) => v.id !== id),
+          deletedVendorIds: [...state.deletedVendorIds, id],
         })),
 
       addTask: (task) =>
