@@ -224,9 +224,10 @@ const CATEGORY_TO_RESEARCH: Partial<Record<string, ResearchType>> = {
   "Attire":       "dress",
 };
 
-// ── Combined status + tags selector ──────────────────────────────────────────
 
-function StatusTagsSelector({
+// ── Compact status selector (for card list view) ─────────────────────────────
+
+function StatusSelector({
   vendor,
   onUpdate,
 }: {
@@ -245,28 +246,18 @@ function StatusTagsSelector({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const tags = vendor.tags ?? [];
-
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-[var(--accent)] transition-colors"
-      >
-        <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[vendor.status]}`} />
-        <span className="capitalize">{vendor.status}</span>
-        {tags.length > 0 && (
-          <span className="text-gray-400 font-normal">· {tags.join(", ")}</span>
-        )}
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-gray-400 ml-0.5">
-          <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+        className={`w-2.5 h-2.5 rounded-full shrink-0 transition-all duration-150 hover:scale-125 hover:shadow-sm ${STATUS_DOT[vendor.status]}`}
+        title={`Current status: ${vendor.status}. Click to change.`}
+      />
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 z-50 min-w-[170px]">
+        <div className="absolute left-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg p-3 z-50 min-w-[140px]">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Status</p>
-          <div className="space-y-1.5 mb-3">
+          <div className="space-y-1.5">
             {(["considering", "contacted", "booked", "rejected"] as const).map((s) => (
               <label key={s} className="flex items-center gap-2 cursor-pointer group">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[s]}`} />
@@ -287,31 +278,6 @@ function StatusTagsSelector({
                 )}
               </label>
             ))}
-          </div>
-
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tags</p>
-          <div className="space-y-1.5">
-            {TAGS.map((tag) => {
-              const active = tags.includes(tag);
-              return (
-                <label key={tag} className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={active}
-                    onChange={(e) => {
-                      const newTags = e.target.checked
-                        ? [...tags, tag]
-                        : tags.filter((t) => t !== tag);
-                      onUpdate({ tags: newTags });
-                    }}
-                    className="w-3 h-3 accent-[var(--accent)] cursor-pointer"
-                  />
-                  <span className={`text-xs ${active ? "font-semibold text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
-                    {tag}
-                  </span>
-                </label>
-              );
-            })}
           </div>
         </div>
       )}
@@ -1204,13 +1170,25 @@ export function Vendors() {
 
               if (isEditing) {
                 return (
-                  <EditVendorForm
+                  <div
                     key={vendor.id}
-                    vendor={vendor}
-                    onSave={(updates) => { updateVendor(vendor.id, updates); setEditingId(null); }}
-                    onCancel={() => setEditingId(null)}
-                    onAutoSave={(updates) => updateVendor(vendor.id, updates)}
-                  />
+                    className="relative"
+                  >
+                    {/* Click-outside overlay */}
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setEditingId(null)}
+                    />
+                    {/* Edit form with higher z-index */}
+                    <div className="relative z-20">
+                      <EditVendorForm
+                        vendor={vendor}
+                        onSave={(updates) => { updateVendor(vendor.id, updates); setEditingId(null); }}
+                        onCancel={() => setEditingId(null)}
+                        onAutoSave={(updates) => updateVendor(vendor.id, updates)}
+                      />
+                    </div>
+                  </div>
                 );
               }
 
@@ -1221,16 +1199,9 @@ export function Vendors() {
                   className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between gap-4 cursor-pointer hover:border-[var(--accent)]/50 hover:shadow-sm transition-[border-color,box-shadow] duration-150"
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const statuses = ["considering", "contacted", "booked", "rejected"] as const;
-                        const currentIndex = statuses.indexOf(vendor.status);
-                        const nextStatus = statuses[(currentIndex + 1) % statuses.length];
-                        updateVendor(vendor.id, { status: nextStatus });
-                      }}
-                      className={`w-2.5 h-2.5 rounded-full shrink-0 transition-all duration-150 hover:scale-125 hover:shadow-sm ${STATUS_DOT[vendor.status]}`}
-                      title={`Current status: ${vendor.status}. Click to change to next status.`}
+                    <StatusSelector 
+                      vendor={vendor}
+                      onUpdate={(updates) => updateVendor(vendor.id, updates)}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{vendor.name}</p>
