@@ -36,6 +36,7 @@ interface PlanState {
   activeTab: Tab;
   intakeComplete: boolean;
   vendorFilterHideRejected: boolean;
+  guestSideFilter: "all" | "bride" | "groom" | "both";
 
   setAnswers: (answers: WeddingAnswers) => void;
   updateAnswers: (partial: Partial<WeddingAnswers>) => void;
@@ -89,6 +90,7 @@ interface PlanState {
 
   setActiveTab: (tab: Tab) => void;
   setVendorFilterHideRejected: (hide: boolean) => void;
+  setGuestSideFilter: (filter: "all" | "bride" | "groom" | "both") => void;
   importStore: (data: Partial<PlanState>) => void;
 }
 
@@ -114,6 +116,7 @@ export const usePlanStore = create<PlanState>()(
       intakeComplete: false,
       emailPrefs: null,
       vendorFilterHideRejected: false,
+      guestSideFilter: "all",
 
       setAnswers: (answers) =>
         set({ answers, intakeComplete: true, activeTab: "advisor" }),
@@ -343,6 +346,8 @@ export const usePlanStore = create<PlanState>()(
       setActiveTab: (tab) => set({ activeTab: tab }),
 
       setVendorFilterHideRejected: (hide) => set({ vendorFilterHideRejected: hide }),
+
+      setGuestSideFilter: (filter) => set({ guestSideFilter: filter }),
 
       importStore: (data) =>
         set((state) => ({

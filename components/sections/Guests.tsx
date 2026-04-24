@@ -455,11 +455,10 @@ function EditGuestForm({
 // ── Main Guests page ──────────────────────────────────────────────────────────
 
 export function Guests() {
-  const { guests, addGuest, updateGuest, removeGuest } = usePlanStore();
+  const { guests, addGuest, updateGuest, removeGuest, guestSideFilter, setGuestSideFilter } = usePlanStore();
 
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [sideFilter, setSideFilter] = useState<GuestSide | "all">("all");
   const [form, setForm] = useState({
     name: "", email: "", address: "", totalGuests: 1, dietary: "", table: "",
     relationship: "" as GuestRelationship | "",
@@ -603,9 +602,9 @@ export function Guests() {
 
   // ── Derived counts ───────────────────────────────────────────────────────
 
-  const filteredGuests = sideFilter === "all"
+  const filteredGuests = guestSideFilter === "all"
     ? guests
-    : guests.filter((g) => g.side === sideFilter || (sideFilter === "both" && g.side === "both"));
+    : guests.filter((g) => g.side === guestSideFilter || (guestSideFilter === "both" && g.side === "both"));
 
   const byRsvp = (s: Guest["rsvp"]) => filteredGuests.filter((g) => g.rsvp === s);
   const counts = {
@@ -669,9 +668,9 @@ export function Guests() {
           {(["all", ...SIDES] as const).map((s) => (
             <button
               key={s}
-              onClick={() => setSideFilter(s)}
+              onClick={() => setGuestSideFilter(s)}
               className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
-                sideFilter === s
+                guestSideFilter === s
                   ? "bg-[var(--accent)] text-white border-[var(--accent)]"
                   : "border-gray-200 text-gray-500 hover:border-[var(--accent)] hover:text-[var(--accent)]"
               }`}
