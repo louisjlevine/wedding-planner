@@ -300,7 +300,6 @@ function EditVendorForm({
 }) {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaveRef = useRef<string>('');
   const [draft, setDraft] = useState({
     name:          vendor.name,
@@ -339,43 +338,18 @@ function EditVendorForm({
     attachments:  attachments.length ? attachments : undefined,
   }), [draft, notesList, attachments, isVenue, vendor.name]);
 
-  const performAutoSave = useCallback(async (updates: Partial<Vendor>) => {
-    const updatesStr = JSON.stringify(updates);
-    if (updatesStr === lastSaveRef.current) return; // No changes
-    
-    lastSaveRef.current = updatesStr;
-    setSaveStatus('saving');
-    setSaveError(null);
-    
-    try {
-      await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay to batch rapid changes
-      onAutoSave(updates);
-      setSaveStatus('saved');
-      
-      // Clear saved status after 2s
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
-    } catch (err) {
-      setSaveStatus('error');
-      setSaveError(err instanceof Error ? err.message : 'Save failed');
-      console.error('[Vendor] Auto-save failed:', err);
-    }
-  }, [onAutoSave]);
-
-  // Auto-save to store 300ms after any change so mobile tab-close doesn't lose data
+  // Flush the draft to the store when the tab is hidden or closed — safety
+  // net for mobile, where clicking "Save" may not be possible before the
+  // browser discards the page.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      performAutoSave(buildUpdates());
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [draft, notesList, attachments, performAutoSave, buildUpdates]);
-
-  // Flush immediately when user switches away (mobile Chrome close / tab switch)
-  useEffect(() => {
-    const flush = () => { 
+    const flush = () => {
       if (document.visibilityState === "hidden") {
+        const updates = buildUpdates();
+        const updatesStr = JSON.stringify(updates);
+        if (updatesStr === lastSaveRef.current) return;
+        lastSaveRef.current = updatesStr;
         setSaveStatus('saving');
-        onAutoSave(buildUpdates()); 
+        onAutoSave(updates);
       }
     };
     document.addEventListener("visibilitychange", flush);
@@ -386,12 +360,18 @@ function EditVendorForm({
     };
   }, [buildUpdates, onAutoSave]);
 
-  // Cleanup save timeout on unmount
+  // Close-on-outside-click: clicking anywhere outside the form fires onCancel,
+  // which discards the draft (explicit Save is the only path that writes).
+  const formRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
-  }, []);
+    function handler(e: MouseEvent) {
+      if (formRef.current && !formRef.current.contains(e.target as Node)) {
+        onCancel();
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onCancel]);
 
   async function handleFiles(files: FileList) {
     try {
@@ -410,7 +390,7 @@ function EditVendorForm({
   }
 
   return (
-    <div className="bg-[var(--accent)]/5 border border-[var(--accent)] rounded-xl px-5 py-4 space-y-3">
+    <div ref={formRef} className="bg-[var(--accent)]/5 border border-[var(--accent)] rounded-xl px-5 py-4 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Name</label>
@@ -687,14 +667,22 @@ export function Vendors() {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
-  
+
+  // Read editing/adding via refs inside the poll so toggling them doesn't
+  // re-fire the effect — otherwise clicking Save would immediately fetch
+  // the server snapshot (still pre-save, due to the 1.5s sync debounce)
+  // and mergeVendors would clobber the freshly-saved local update.
+  const editingIdRef = useRef(editingId);
+  const addingRef = useRef(adding);
+  editingIdRef.current = editingId;
+  addingRef.current = adding;
+
   // Poll for externally-imported vendors (e.g. from email/shortcut).
   // Runs immediately on mount, then every 30s, but pauses during editing to prevent conflicts.
   useEffect(() => {
     async function pollVendors() {
-      // Skip polling if user is actively editing to prevent data conflicts
-      if (editingId || adding) return;
-      
+      if (editingIdRef.current || addingRef.current) return;
+
       try {
         const res = await fetch("/api/sync");
         if (!res.ok) return;
@@ -709,7 +697,7 @@ export function Vendors() {
     pollVendors(); // immediate on mount
     const id = setInterval(pollVendors, 30_000);
     return () => clearInterval(id);
-  }, [mergeVendors, editingId, adding]);
+  }, [mergeVendors]);
   const [importUrl, setImportUrl] = useState("");
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -1170,25 +1158,13 @@ export function Vendors() {
 
               if (isEditing) {
                 return (
-                  <div
+                  <EditVendorForm
                     key={vendor.id}
-                    className="relative"
-                  >
-                    {/* Click-outside overlay */}
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setEditingId(null)}
-                    />
-                    {/* Edit form with higher z-index */}
-                    <div className="relative z-20">
-                      <EditVendorForm
-                        vendor={vendor}
-                        onSave={(updates) => { updateVendor(vendor.id, updates); setEditingId(null); }}
-                        onCancel={() => setEditingId(null)}
-                        onAutoSave={(updates) => updateVendor(vendor.id, updates)}
-                      />
-                    </div>
-                  </div>
+                    vendor={vendor}
+                    onSave={(updates) => { updateVendor(vendor.id, updates); setEditingId(null); }}
+                    onCancel={() => setEditingId(null)}
+                    onAutoSave={(updates) => updateVendor(vendor.id, updates)}
+                  />
                 );
               }
 

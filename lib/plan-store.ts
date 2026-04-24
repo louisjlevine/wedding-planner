@@ -378,11 +378,25 @@ export const usePlanStore = create<PlanState>()(
       setVendorFilterHideRejected: (hide) => set({ vendorFilterHideRejected: hide }),
 
       importStore: (data) =>
-        set((state) => ({
-          ...state,
-          ...data,
-          intakeComplete: !!(data.answers ?? state.answers),
-        })),
+        set((state) => {
+          // Union local + incoming deletion records so deletes from any device stick
+          const incomingDeleted = Array.isArray(data.deletedVendorIds)
+            ? data.deletedVendorIds
+            : [];
+          const deletedVendorIds = Array.from(
+            new Set([...state.deletedVendorIds, ...incomingDeleted])
+          );
+          // Strip out any vendor whose id is in the merged deletion list
+          const vendorsSource = Array.isArray(data.vendors) ? data.vendors : state.vendors;
+          const vendors = vendorsSource.filter((v) => !deletedVendorIds.includes(v.id));
+          return {
+            ...state,
+            ...data,
+            vendors,
+            deletedVendorIds,
+            intakeComplete: !!(data.answers ?? state.answers),
+          };
+        }),
     }),
     {
       name: "wedding-planner-store",
