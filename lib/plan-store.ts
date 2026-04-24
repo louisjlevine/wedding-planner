@@ -37,6 +37,7 @@ interface PlanState {
   intakeComplete: boolean;
   vendorFilterHideRejected: boolean;
   deletedVendorIds: string[]; // track locally-deleted vendors to prevent re-import
+  deletedVendorDomains: string[]; // track domains of deleted vendors to prevent re-import
 
   setAnswers: (answers: WeddingAnswers) => void;
   updateAnswers: (partial: Partial<WeddingAnswers>) => void;
@@ -116,6 +117,7 @@ export const usePlanStore = create<PlanState>()(
       emailPrefs: null,
       vendorFilterHideRejected: false,
       deletedVendorIds: [],
+      deletedVendorDomains: [],
 
       setAnswers: (answers) =>
         set({ answers, intakeComplete: true, activeTab: "advisor" }),
@@ -157,10 +159,28 @@ export const usePlanStore = create<PlanState>()(
         })),
 
       removeVendor: (id) =>
-        set((state) => ({
-          vendors: state.vendors.filter((v) => v.id !== id),
-          deletedVendorIds: [...state.deletedVendorIds, id],
-        })),
+        set((state) => {
+          const vendor = state.vendors.find((v) => v.id === id);
+          const newDeletedDomains = [...state.deletedVendorDomains];
+          
+          // Extract domain from vendor website and add to deleted domains
+          if (vendor?.website) {
+            try {
+              const domain = new URL(vendor.website).hostname.replace(/^www\./, "");
+              if (!newDeletedDomains.includes(domain)) {
+                newDeletedDomains.push(domain);
+              }
+            } catch {
+              // Invalid URL, skip domain tracking
+            }
+          }
+          
+          return {
+            vendors: state.vendors.filter((v) => v.id !== id),
+            deletedVendorIds: [...state.deletedVendorIds, id],
+            deletedVendorDomains: newDeletedDomains,
+          };
+        }),
 
       addTask: (task) =>
         set((state) => ({ tasks: [...state.tasks, task] })),

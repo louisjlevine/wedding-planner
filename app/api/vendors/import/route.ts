@@ -223,6 +223,14 @@ Rules:
   try {
     const state = await readState();
     const vendors = Array.isArray(state.vendors) ? (state.vendors as Record<string, unknown>[]) : [];
+    const deletedVendorIds = Array.isArray(state.deletedVendorIds) ? (state.deletedVendorIds as string[]) : [];
+    const deletedVendorDomains = Array.isArray(state.deletedVendorDomains) ? (state.deletedVendorDomains as string[]) : [];
+
+    // Check if this domain was previously deleted
+    if (incomingDomain && deletedVendorDomains.includes(incomingDomain)) {
+      // Domain was previously deleted - don't re-import
+      return NextResponse.json({ vendor: null, matched: false, message: "Vendor domain was previously deleted" });
+    }
 
     // Try to find an existing vendor whose website shares the same domain
     const matchIndex = incomingDomain
@@ -230,8 +238,15 @@ Rules:
       : -1;
 
     if (matchIndex >= 0) {
-      // Merge into existing vendor: add note, backfill missing contact/price
+      // Check if the existing vendor was deleted locally
       const existing = vendors[matchIndex] as Record<string, unknown>;
+      const vendorId = typeof existing.id === "string" ? existing.id : "";
+      if (vendorId && deletedVendorIds.includes(vendorId)) {
+        // Vendor was locally deleted - don't re-import
+        return NextResponse.json({ vendor: null, matched: false, message: "Vendor was previously deleted" });
+      }
+      
+      // Merge into existing vendor: add note, backfill missing contact/price
       const existingNotes = Array.isArray(existing.notesList) ? existing.notesList : [];
       const updated = {
         ...existing,
