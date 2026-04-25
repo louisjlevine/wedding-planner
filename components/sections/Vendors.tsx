@@ -1173,14 +1173,41 @@ export function Vendors() {
                   onClick={() => setEditingId(vendor.id)}
                   className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between gap-4 cursor-pointer hover:border-[var(--accent)]/50 hover:shadow-sm transition-[border-color,box-shadow] duration-150"
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <StatusSelector 
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <StatusSelector
                       vendor={vendor}
                       onUpdate={(updates) => updateVendor(vendor.id, updates)}
                     />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{vendor.name}</p>
-                    </div>
+                    <p className="text-sm font-medium text-gray-900 truncate">{vendor.name}</p>
+                    {vendor.tags && vendor.tags.length > 0 && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        {vendor.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {vendor.website && (
+                      <a
+                        href={/^https?:\/\//i.test(vendor.website) ? vendor.website : `https://${vendor.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title={vendor.website}
+                        aria-label={`Open ${vendor.name} website`}
+                        className="inline-flex items-center text-gray-400 hover:text-[var(--accent)] transition-colors shrink-0"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                          <polyline points="15 3 21 3 21 9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                      </a>
+                    )}
                   </div>
 
                   <div
