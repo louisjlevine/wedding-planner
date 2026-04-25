@@ -360,19 +360,6 @@ function EditVendorForm({
     };
   }, [buildUpdates, onAutoSave]);
 
-  // Close-on-outside-click: clicking anywhere outside the form fires onCancel,
-  // which discards the draft (explicit Save is the only path that writes).
-  const formRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (formRef.current && !formRef.current.contains(e.target as Node)) {
-        onCancel();
-      }
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [onCancel]);
-
   async function handleFiles(files: FileList) {
     try {
       setSaveStatus('saving');
@@ -390,7 +377,48 @@ function EditVendorForm({
   }
 
   return (
-    <div ref={formRef} className="bg-[var(--accent)]/5 border border-[var(--accent)] rounded-xl px-5 py-4 space-y-3">
+    <div className="bg-[var(--accent)]/5 border border-[var(--accent)] rounded-xl px-5 py-4 space-y-3">
+      <div>
+        <label className="text-xs text-gray-500 mb-1.5 block">Status &amp; Tags</label>
+        <div className="flex flex-wrap items-center gap-2">
+          {(["considering", "contacted", "booked", "rejected"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setDraft((d) => ({ ...d, status: s }))}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                draft.status === s
+                  ? "bg-[var(--accent)] text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full shrink-0 ${draft.status === s ? "bg-white/80" : STATUS_DOT[s]}`} />
+              <span className="capitalize">{s}</span>
+            </button>
+          ))}
+          <span className="text-gray-300 select-none">|</span>
+          {TAGS.map((tag) => {
+            const active = draft.tags.includes(tag);
+            return (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setDraft((d) => ({
+                  ...d,
+                  tags: active ? d.tags.filter((t) => t !== tag) : [...d.tags, tag],
+                }))}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-[var(--accent)] text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {tag}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Name</label>
@@ -421,47 +449,6 @@ function EditVendorForm({
           <input type="number" value={draft.price} onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))}
             placeholder="0"
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
-        </div>
-        <div className="col-span-2">
-          <label className="text-xs text-gray-500 mb-1.5 block">Status &amp; Tags</label>
-          <div className="flex flex-wrap items-center gap-2">
-            {(["considering", "contacted", "booked", "rejected"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setDraft((d) => ({ ...d, status: s }))}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                  draft.status === s
-                    ? "bg-[var(--accent)] text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                <span className={`w-2 h-2 rounded-full shrink-0 ${draft.status === s ? "bg-white/80" : STATUS_DOT[s]}`} />
-                <span className="capitalize">{s}</span>
-              </button>
-            ))}
-            <span className="text-gray-300 select-none">|</span>
-            {TAGS.map((tag) => {
-              const active = draft.tags.includes(tag);
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setDraft((d) => ({
-                    ...d,
-                    tags: active ? d.tags.filter((t) => t !== tag) : [...d.tags, tag],
-                  }))}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                    active
-                      ? "bg-[var(--accent)] text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {tag}
-                </button>
-              );
-            })}
-          </div>
         </div>
         {isVenue && (
           <>
@@ -540,11 +527,11 @@ function EditVendorForm({
         </div>
       </div>
       <div className="flex gap-2 items-center">
-        <button onClick={commit}
+        <button type="button" onClick={commit}
           className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
           Save
         </button>
-        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
           Cancel
         </button>
         
@@ -1158,13 +1145,25 @@ export function Vendors() {
 
               if (isEditing) {
                 return (
-                  <EditVendorForm
-                    key={vendor.id}
-                    vendor={vendor}
-                    onSave={(updates) => { updateVendor(vendor.id, updates); setEditingId(null); }}
-                    onCancel={() => setEditingId(null)}
-                    onAutoSave={(updates) => updateVendor(vendor.id, updates)}
-                  />
+                  <div key={vendor.id} className="relative">
+                    {/* Backdrop catches taps outside the form. Form sits above
+                        it via z-index, so taps on Save/Cancel/inputs reach the
+                        form normally. More reliable on mobile than a document
+                        mousedown listener (keyboard dismissal can shift the
+                        layout and misroute the synthesized mouse event). */}
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setEditingId(null)}
+                    />
+                    <div className="relative z-20">
+                      <EditVendorForm
+                        vendor={vendor}
+                        onSave={(updates) => { updateVendor(vendor.id, updates); setEditingId(null); }}
+                        onCancel={() => setEditingId(null)}
+                        onAutoSave={(updates) => updateVendor(vendor.id, updates)}
+                      />
+                    </div>
+                  </div>
                 );
               }
 
@@ -1174,14 +1173,41 @@ export function Vendors() {
                   onClick={() => setEditingId(vendor.id)}
                   className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between gap-4 cursor-pointer hover:border-[var(--accent)]/50 hover:shadow-sm transition-[border-color,box-shadow] duration-150"
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <StatusSelector 
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <StatusSelector
                       vendor={vendor}
                       onUpdate={(updates) => updateVendor(vendor.id, updates)}
                     />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{vendor.name}</p>
-                    </div>
+                    <p className="text-sm font-medium text-gray-900 truncate">{vendor.name}</p>
+                    {vendor.tags && vendor.tags.length > 0 && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        {vendor.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {vendor.website && (
+                      <a
+                        href={/^https?:\/\//i.test(vendor.website) ? vendor.website : `https://${vendor.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title={vendor.website}
+                        aria-label={`Open ${vendor.name} website`}
+                        className="inline-flex items-center text-gray-400 hover:text-[var(--accent)] transition-colors shrink-0"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                          <polyline points="15 3 21 3 21 9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                      </a>
+                    )}
                   </div>
 
                   <div
