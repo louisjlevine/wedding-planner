@@ -26,60 +26,77 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - uses: anthropics/claude-code-action@beta
-        env:
-          LINEAR_ACCESS_TOKEN: ${{ secrets.LINEAR_ACCESS_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           mode: agent
-          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep"
+          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep,mcp__linear__*"
+          mcp_config: |
+            {
+              "mcpServers": {
+                "linear": {
+                  "type": "connector",
+                  "connectorId": "8c0518ab-9c19-4121-a304-3cb7c9c4b97c"
+                }
+              }
+            }
           direct_prompt: |
             You are an automated issue worker for the Wedding Planner project
             (https://github.com/louisjlevine/wedding-planner).
 
-            You have access to the Linear GraphQL API via the LINEAR_ACCESS_TOKEN
-            environment variable. Use curl to call https://api.linear.app/graphql.
+            You have access to the Linear MCP connector. Use the mcp__linear__*
+            tools to interact with Linear (list issues, get issue details, update
+            issue status, etc.).
 
-            STEP 1 — CHECK FOR OPEN ISSUES:
-            Query the "Wedding Website" project issues using this curl pattern:
-              curl -s -X POST https://api.linear.app/graphql \
-                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d '{"query": "{ issues(filter: { project: { name: { eq: \"Wedding Website\" } }, state: { type: { in: [\"unstarted\", \"started\"] } } }, orderBy: priority) { nodes { id identifier title priority state { name type } description url } } }"}'
+            ── STEP 0 — PRE-FLIGHT STATUS CHECK ──────────────────────────────
 
-            Find the highest-priority open issue (lower priority number = higher priority:
-            1=Urgent, 2=High, 3=Medium, 4=Low, 0=No priority — treat 0 as lowest).
+            BEFORE doing any implementation work, you MUST verify the ticket is
+            in an actionable state. Use mcp__linear__list_issues to fetch issues
+            from the "Wedding Website" project, sorted by priority.
 
-            An issue is "open" ONLY if its state type is "unstarted" or "started"
-            AND the state name is NOT "In Review" or "Done" or "Cancelled".
+            Pick the highest-priority issue (priority: 1=Urgent, 2=High, 3=Medium,
+            4=Low, 0=No priority — treat 0 as lowest).
 
-            If no open issues exist, print "No open issues found — skipping this run."
-            and stop immediately.
+            Then use mcp__linear__get_issue_status to confirm its state.
 
-            STEP 2 — IMPLEMENT THE ISSUE:
-            Read the full issue description. Explore the codebase (read CLAUDE.md first).
-            Implement the changes described by the issue. Follow project coding standards:
-            Tailwind only, no inline styles, pink accent #D4537E, no emoji in UI.
+            ONLY PROCEED if the state type is "unstarted" or "started" AND the
+            state name is NOT any of: "In Review", "Done", "Cancelled", "Closed",
+            "Completed", "Archived", "Duplicate".
+
+            If the ticket is in any closed/review/done state, or if no open issues
+            exist, print:
+              "No actionable issues — skipping this run."
+            and STOP IMMEDIATELY. Do not create branches or PRs.
+
+            ── STEP 1 — IMPLEMENT THE ISSUE ───────────────────────────────────
+
+            Use mcp__linear__get_issue to read the full description.
+            Read CLAUDE.md for project coding standards.
+            Implement the changes. Follow these rules:
+            - Tailwind only, no inline styles
+            - Pink accent #D4537E for CTAs and active states
+            - No emoji in UI (except final wedding day milestone)
+            - All AI responses in <pre className="whitespace-pre-wrap">
             Run `npm test` to verify nothing breaks.
 
-            STEP 3 — COMMIT AND PUSH:
+            ── STEP 2 — COMMIT AND PUSH ────────────────────────────────────────
+
             Create a branch named linear/<issue-identifier>-<short-slug>.
-            Commit all changes with a message referencing the Linear issue identifier.
+            Commit all changes with a message referencing the Linear issue
+            identifier (e.g. "WED-42: Add guest RSVP tracking").
             Push the branch to origin.
 
-            STEP 4 — CREATE A PULL REQUEST:
-            Open a pull request targeting main. Include a summary of changes and a
-            link to the Linear issue URL in the PR body.
+            ── STEP 3 — CREATE A PULL REQUEST ──────────────────────────────────
 
-            STEP 5 — UPDATE LINEAR STATUS:
-            Move the issue to "In Review" status using:
-              curl -s -X POST https://api.linear.app/graphql \
-                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d '{"query": "mutation { issueUpdate(id: \"<ISSUE_ID>\", input: { stateId: \"<IN_REVIEW_STATE_ID>\" }) { success } }"}'
+            Open a pull request targeting main. Include:
+            - Summary of changes (what and why)
+            - Link to the Linear issue URL
+            - Test results
 
-            To find the "In Review" state ID, first query:
-              curl -s -X POST https://api.linear.app/graphql \
-                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d '{"query": "{ workflowStates { nodes { id name type } } }"}'
+            ── STEP 4 — MARK ISSUE IN REVIEW ───────────────────────────────────
+
+            Use mcp__linear__list_issue_statuses to find the "In Review" state ID
+            for the issue's team. Then use mcp__linear__save_issue to update the
+            issue's state to "In Review".
+
+            Confirm the status was updated before finishing.
