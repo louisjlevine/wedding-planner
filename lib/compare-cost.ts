@@ -1,4 +1,4 @@
-import type { Vendor, BarMode } from "./types";
+import type { Vendor, BarMode, CatererPackage } from "./types";
 
 export interface CostBreakdown {
   base: number;          // venue rental or per-person × guests
@@ -34,13 +34,46 @@ export function computeVenueCost(
   };
 }
 
-export function computePerPersonCost(
+// Pick a package by id, falling back to the first one if id is missing.
+export function resolvePackage(
   vendor: Vendor | undefined,
+  packageId?: string
+): CatererPackage | undefined {
+  if (!vendor?.packages || vendor.packages.length === 0) return undefined;
+  if (packageId) {
+    const found = vendor.packages.find((p) => p.id === packageId);
+    if (found) return found;
+  }
+  return vendor.packages[0];
+}
+
+// Caterer cost from a selected package. Falls back to the legacy
+// vendor.costModel.perPerson if the caterer has no packages defined yet,
+// so existing single-cost caterers still work.
+export function computeCateringCost(
+  vendor: Vendor | undefined,
+  packageId: string | undefined,
   guestCount: number
 ): CostBreakdown {
-  if (!vendor?.costModel) return EMPTY;
+  if (!vendor) return EMPTY;
+  const guests = Math.max(0, guestCount);
+  const pkg = resolvePackage(vendor, packageId);
+  if (pkg) {
+    const base = pkg.base ?? 0;
+    const perPerson = pkg.perPerson ?? 0;
+    const personSubtotal = perPerson * guests;
+    return {
+      base,
+      overtime: 0,
+      perPerson: personSubtotal,
+      total: base + personSubtotal,
+      hasData: base > 0 || perPerson > 0,
+    };
+  }
+  // Legacy fallback for caterers added before packages existed.
+  if (!vendor.costModel) return EMPTY;
   const { base = 0, perPerson = 0 } = vendor.costModel;
-  const personSubtotal = perPerson * Math.max(0, guestCount);
+  const personSubtotal = perPerson * guests;
   return {
     base,
     overtime: 0,
@@ -82,12 +115,13 @@ export interface ScenarioTotal {
 export function computeScenario(
   venue: Vendor | undefined,
   catering: Vendor | undefined,
+  packageId: string | undefined,
   bar: BarAddon,
   guestCount: number,
   hours: number
 ): ScenarioTotal {
   const v = computeVenueCost(venue, hours);
-  const c = computePerPersonCost(catering, guestCount);
+  const c = computeCateringCost(catering, packageId, guestCount);
   const b = computeBarCost(bar, guestCount);
   return {
     venue: v,

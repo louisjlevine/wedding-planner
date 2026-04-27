@@ -15,12 +15,12 @@ import type {
   Tab,
   EmailDigestPrefs,
   ComparisonSelection,
+  VenueComparisonConfig,
 } from "./types";
 
 const EMPTY_COMPARISON: ComparisonSelection = {
   venueIds: [],
-  cateringIds: [],
-  barIds: [],
+  venueConfigs: {},
   notes: "",
 };
 
@@ -104,6 +104,7 @@ interface PlanState {
   // Compare dashboard
   comparison: ComparisonSelection;
   updateComparison: (partial: Partial<ComparisonSelection>) => void;
+  updateVenueConfig: (venueId: string, partial: Partial<VenueComparisonConfig>) => void;
 }
 
 function emptySession(state: PlanState, type: string): ResearchSession {
@@ -393,6 +394,17 @@ export const usePlanStore = create<PlanState>()(
       updateComparison: (partial) =>
         set((state) => ({ comparison: { ...state.comparison, ...partial } })),
 
+      updateVenueConfig: (venueId, partial) =>
+        set((state) => ({
+          comparison: {
+            ...state.comparison,
+            venueConfigs: {
+              ...state.comparison.venueConfigs,
+              [venueId]: { ...state.comparison.venueConfigs[venueId], ...partial },
+            },
+          },
+        })),
+
       importStore: (data) =>
         set((state) => {
           // Union local + incoming deletion records so deletes from any device stick
@@ -416,11 +428,17 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
-      version: 1,
+      version: 2,
       migrate: (persisted, version) => {
         const state = (persisted as Partial<PlanState>) ?? {};
         if (version < 1) {
           state.vendorFilterHideRejected = true;
+        }
+        if (version < 2) {
+          // Comparison schema changed: cartesian-product caterer scenarios →
+          // per-venue config with single caterer, package, and bar mode.
+          // Reset rather than attempt a lossy conversion.
+          state.comparison = EMPTY_COMPARISON;
         }
         return state as PlanState;
       },
