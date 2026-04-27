@@ -191,12 +191,17 @@ export type Tab =
   | "advisor"
   | "digest";
 
+export type BarMode = "self_host" | "via_caterer";
+
 export interface ComparisonSelection {
   venueIds: string[];
   cateringIds: string[];
-  barIds: string[];
-  guestCount?: number;     // override; falls back to answers.guestCount
-  hours?: number;          // total event hours used for overtime math
+  barIds: string[];          // legacy; no longer surfaced in Compare UI
+  guestCount?: number;       // override; falls back to answers.guestCount
+  hours?: number;            // total event hours used for overtime math
+  barMode?: BarMode;         // self_host = flat budget, via_caterer = $/person add-on
+  barFlatBudget?: number;    // self_host: total alcohol budget
+  barPerPerson?: number;     // via_caterer: $ added per guest by caterer
   notes: string;
 }
 

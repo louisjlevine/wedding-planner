@@ -307,20 +307,24 @@ function EditVendorForm({
   const [processing, setProcessing] = useState(0);
   const processingRef = useRef(0);
   processingRef.current = processing;
+  // Migration: seed cost-detail fields from the deprecated price/rentalPeriod/
+  // overtimeRate strings if structured costModel isn't set yet.
+  const firstNumber = (s?: string): string => {
+    if (!s) return "";
+    const m = s.match(/[\d.]+/);
+    return m ? m[0] : "";
+  };
   const [draft, setDraft] = useState({
     name:          vendor.name,
     category:      vendor.category,
     contact:       vendor.contact       ?? "",
     website:       vendor.website       ?? "",
-    price:         vendor.price?.toString() ?? "",
     status:        vendor.status,
     tags:          vendor.tags          ?? [] as string[],
-    rentalPeriod:  vendor.rentalPeriod  ?? "",
-    overtimeRate:  vendor.overtimeRate  ?? "",
-    costBase:         vendor.costModel?.base?.toString()           ?? "",
-    costHours:        vendor.costModel?.hoursIncluded?.toString()  ?? "",
-    costOvertime:     vendor.costModel?.overtimeHourly?.toString() ?? "",
-    costPerPerson:    vendor.costModel?.perPerson?.toString()      ?? "",
+    costBase:      vendor.costModel?.base?.toString()           ?? vendor.price?.toString() ?? "",
+    costHours:     vendor.costModel?.hoursIncluded?.toString()  ?? firstNumber(vendor.rentalPeriod),
+    costOvertime:  vendor.costModel?.overtimeHourly?.toString() ?? firstNumber(vendor.overtimeRate),
+    costPerPerson: vendor.costModel?.perPerson?.toString()      ?? "",
   });
   // Seed notesList from structured list, falling back to legacy notes string
   const [notesList, setNotesList] = useState<VendorNote[]>(() => {
@@ -333,38 +337,36 @@ function EditVendorForm({
 
   const isVenue = draft.category === "Venue";
   const isPerPerson = draft.category === "Catering" || draft.category === "Bar";
-  const showCostDetails = isVenue || isPerPerson;
 
   const buildUpdates = useCallback((): Partial<Vendor> => {
     const num = (s: string) => {
       const n = parseFloat(s);
       return Number.isFinite(n) ? n : undefined;
     };
-    const cm: Vendor["costModel"] = showCostDetails
-      ? {
-          base:           num(draft.costBase),
-          hoursIncluded:  isVenue ? num(draft.costHours) : undefined,
-          overtimeHourly: isVenue ? num(draft.costOvertime) : undefined,
-          perPerson:      isPerPerson ? num(draft.costPerPerson) : undefined,
-        }
-      : undefined;
-    const cmHasAny = cm && Object.values(cm).some((v) => v !== undefined);
+    const cm: Vendor["costModel"] = {
+      base:           num(draft.costBase),
+      hoursIncluded:  isVenue ? num(draft.costHours) : undefined,
+      overtimeHourly: isVenue ? num(draft.costOvertime) : undefined,
+      perPerson:      isPerPerson ? num(draft.costPerPerson) : undefined,
+    };
+    const cmHasAny = Object.values(cm).some((v) => v !== undefined);
     return {
       name:         draft.name.trim() || vendor.name,
       category:     draft.category,
       contact:      draft.contact      || undefined,
       website:      draft.website      || undefined,
-      price:        draft.price        ? parseInt(draft.price) : undefined,
+      // Drop legacy price / rentalPeriod / overtimeRate on save — superseded by costModel.
+      price:        undefined,
+      rentalPeriod: undefined,
+      overtimeRate: undefined,
       notes:        undefined,          // always migrate legacy notes into notesList
       notesList:    notesList.length   ? notesList : undefined,
       status:       draft.status,
       tags:         draft.tags.length  ? draft.tags : undefined,
-      rentalPeriod: isVenue ? (draft.rentalPeriod || undefined) : undefined,
-      overtimeRate: isVenue ? (draft.overtimeRate || undefined) : undefined,
       costModel:    cmHasAny ? cm : undefined,
       attachments:  attachments.length ? attachments : undefined,
     };
-  }, [draft, notesList, attachments, isVenue, isPerPerson, showCostDetails, vendor.name]);
+  }, [draft, notesList, attachments, isVenue, isPerPerson, vendor.name]);
 
   // Flush the draft to the store when the tab is hidden or closed — safety
   // net for mobile, where clicking "Save" may not be possible before the
@@ -498,68 +500,42 @@ function EditVendorForm({
             placeholder="https://..."
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">Estimated price ($)</label>
-          <input type="number" value={draft.price} onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))}
-            placeholder="0"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
-        </div>
-        {isVenue && (
-          <>
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Rental period</label>
-              <input value={draft.rentalPeriod} onChange={(e) => setDraft((d) => ({ ...d, rentalPeriod: e.target.value }))}
-                placeholder="e.g. 8 hours, full day"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Overtime rate</label>
-              <input value={draft.overtimeRate} onChange={(e) => setDraft((d) => ({ ...d, overtimeRate: e.target.value }))}
-                placeholder="e.g. $250/hour"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
-            </div>
-          </>
-        )}
       </div>
-      {showCostDetails && (
-        <div className="border-t border-gray-200/70 pt-3 space-y-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Cost details <span className="font-normal normal-case text-gray-400">— used in Compare</span>
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Base cost ($)</label>
-              <input type="number" value={draft.costBase} onChange={(e) => setDraft((d) => ({ ...d, costBase: e.target.value }))}
-                placeholder={isVenue ? "Rental fee" : "Setup / minimum"}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
-            </div>
-            {isVenue && (
-              <>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Hours included</label>
-                  <input type="number" value={draft.costHours} onChange={(e) => setDraft((d) => ({ ...d, costHours: e.target.value }))}
-                    placeholder="e.g. 8"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Overtime $ / hour</label>
-                  <input type="number" value={draft.costOvertime} onChange={(e) => setDraft((d) => ({ ...d, costOvertime: e.target.value }))}
-                    placeholder="e.g. 500"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
-                </div>
-              </>
-            )}
-            {isPerPerson && (
+      <div className="border-t border-gray-200/70 pt-3 space-y-2">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cost</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Base cost ($)</label>
+            <input type="number" value={draft.costBase} onChange={(e) => setDraft((d) => ({ ...d, costBase: e.target.value }))}
+              placeholder={isVenue ? "Rental fee" : isPerPerson ? "Setup / minimum" : "0"}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+          </div>
+          {isVenue && (
+            <>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">$ per person</label>
-                <input type="number" value={draft.costPerPerson} onChange={(e) => setDraft((d) => ({ ...d, costPerPerson: e.target.value }))}
-                  placeholder={draft.category === "Bar" ? "e.g. 55" : "e.g. 145"}
+                <label className="text-xs text-gray-500 mb-1 block">Hours included</label>
+                <input type="number" value={draft.costHours} onChange={(e) => setDraft((d) => ({ ...d, costHours: e.target.value }))}
+                  placeholder="e.g. 8"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
               </div>
-            )}
-          </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Overtime $ / hour</label>
+                <input type="number" value={draft.costOvertime} onChange={(e) => setDraft((d) => ({ ...d, costOvertime: e.target.value }))}
+                  placeholder="e.g. 500"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+              </div>
+            </>
+          )}
+          {isPerPerson && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">$ per person</label>
+              <input type="number" value={draft.costPerPerson} onChange={(e) => setDraft((d) => ({ ...d, costPerPerson: e.target.value }))}
+                placeholder={draft.category === "Bar" ? "e.g. 55" : "e.g. 145"}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+            </div>
+          )}
         </div>
-      )}
+      </div>
       <div className="space-y-2">
         <label className="text-xs text-gray-500 block">Notes</label>
         {notesList.length > 0 && (
@@ -792,8 +768,8 @@ export function Vendors() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [form, setForm] = useState({
-    category: "Venue", name: "", contact: "", website: "", price: "", notes: "",
-    rentalPeriod: "", overtimeRate: "",
+    category: "Venue", name: "", contact: "", website: "", notes: "",
+    costBase: "", costHours: "", costOvertime: "", costPerPerson: "",
   });
   const [addFormAttachments, setAddFormAttachments] = useState<VendorAttachment[]>([]);
 
@@ -803,9 +779,6 @@ export function Vendors() {
   // Category filter — "All" means no filter
   const [filterCategory, setFilterCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Venue comparison table pop-out
-  const [showVenueTable, setShowVenueTable] = useState(false);
 
   async function handleImportUrl() {
     const url = importUrl.trim();
@@ -848,20 +821,30 @@ export function Vendors() {
     
     try {
       const isVenue = form.category === "Venue";
+      const isPerPerson = form.category === "Catering" || form.category === "Bar";
+      const num = (s: string) => {
+        const n = parseFloat(s);
+        return Number.isFinite(n) ? n : undefined;
+      };
+      const cm: Vendor["costModel"] = {
+        base:           num(form.costBase),
+        hoursIncluded:  isVenue ? num(form.costHours) : undefined,
+        overtimeHourly: isVenue ? num(form.costOvertime) : undefined,
+        perPerson:      isPerPerson ? num(form.costPerPerson) : undefined,
+      };
+      const cmHasAny = Object.values(cm).some((v) => v !== undefined);
       addVendor({
         id:           `vendor-${Date.now()}`,
         category:     form.category,
         name:         form.name,
         contact:      form.contact      || undefined,
         website:      form.website      || undefined,
-        price:        form.price        ? parseInt(form.price) : undefined,
         notes:        form.notes        || undefined,
         status:       "considering",
-        rentalPeriod: isVenue ? (form.rentalPeriod || undefined) : undefined,
-        overtimeRate: isVenue ? (form.overtimeRate || undefined) : undefined,
+        costModel:    cmHasAny ? cm : undefined,
         attachments:  addFormAttachments.length ? addFormAttachments : undefined,
       });
-      setForm({ category: "Venue", name: "", contact: "", website: "", price: "", notes: "", rentalPeriod: "", overtimeRate: "" });
+      setForm({ category: "Venue", name: "", contact: "", website: "", notes: "", costBase: "", costHours: "", costOvertime: "", costPerPerson: "" });
       setAddFormAttachments([]);
       setAdding(false);
     } catch (err) {
@@ -928,59 +911,8 @@ export function Vendors() {
     ([category]) => filterCategory === "All" || category === filterCategory
   );
 
-  const venueVendors = grouped["Venue"] ?? [];
-
   return (
     <div className="space-y-6">
-      {/* Venue comparison pop-out modal */}
-      {showVenueTable && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setShowVenueTable(false)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-900">Venue comparison</h2>
-              <button
-                onClick={() => setShowVenueTable(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M2 2l12 12M14 2L2 14" />
-                </svg>
-              </button>
-            </div>
-            <div className="overflow-x-auto p-5">
-              <table className="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
-                <thead>
-                  <tr className="bg-gray-50 text-left text-gray-500">
-                    <th className="px-3 py-2 font-medium">Venue</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Base price</th>
-                    <th className="px-3 py-2 font-medium">Rental period</th>
-                    <th className="px-3 py-2 font-medium">Overtime rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {venueVendors.map((v) => (
-                    <tr key={v.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-3 py-2 font-medium text-gray-900">{v.name}</td>
-                      <td className="px-3 py-2 capitalize text-gray-600">{v.status}</td>
-                      <td className="px-3 py-2 text-gray-600">{v.price ? `$${v.price.toLocaleString()}` : "—"}</td>
-                      <td className="px-3 py-2 text-gray-600">{v.rentalPeriod || "—"}</td>
-                      <td className="px-3 py-2 text-gray-600">{v.overtimeRate || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Vendors</h1>
@@ -990,14 +922,6 @@ export function Vendors() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          {venueVendors.length >= 2 && (
-            <button
-              onClick={() => setShowVenueTable(true)}
-              className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
-            >
-              Compare venues
-            </button>
-          )}
           <button
             onClick={() => setShowSetup((s) => !s)}
             className="px-3 py-2 text-xs text-gray-500 border border-gray-200 rounded-lg hover:border-gray-300 hover:text-gray-700 transition-colors"
@@ -1083,16 +1007,6 @@ export function Vendors() {
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Estimated price ($)</label>
-              <input
-                type="number"
-                value={form.price}
-                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                placeholder="0"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
-              />
-            </div>
-            <div>
               <label className="text-xs text-gray-500 mb-1 block">Notes</label>
               <input
                 value={form.notes}
@@ -1101,27 +1015,51 @@ export function Vendors() {
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Base cost ($)</label>
+              <input
+                type="number"
+                value={form.costBase}
+                onChange={(e) => setForm((f) => ({ ...f, costBase: e.target.value }))}
+                placeholder="0"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              />
+            </div>
             {form.category === "Venue" && (
               <>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Rental period</label>
+                  <label className="text-xs text-gray-500 mb-1 block">Hours included</label>
                   <input
-                    value={form.rentalPeriod}
-                    onChange={(e) => setForm((f) => ({ ...f, rentalPeriod: e.target.value }))}
-                    placeholder="e.g. 8 hours, full day"
+                    type="number"
+                    value={form.costHours}
+                    onChange={(e) => setForm((f) => ({ ...f, costHours: e.target.value }))}
+                    placeholder="e.g. 8"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Overtime rate</label>
+                  <label className="text-xs text-gray-500 mb-1 block">Overtime $ / hour</label>
                   <input
-                    value={form.overtimeRate}
-                    onChange={(e) => setForm((f) => ({ ...f, overtimeRate: e.target.value }))}
-                    placeholder="e.g. $250/hour"
+                    type="number"
+                    value={form.costOvertime}
+                    onChange={(e) => setForm((f) => ({ ...f, costOvertime: e.target.value }))}
+                    placeholder="e.g. 500"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
                   />
                 </div>
               </>
+            )}
+            {(form.category === "Catering" || form.category === "Bar") && (
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">$ per person</label>
+                <input
+                  type="number"
+                  value={form.costPerPerson}
+                  onChange={(e) => setForm((f) => ({ ...f, costPerPerson: e.target.value }))}
+                  placeholder={form.category === "Bar" ? "e.g. 55" : "e.g. 145"}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+                />
+              </div>
             )}
           </div>
           <div>
