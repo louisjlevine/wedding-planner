@@ -43,17 +43,21 @@ function resizeImage(file: File): Promise<string> {
   });
 }
 
-async function processFiles(files: FileList): Promise<VendorAttachment[]> {
-  const results: VendorAttachment[] = [];
-  const skipped: string[] = [];
-  
+type SkippedFile = { name: string; reason: "too-large" | "failed"; size?: number };
+
+async function processFiles(
+  files: FileList,
+): Promise<{ accepted: VendorAttachment[]; skipped: SkippedFile[] }> {
+  const accepted: VendorAttachment[] = [];
+  const skipped: SkippedFile[] = [];
+
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     if (file.size > MAX_FILE_SIZE) {
-      skipped.push(`${file.name} (too large)`);
+      skipped.push({ name: file.name, reason: "too-large", size: file.size });
       continue;
     }
-    
+
     try {
       const dataUrl = file.type.startsWith("image/")
         ? await resizeImage(file)
@@ -63,7 +67,7 @@ async function processFiles(files: FileList): Promise<VendorAttachment[]> {
             r.onerror = () => rej(new Error(`Failed to read ${file.name}`));
             r.readAsDataURL(file);
           });
-      results.push({
+      accepted.push({
         id: `att-${Date.now()}-${i}`,
         fileName: file.name,
         mimeType: file.type,
@@ -71,17 +75,68 @@ async function processFiles(files: FileList): Promise<VendorAttachment[]> {
         addedAt: new Date().toISOString(),
       });
     } catch (err) {
-      skipped.push(`${file.name} (processing failed)`);
+      skipped.push({ name: file.name, reason: "failed" });
       console.error('[processFiles] Failed to process file:', file.name, err);
     }
   }
-  
-  if (skipped.length > 0) {
-    console.warn('[processFiles] Skipped files:', skipped);
-    // Could show a toast notification here in the future
+
+  return { accepted, skipped };
+}
+
+function formatMb(bytes: number) {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function buildSkippedMessage(skipped: SkippedFile[]): string {
+  const tooLarge = skipped.filter((s) => s.reason === "too-large");
+  const failed = skipped.filter((s) => s.reason === "failed");
+  const parts: string[] = [];
+  if (tooLarge.length > 0) {
+    const names = tooLarge
+      .map((s) => (s.size ? `${s.name} (${formatMb(s.size)})` : s.name))
+      .join(", ");
+    parts.push(
+      `${tooLarge.length === 1 ? "File" : "Files"} over ${formatMb(MAX_FILE_SIZE)} can't be attached: ${names}.`,
+    );
   }
-  
-  return results;
+  if (failed.length > 0) {
+    parts.push(`Couldn't read: ${failed.map((s) => s.name).join(", ")}.`);
+  }
+  return parts.join(" ");
+}
+
+function AttachmentError({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="mt-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+    >
+      <svg
+        className="w-3.5 h-3.5 mt-0.5 shrink-0"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 9v3.75m0 3v.008m9-3.758a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      <p className="flex-1 leading-relaxed">{message}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className="text-red-400 hover:text-red-600 transition-colors shrink-0"
+      >
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M1 1l10 10M11 1L1 11" />
+        </svg>
+      </button>
+    </div>
+  );
 }
 
 // ── Attachment list component ────────────────────────────────────────────────
@@ -157,45 +212,48 @@ function AttachmentUpload({
   const fileRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="flex gap-2">
-      <input
-        ref={fileRef}
-        type="file"
-        multiple
-        accept="image/*,.pdf,.doc,.docx,.txt"
-        capture={undefined}
-        onChange={(e) => { if (e.target.files?.length) onFiles(e.target.files); e.target.value = ""; }}
-        className="hidden"
-      />
-      <button
-        type="button"
-        onClick={() => fileRef.current?.click()}
-        className="inline-flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
-        </svg>
-        Attach file
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          // Create a separate input with capture="environment" for camera
-          const input = document.createElement("input");
-          input.type = "file";
-          input.accept = "image/*";
-          input.capture = "environment";
-          input.onchange = () => { if (input.files?.length) onFiles(input.files); };
-          input.click();
-        }}
-        className="inline-flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
-        </svg>
-        Photo
-      </button>
+    <div className="space-y-1.5">
+      <div className="flex gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          accept="image/*,.pdf,.doc,.docx,.txt"
+          capture={undefined}
+          onChange={(e) => { if (e.target.files?.length) onFiles(e.target.files); e.target.value = ""; }}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="inline-flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+          </svg>
+          Attach file
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            // Create a separate input with capture="environment" for camera
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/*";
+            input.capture = "environment";
+            input.onchange = () => { if (input.files?.length) onFiles(input.files); };
+            input.click();
+          }}
+          className="inline-flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+          </svg>
+          Photo
+        </button>
+      </div>
+      <p className="text-[10px] text-gray-400">Max {formatMb(MAX_FILE_SIZE)} per file</p>
     </div>
   );
 }
@@ -334,6 +392,7 @@ function EditVendorForm({
   });
   const [newNoteText, setNewNoteText] = useState("");
   const [attachments, setAttachments] = useState<VendorAttachment[]>(vendor.attachments ?? []);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const isVenue = draft.category === "Venue";
   const isPerPerson = draft.category === "Catering" || draft.category === "Bar";
@@ -416,9 +475,11 @@ function EditVendorForm({
 
   async function handleFiles(files: FileList) {
     setProcessing((n) => n + 1);
+    setAttachmentError(null);
     try {
-      const newAtts = await processFiles(files);
-      setAttachments((prev) => [...prev, ...newAtts]);
+      const { accepted, skipped } = await processFiles(files);
+      if (accepted.length > 0) setAttachments((prev) => [...prev, ...accepted]);
+      if (skipped.length > 0) setAttachmentError(buildSkippedMessage(skipped));
     } catch (err) {
       setSaveStatus('error');
       setSaveError(err instanceof Error ? err.message : 'File upload failed');
@@ -594,6 +655,12 @@ function EditVendorForm({
         <div className="mt-2">
           <AttachmentUpload onFiles={handleFiles} />
         </div>
+        {attachmentError && (
+          <AttachmentError
+            message={attachmentError}
+            onDismiss={() => setAttachmentError(null)}
+          />
+        )}
       </div>
       <div className="flex gap-2 items-center">
         <button
@@ -772,6 +839,7 @@ export function Vendors() {
     costBase: "", costHours: "", costOvertime: "", costPerPerson: "",
   });
   const [addFormAttachments, setAddFormAttachments] = useState<VendorAttachment[]>([]);
+  const [addFormAttachmentError, setAddFormAttachmentError] = useState<string | null>(null);
 
   // Per-vendor loading state for "Find similar"
   const [findingFor, setFindingFor] = useState<string | null>(null);
@@ -1070,10 +1138,18 @@ export function Vendors() {
             />
             <div className="mt-2">
               <AttachmentUpload onFiles={async (files) => {
-                const newAtts = await processFiles(files);
-                setAddFormAttachments((prev) => [...prev, ...newAtts]);
+                setAddFormAttachmentError(null);
+                const { accepted, skipped } = await processFiles(files);
+                if (accepted.length > 0) setAddFormAttachments((prev) => [...prev, ...accepted]);
+                if (skipped.length > 0) setAddFormAttachmentError(buildSkippedMessage(skipped));
               }} />
             </div>
+            {addFormAttachmentError && (
+              <AttachmentError
+                message={addFormAttachmentError}
+                onDismiss={() => setAddFormAttachmentError(null)}
+              />
+            )}
           </div>
           <div className="flex gap-2">
             <button
