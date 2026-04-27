@@ -78,6 +78,12 @@ export interface CatererPackage {
   description?: string;
 }
 
+export interface MiscLineItem {
+  id: string;
+  label: string;
+  cost: number;
+}
+
 export interface Vendor {
   id: string;
   category: string;
@@ -93,9 +99,11 @@ export interface Vendor {
   // Venue-specific fields
   rentalPeriod?: string;  // e.g. "8 hours", "full day"
   overtimeRate?: string;  // e.g. "$250/hour"
-  barAllowedModes?: BarMode[];  // venue: which bar modes the venue permits (default: both)
+  barMode?: BarMode;      // venue: which bar setup this venue uses
   // Catering-specific
   packages?: CatererPackage[];
+  // Extra cost lines surfaced as "Misc" in the Compare table
+  miscLineItems?: MiscLineItem[];
   // Structured cost model used by the Compare dashboard
   costModel?: VendorCostModel;
 }
@@ -207,7 +215,8 @@ export type BarMode = "self_host" | "via_caterer";
 export interface VenueComparisonConfig {
   catererId?: string;        // single caterer per venue
   packageId?: string;        // selected package from that caterer
-  barMode?: BarMode;         // per-venue: self-host or through caterer
+  // Bar mode itself is set on the venue (Vendor.barMode); only the
+  // amount/rate input lives on the compare config.
   barFlatBudget?: number;    // self_host: total alcohol budget
   barPerPerson?: number;     // via_caterer: $ added per guest
 }
