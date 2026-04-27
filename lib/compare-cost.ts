@@ -1,9 +1,9 @@
-import type { Vendor } from "./types";
+import type { Vendor, BarMode } from "./types";
 
 export interface CostBreakdown {
   base: number;          // venue rental or per-person × guests
   overtime: number;      // venue overtime hours × rate (0 for non-venue)
-  perPerson: number;     // catering / bar per-person subtotal (0 for venue)
+  perPerson: number;     // catering per-person subtotal (0 for venue)
   total: number;
   // diagnostic: are any required fields missing?
   hasData: boolean;
@@ -50,23 +50,45 @@ export function computePerPersonCost(
   };
 }
 
+export interface BarAddon {
+  mode: BarMode;
+  flatBudget?: number;   // self_host
+  perPerson?: number;    // via_caterer
+}
+
+export interface BarBreakdown {
+  mode: BarMode;
+  total: number;
+  hasData: boolean;
+}
+
+export function computeBarCost(addon: BarAddon, guestCount: number): BarBreakdown {
+  if (addon.mode === "self_host") {
+    const total = addon.flatBudget ?? 0;
+    return { mode: "self_host", total, hasData: total > 0 };
+  }
+  const perPerson = addon.perPerson ?? 0;
+  const total = perPerson * Math.max(0, guestCount);
+  return { mode: "via_caterer", total, hasData: perPerson > 0 };
+}
+
 export interface ScenarioTotal {
   venue: CostBreakdown;
   catering: CostBreakdown;
-  bar: CostBreakdown;
+  bar: BarBreakdown;
   total: number;
 }
 
 export function computeScenario(
   venue: Vendor | undefined,
   catering: Vendor | undefined,
-  bar: Vendor | undefined,
+  bar: BarAddon,
   guestCount: number,
   hours: number
 ): ScenarioTotal {
   const v = computeVenueCost(venue, hours);
   const c = computePerPersonCost(catering, guestCount);
-  const b = computePerPersonCost(bar, guestCount);
+  const b = computeBarCost(bar, guestCount);
   return {
     venue: v,
     catering: c,

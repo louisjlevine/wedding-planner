@@ -3,8 +3,8 @@
 import { useMemo } from "react";
 import { usePlanStore } from "@/lib/plan-store";
 import { Panel } from "@/components/ui/Panel";
-import type { Vendor } from "@/lib/types";
-import { computeScenario } from "@/lib/compare-cost";
+import type { Vendor, BarMode } from "@/lib/types";
+import { computeScenario, type BarAddon } from "@/lib/compare-cost";
 
 const STATUS_DOT: Record<Vendor["status"], string> = {
   considering: "bg-gray-400",
@@ -72,8 +72,6 @@ function CategoryPicker({
   );
 }
 
-// ── A single comparison "scenario" column ────────────────────────────────────
-
 type Scenario = ReturnType<typeof computeScenario>;
 
 function MoneyCell({ value, faded }: { value: number; faded?: boolean }) {
@@ -89,11 +87,11 @@ function MoneyCell({ value, faded }: { value: number; faded?: boolean }) {
 export function Compare() {
   const { vendors, answers, comparison, updateComparison } = usePlanStore();
 
-  const venueOptions    = vendors.filter((v) => v.category === "Venue");
-  const cateringOptions = vendors.filter((v) => v.category === "Catering");
-  const barOptions      = vendors.filter((v) => v.category === "Bar");
+  // Rejected vendors don't belong in cost comparison.
+  const venueOptions    = vendors.filter((v) => v.category === "Venue"    && v.status !== "rejected");
+  const cateringOptions = vendors.filter((v) => v.category === "Catering" && v.status !== "rejected");
 
-  function toggle(list: "venueIds" | "cateringIds" | "barIds", id: string) {
+  function toggle(list: "venueIds" | "cateringIds", id: string) {
     const current = comparison[list];
     const next = current.includes(id)
       ? current.filter((x) => x !== id)
@@ -103,45 +101,40 @@ export function Compare() {
 
   const guestCount = comparison.guestCount ?? answers?.guestCount ?? 100;
   const hours      = comparison.hours ?? 8;
+  const barMode: BarMode = comparison.barMode ?? "self_host";
+  const barFlat = comparison.barFlatBudget;
+  const barPerPerson = comparison.barPerPerson;
 
-  // Build the matrix: every selected venue × every selected caterer × every selected bar.
-  // Cap the column count to a sensible number so the table stays readable.
-  // If a category has nothing selected, the row in the table just shows "—".
   const venueSel    = venueOptions.filter((v) => comparison.venueIds.includes(v.id));
   const cateringSel = cateringOptions.filter((v) => comparison.cateringIds.includes(v.id));
-  const barSel      = barOptions.filter((v) => comparison.barIds.includes(v.id));
 
   type Column = {
     key: string;
     venue?: Vendor;
     catering?: Vendor;
-    bar?: Vendor;
     scenario: Scenario;
   };
 
   const columns: Column[] = useMemo(() => {
+    const barAddon: BarAddon = { mode: barMode, flatBudget: barFlat, perPerson: barPerPerson };
     const venues = venueSel.length ? venueSel : [undefined];
     const caterings = cateringSel.length ? cateringSel : [undefined];
-    const bars = barSel.length ? barSel : [undefined];
     const out: Column[] = [];
     for (const v of venues) {
       for (const c of caterings) {
-        for (const b of bars) {
-          out.push({
-            key: `${v?.id ?? "–"}|${c?.id ?? "–"}|${b?.id ?? "–"}`,
-            venue: v,
-            catering: c,
-            bar: b,
-            scenario: computeScenario(v, c, b, guestCount, hours),
-          });
-        }
+        out.push({
+          key: `${v?.id ?? "–"}|${c?.id ?? "–"}`,
+          venue: v,
+          catering: c,
+          scenario: computeScenario(v, c, barAddon, guestCount, hours),
+        });
       }
     }
-    return out.slice(0, 8); // keep the table readable
-  }, [venueSel, cateringSel, barSel, guestCount, hours]);
+    return out.slice(0, 8);
+  }, [venueSel, cateringSel, barMode, barFlat, barPerPerson, guestCount, hours]);
 
   const budget = answers?.budget ?? 0;
-  const anySelected = venueSel.length + cateringSel.length + barSel.length > 0;
+  const anySelected = venueSel.length + cateringSel.length > 0;
 
   return (
     <div className="space-y-6">
@@ -167,44 +160,98 @@ export function Compare() {
             selectedIds={comparison.cateringIds}
             onToggle={(id) => toggle("cateringIds", id)}
           />
-          <CategoryPicker
-            label="Bar"
-            vendors={barOptions}
-            selectedIds={comparison.barIds}
-            onToggle={(id) => toggle("barIds", id)}
-          />
         </div>
       </Panel>
 
       {/* Inputs that drive the math */}
       <Panel title="Event assumptions">
-        <div className="grid grid-cols-2 gap-4 max-w-md">
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Guest count</label>
-            <input
-              type="number"
-              value={comparison.guestCount ?? answers?.guestCount ?? ""}
-              placeholder={(answers?.guestCount ?? 100).toString()}
-              onChange={(e) => {
-                const n = parseInt(e.target.value);
-                updateComparison({ guestCount: Number.isFinite(n) ? n : undefined });
-              }}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
-            />
-            <p className="text-[11px] text-gray-400 mt-1">Drives catering & bar per-person totals.</p>
+        <div className="space-y-4 max-w-xl">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Guest count</label>
+              <input
+                type="number"
+                value={comparison.guestCount ?? answers?.guestCount ?? ""}
+                placeholder={(answers?.guestCount ?? 100).toString()}
+                onChange={(e) => {
+                  const n = parseInt(e.target.value);
+                  updateComparison({ guestCount: Number.isFinite(n) ? n : undefined });
+                }}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">Drives catering & per-person bar totals.</p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Event hours</label>
+              <input
+                type="number"
+                value={comparison.hours ?? 8}
+                onChange={(e) => {
+                  const n = parseInt(e.target.value);
+                  updateComparison({ hours: Number.isFinite(n) ? n : undefined });
+                }}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">Hours past venue&apos;s included time = overtime.</p>
+            </div>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Event hours</label>
-            <input
-              type="number"
-              value={comparison.hours ?? 8}
-              onChange={(e) => {
-                const n = parseInt(e.target.value);
-                updateComparison({ hours: Number.isFinite(n) ? n : undefined });
-              }}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
-            />
-            <p className="text-[11px] text-gray-400 mt-1">Hours past venue&apos;s included time = overtime.</p>
+
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Bar handling</p>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {([
+                { id: "self_host",  label: "Self-host" },
+                { id: "via_caterer", label: "Through caterer" },
+              ] as const).map((opt) => {
+                const active = barMode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => updateComparison({ barMode: opt.id })}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
+                      active
+                        ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                        : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]/50"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {barMode === "self_host" ? (
+              <div className="max-w-xs">
+                <label className="text-xs text-gray-500 mb-1 block">Total alcohol budget ($)</label>
+                <input
+                  type="number"
+                  value={comparison.barFlatBudget ?? ""}
+                  placeholder="e.g. 2500"
+                  onChange={(e) => {
+                    const n = parseFloat(e.target.value);
+                    updateComparison({ barFlatBudget: Number.isFinite(n) ? n : undefined });
+                  }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Flat amount for booze + ice + bartender if any.</p>
+              </div>
+            ) : (
+              <div className="max-w-xs">
+                <label className="text-xs text-gray-500 mb-1 block">$ / person added by caterer</label>
+                <input
+                  type="number"
+                  value={comparison.barPerPerson ?? ""}
+                  placeholder="e.g. 25"
+                  onChange={(e) => {
+                    const n = parseFloat(e.target.value);
+                    updateComparison({ barPerPerson: Number.isFinite(n) ? n : undefined });
+                  }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Multiplied by guest count.</p>
+              </div>
+            )}
           </div>
         </div>
       </Panel>
@@ -294,25 +341,13 @@ export function Compare() {
                 {/* BAR GROUP */}
                 <tr className="bg-gray-50/60 border-t border-gray-100">
                   <td colSpan={columns.length + 1} className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
-                    Bar
+                    Bar — {barMode === "self_host" ? "Self-hosted" : "Through caterer"}
                   </td>
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Vendor</td>
-                  {columns.map((col) => (
-                    <td key={col.key} className="px-3 py-2 text-right font-medium text-gray-900 whitespace-nowrap">
-                      {col.bar?.name ?? "—"}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">$ / person</td>
-                  {columns.map((col) => (
-                    <MoneyCell key={col.key} value={col.bar?.costModel?.perPerson ?? 0} />
-                  ))}
-                </tr>
-                <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Subtotal ({guestCount} ppl)</td>
+                  <td className="px-3 py-2 text-gray-500">
+                    {barMode === "self_host" ? "Flat budget" : `$/person × ${guestCount}`}
+                  </td>
                   {columns.map((col) => (
                     <MoneyCell key={col.key} value={col.scenario.bar.total} />
                   ))}
