@@ -3,10 +3,11 @@ import {
   computeVenueCost,
   computeCateringCost,
   computeBarCost,
+  computeMiscCost,
   computeScenario,
   resolvePackage,
 } from "@/lib/compare-cost";
-import type { Vendor, CatererPackage } from "@/lib/types";
+import type { Vendor, CatererPackage, MiscLineItem } from "@/lib/types";
 
 function venue(overrides: Partial<NonNullable<Vendor["costModel"]>>): Vendor {
   return {
@@ -168,6 +169,49 @@ describe("computeBarCost", () => {
   });
 });
 
+describe("computeMiscCost", () => {
+  function withMisc(category: string, items: MiscLineItem[]): Vendor {
+    return {
+      id: `${category}-misc`,
+      name: category,
+      category,
+      status: "considering",
+      miscLineItems: items,
+    };
+  }
+
+  it("aggregates misc items from venue and caterer with source tags", () => {
+    const venue = withMisc("Venue", [
+      { id: "m1", label: "Cleanup", cost: 500 },
+      { id: "m2", label: "Chairs",  cost: 300 },
+    ]);
+    const caterer = withMisc("Catering", [
+      { id: "m3", label: "Vendor meals", cost: 240 },
+    ]);
+    const r = computeMiscCost(venue, caterer);
+    expect(r.total).toBe(500 + 300 + 240);
+    expect(r.items).toHaveLength(3);
+    expect(r.items.filter((i) => i.source === "venue")).toHaveLength(2);
+    expect(r.items.filter((i) => i.source === "caterer")).toHaveLength(1);
+  });
+
+  it("returns zero total when no misc items are set", () => {
+    const r = computeMiscCost(undefined, undefined);
+    expect(r.total).toBe(0);
+    expect(r.items).toEqual([]);
+  });
+
+  it("ignores non-finite costs", () => {
+    const venue = withMisc("Venue", [
+      { id: "m1", label: "Bad",  cost: Number.NaN },
+      { id: "m2", label: "Good", cost: 100 },
+    ]);
+    const r = computeMiscCost(venue, undefined);
+    expect(r.total).toBe(100);
+    expect(r.items).toHaveLength(1);
+  });
+});
+
 describe("computeScenario", () => {
   it("sums venue + catering + bar (self-host) into a single total", () => {
     const v = venue({ base: 12000, hoursIncluded: 8, overtimeHourly: 750 });
@@ -228,5 +272,27 @@ describe("computeScenario", () => {
       8
     );
     expect(s.total).toBe(12000 + 1000);
+  });
+
+  it("includes misc line items from venue and caterer in the total", () => {
+    const v: Vendor = {
+      ...venue({ base: 10000, hoursIncluded: 8 }),
+      miscLineItems: [{ id: "m1", label: "Cleanup", cost: 500 }],
+    };
+    const c: Vendor = {
+      ...legacyCaterer(100),
+      miscLineItems: [{ id: "m2", label: "Vendor meals", cost: 200 }],
+    };
+    const s = computeScenario(
+      v,
+      c,
+      undefined,
+      { mode: "self_host", flatBudget: 1000 },
+      50,
+      8
+    );
+    // venue 10000 + catering 100*50 + bar 1000 + misc 500+200
+    expect(s.total).toBe(10000 + 5000 + 1000 + 700);
+    expect(s.misc.total).toBe(700);
   });
 });

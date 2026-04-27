@@ -29,6 +29,15 @@ function fmtSigned(n: number): string {
   return `${sign}$${Math.abs(Math.round(n)).toLocaleString()}`;
 }
 
+// Pencil icon for "edit costs" links that jump to the Vendors tab.
+function EditPencil({ className = "w-3 h-3" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+    </svg>
+  );
+}
+
 // ── Venue chip selector ──────────────────────────────────────────────────────
 
 function VenuePicker({
@@ -83,25 +92,34 @@ function VenueConfigCard({
   caterers,
   guestCount,
   onChange,
+  onEditVenue,
 }: {
   venue: Vendor;
   config: VenueComparisonConfig;
   caterers: Vendor[];
   guestCount: number;
   onChange: (partial: Partial<VenueComparisonConfig>) => void;
+  onEditVenue: () => void;
 }) {
   const caterer = caterers.find((c) => c.id === config.catererId);
-  const allowedModes: BarMode[] =
-    venue.barAllowedModes && venue.barAllowedModes.length > 0
-      ? venue.barAllowedModes
-      : ["self_host", "via_caterer"];
-  const barMode: BarMode = config.barMode ?? allowedModes[0];
+  const barMode = venue.barMode;
 
   return (
     <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-white">
-      <div className="flex items-center gap-2">
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[venue.status]}`} />
-        <p className="text-sm font-semibold text-gray-900 truncate">{venue.name?.trim() || "Untitled"}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[venue.status]}`} />
+          <p className="text-sm font-semibold text-gray-900 truncate">{venue.name?.trim() || "Untitled"}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onEditVenue}
+          className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-[var(--accent)] transition-colors shrink-0"
+          title="Edit this venue's costs in the Vendors tab"
+        >
+          <EditPencil />
+          Edit costs
+        </button>
       </div>
 
       {/* Caterer pick */}
@@ -145,29 +163,23 @@ function VenueConfigCard({
         </div>
       )}
 
-      {/* Bar handling */}
+      {/* Bar input — mode is set on the venue, only the amount lives here */}
       <div>
-        <p className="text-[11px] text-gray-500 mb-1">Bar handling</p>
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {allowedModes.map((mode) => {
-            const active = barMode === mode;
-            return (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => onChange({ barMode: mode })}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border ${
-                  active
-                    ? "bg-[var(--accent)] text-white border-[var(--accent)]"
-                    : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]/50"
-                }`}
-              >
-                {BAR_MODE_LABEL[mode]}
-              </button>
-            );
-          })}
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-[11px] text-gray-500">
+            Bar — {barMode ? BAR_MODE_LABEL[barMode] : "not set"}
+          </p>
+          {!barMode && (
+            <button
+              type="button"
+              onClick={onEditVenue}
+              className="text-[11px] text-[var(--accent)] hover:opacity-80"
+            >
+              Set on venue →
+            </button>
+          )}
         </div>
-        {barMode === "self_host" ? (
+        {barMode === "self_host" && (
           <div>
             <label className="text-[11px] text-gray-500 mb-1 block">Total alcohol budget ($)</label>
             <input
@@ -181,7 +193,8 @@ function VenueConfigCard({
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
             />
           </div>
-        ) : (
+        )}
+        {barMode === "via_caterer" && (
           <div>
             <label className="text-[11px] text-gray-500 mb-1 block">$ / person × {guestCount}</label>
             <input
@@ -214,7 +227,16 @@ function MoneyCell({ value, faded }: { value: number; faded?: boolean }) {
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export function Compare() {
-  const { vendors, answers, comparison, updateComparison, updateVenueConfig } = usePlanStore();
+  const {
+    vendors, answers, comparison,
+    updateComparison, updateVenueConfig,
+    setActiveTab, setEditingVendorId,
+  } = usePlanStore();
+
+  function openVendorEditor(vendorId: string) {
+    setEditingVendorId(vendorId);
+    setActiveTab("vendors");
+  }
 
   // Rejected vendors don't belong in cost comparison.
   const venueOptions    = vendors.filter((v) => v.category === "Venue"    && v.status !== "rejected");
@@ -245,8 +267,10 @@ export function Compare() {
     return venueSel.slice(0, 8).map((venue) => {
       const config = comparison.venueConfigs[venue.id] ?? {};
       const caterer = cateringOptions.find((c) => c.id === config.catererId);
+      // Bar mode is set on the venue; default to self_host so the addon is
+      // still computable (with a zero total) when no mode is chosen yet.
       const barAddon: BarAddon = {
-        mode: config.barMode ?? "self_host",
+        mode: venue.barMode ?? "self_host",
         flatBudget: config.barFlatBudget,
         perPerson: config.barPerPerson,
       };
@@ -263,12 +287,22 @@ export function Compare() {
   const budget = answers?.budget ?? 0;
   const anySelected = venueSel.length > 0;
 
+  // Build a sorted union of misc labels that appear in any column so each
+  // label gets its own row, with "—" in columns that don't include it.
+  const miscLabels = useMemo(() => {
+    const set = new Set<string>();
+    for (const col of columns) {
+      for (const m of col.scenario.misc.items) set.add(m.label);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [columns]);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold text-gray-900">Compare</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Side-by-side cost per venue. Pick a caterer, package, and bar setup for each venue.
+          Side-by-side cost per venue. Pick a caterer and package per venue. Bar mode and misc items come from each vendor.
         </p>
       </div>
 
@@ -326,6 +360,7 @@ export function Compare() {
                 caterers={cateringOptions}
                 guestCount={guestCount}
                 onChange={(partial) => updateVenueConfig(venue.id, partial)}
+                onEditVenue={() => openVendorEditor(venue.id)}
               />
             ))}
           </div>
@@ -346,7 +381,18 @@ export function Compare() {
                   <th className="px-3 py-2 font-medium text-gray-500 w-44">Line item</th>
                   {columns.map((col) => (
                     <th key={col.key} className="px-3 py-2 font-medium text-gray-700 text-right whitespace-nowrap">
-                      {col.venue.name?.trim() || "Untitled"}
+                      <div className="inline-flex items-center gap-1.5 justify-end">
+                        <span>{col.venue.name?.trim() || "Untitled"}</span>
+                        <button
+                          type="button"
+                          onClick={() => openVendorEditor(col.venue.id)}
+                          className="text-gray-300 hover:text-[var(--accent)] transition-colors"
+                          title="Edit venue costs"
+                          aria-label={`Edit ${col.venue.name} costs`}
+                        >
+                          <EditPencil />
+                        </button>
+                      </div>
                     </th>
                   ))}
                 </tr>
@@ -389,7 +435,20 @@ export function Compare() {
                   <td className="px-3 py-2 text-gray-500">Caterer</td>
                   {columns.map((col) => (
                     <td key={col.key} className="px-3 py-2 text-right font-medium text-gray-900 whitespace-nowrap">
-                      {col.caterer?.name ?? "—"}
+                      {col.caterer ? (
+                        <span className="inline-flex items-center gap-1.5 justify-end">
+                          <span>{col.caterer.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => openVendorEditor(col.caterer!.id)}
+                            className="text-gray-300 hover:text-[var(--accent)] transition-colors"
+                            title="Edit caterer costs"
+                            aria-label={`Edit ${col.caterer.name} costs`}
+                          >
+                            <EditPencil />
+                          </button>
+                        </span>
+                      ) : "—"}
                     </td>
                   ))}
                 </tr>
@@ -429,7 +488,7 @@ export function Compare() {
                   <td className="px-3 py-2 text-gray-500">Mode</td>
                   {columns.map((col) => (
                     <td key={col.key} className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">
-                      {BAR_MODE_LABEL[col.scenario.bar.mode]}
+                      {col.venue.barMode ? BAR_MODE_LABEL[col.venue.barMode] : "—"}
                     </td>
                   ))}
                 </tr>
@@ -439,6 +498,32 @@ export function Compare() {
                     <MoneyCell key={col.key} value={col.scenario.bar.total} />
                   ))}
                 </tr>
+
+                {/* MISC GROUP — render only if any column has misc items */}
+                {miscLabels.length > 0 && (
+                  <>
+                    <tr className="bg-gray-50/60 border-t border-gray-100">
+                      <td colSpan={columns.length + 1} className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                        Misc
+                      </td>
+                    </tr>
+                    {miscLabels.map((label) => (
+                      <tr key={label} className="border-t border-gray-100">
+                        <td className="px-3 py-2 text-gray-500">{label}</td>
+                        {columns.map((col) => {
+                          const match = col.scenario.misc.items.find((m) => m.label === label);
+                          return <MoneyCell key={col.key} value={match?.cost ?? 0} faded={!match} />;
+                        })}
+                      </tr>
+                    ))}
+                    <tr className="border-t border-gray-100">
+                      <td className="px-3 py-2 text-gray-500">Subtotal</td>
+                      {columns.map((col) => (
+                        <MoneyCell key={col.key} value={col.scenario.misc.total} />
+                      ))}
+                    </tr>
+                  </>
+                )}
 
                 {/* TOTALS */}
                 <tr className="border-t-2 border-gray-300 bg-[var(--accent)]/5">

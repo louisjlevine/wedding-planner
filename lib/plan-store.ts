@@ -16,6 +16,7 @@ import type {
   EmailDigestPrefs,
   ComparisonSelection,
   VenueComparisonConfig,
+  BarMode,
 } from "./types";
 
 const EMPTY_COMPARISON: ComparisonSelection = {
@@ -105,6 +106,10 @@ interface PlanState {
   comparison: ComparisonSelection;
   updateComparison: (partial: Partial<ComparisonSelection>) => void;
   updateVenueConfig: (venueId: string, partial: Partial<VenueComparisonConfig>) => void;
+
+  // Cross-tab vendor editing — Compare uses this to deep-link into Vendors
+  editingVendorId: string | null;
+  setEditingVendorId: (id: string | null) => void;
 }
 
 function emptySession(state: PlanState, type: string): ResearchSession {
@@ -132,6 +137,7 @@ export const usePlanStore = create<PlanState>()(
       deletedVendorIds: [],
       deletedVendorDomains: [],
       comparison: EMPTY_COMPARISON,
+      editingVendorId: null,
 
       setAnswers: (answers) =>
         set({ answers, intakeComplete: true, activeTab: "advisor" }),
@@ -405,6 +411,8 @@ export const usePlanStore = create<PlanState>()(
           },
         })),
 
+      setEditingVendorId: (id) => set({ editingVendorId: id }),
+
       importStore: (data) =>
         set((state) => {
           // Union local + incoming deletion records so deletes from any device stick
@@ -428,7 +436,7 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
         const state = (persisted as Partial<PlanState>) ?? {};
         if (version < 1) {
@@ -439,6 +447,36 @@ export const usePlanStore = create<PlanState>()(
           // per-venue config with single caterer, package, and bar mode.
           // Reset rather than attempt a lossy conversion.
           state.comparison = EMPTY_COMPARISON;
+        }
+        if (version < 3) {
+          // Bar mode moved from a per-venue array (`barAllowedModes`) and a
+          // per-comparison-config field to a single `barMode` on the venue
+          // vendor. Migrate vendors forward; clear stray config.barMode.
+          if (Array.isArray(state.vendors)) {
+            state.vendors = state.vendors.map((v) => {
+              const old = v as Vendor & { barAllowedModes?: BarMode[] };
+              if (old.barAllowedModes && old.barAllowedModes.length > 0 && !old.barMode) {
+                const { barAllowedModes, ...rest } = old;
+                void barAllowedModes;
+                return { ...rest, barMode: old.barAllowedModes[0] };
+              }
+              if (old.barAllowedModes) {
+                const { barAllowedModes, ...rest } = old;
+                void barAllowedModes;
+                return rest;
+              }
+              return v;
+            });
+          }
+          if (state.comparison?.venueConfigs) {
+            const cleaned: Record<string, VenueComparisonConfig> = {};
+            for (const [venueId, cfg] of Object.entries(state.comparison.venueConfigs)) {
+              const { barMode: _drop, ...rest } = cfg as VenueComparisonConfig & { barMode?: BarMode };
+              void _drop;
+              cleaned[venueId] = rest;
+            }
+            state.comparison = { ...state.comparison, venueConfigs: cleaned };
+          }
         }
         return state as PlanState;
       },

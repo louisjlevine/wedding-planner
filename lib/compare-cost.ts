@@ -105,10 +105,41 @@ export function computeBarCost(addon: BarAddon, guestCount: number): BarBreakdow
   return { mode: "via_caterer", total, hasData: perPerson > 0 };
 }
 
+export interface MiscEntry {
+  source: "venue" | "caterer";
+  label: string;
+  cost: number;
+}
+
+export interface MiscBreakdown {
+  items: MiscEntry[];
+  total: number;
+}
+
+export function computeMiscCost(
+  venue: Vendor | undefined,
+  catering: Vendor | undefined
+): MiscBreakdown {
+  const items: MiscEntry[] = [];
+  for (const m of venue?.miscLineItems ?? []) {
+    if (Number.isFinite(m.cost)) {
+      items.push({ source: "venue", label: m.label, cost: m.cost });
+    }
+  }
+  for (const m of catering?.miscLineItems ?? []) {
+    if (Number.isFinite(m.cost)) {
+      items.push({ source: "caterer", label: m.label, cost: m.cost });
+    }
+  }
+  const total = items.reduce((sum, m) => sum + m.cost, 0);
+  return { items, total };
+}
+
 export interface ScenarioTotal {
   venue: CostBreakdown;
   catering: CostBreakdown;
   bar: BarBreakdown;
+  misc: MiscBreakdown;
   total: number;
 }
 
@@ -123,10 +154,12 @@ export function computeScenario(
   const v = computeVenueCost(venue, hours);
   const c = computeCateringCost(catering, packageId, guestCount);
   const b = computeBarCost(bar, guestCount);
+  const m = computeMiscCost(venue, catering);
   return {
     venue: v,
     catering: c,
     bar: b,
-    total: v.total + c.total + b.total,
+    misc: m,
+    total: v.total + c.total + b.total + m.total,
   };
 }
