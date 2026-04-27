@@ -14,7 +14,15 @@ import type {
   AdvisorMessage,
   Tab,
   EmailDigestPrefs,
+  ComparisonSelection,
 } from "./types";
+
+const EMPTY_COMPARISON: ComparisonSelection = {
+  venueIds: [],
+  cateringIds: [],
+  barIds: [],
+  notes: "",
+};
 
 interface BudgetOverride {
   percentage: number; // user-set allocation %
@@ -92,6 +100,10 @@ interface PlanState {
   setActiveTab: (tab: Tab) => void;
   setVendorFilterHideRejected: (hide: boolean) => void;
   importStore: (data: Partial<PlanState>) => void;
+
+  // Compare dashboard
+  comparison: ComparisonSelection;
+  updateComparison: (partial: Partial<ComparisonSelection>) => void;
 }
 
 function emptySession(state: PlanState, type: string): ResearchSession {
@@ -118,6 +130,7 @@ export const usePlanStore = create<PlanState>()(
       vendorFilterHideRejected: false,
       deletedVendorIds: [],
       deletedVendorDomains: [],
+      comparison: EMPTY_COMPARISON,
 
       setAnswers: (answers) =>
         set({ answers, intakeComplete: true, activeTab: "advisor" }),
@@ -376,6 +389,9 @@ export const usePlanStore = create<PlanState>()(
       setActiveTab: (tab) => set({ activeTab: tab }),
 
       setVendorFilterHideRejected: (hide) => set({ vendorFilterHideRejected: hide }),
+
+      updateComparison: (partial) =>
+        set((state) => ({ comparison: { ...state.comparison, ...partial } })),
 
       importStore: (data) =>
         set((state) => {

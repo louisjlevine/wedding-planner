@@ -63,6 +63,13 @@ export interface VendorNote {
   addedAt: string; // ISO date
 }
 
+export interface VendorCostModel {
+  base?: number;            // flat fee (venue rental, catering minimum, bar setup)
+  hoursIncluded?: number;   // venue: hours included in base price
+  overtimeHourly?: number;  // venue: $ per extra hour
+  perPerson?: number;       // catering / bar: $ per guest
+}
+
 export interface Vendor {
   id: string;
   category: string;
@@ -78,6 +85,8 @@ export interface Vendor {
   // Venue-specific fields
   rentalPeriod?: string;  // e.g. "8 hours", "full day"
   overtimeRate?: string;  // e.g. "$250/hour"
+  // Structured cost model used by the Compare dashboard
+  costModel?: VendorCostModel;
 }
 
 export interface Task {
@@ -176,10 +185,20 @@ export type Tab =
   | "budget"
   | "tasks"
   | "vendors"
+  | "compare"
   | "guests"
   | "research"
   | "advisor"
   | "digest";
+
+export interface ComparisonSelection {
+  venueIds: string[];
+  cateringIds: string[];
+  barIds: string[];
+  guestCount?: number;     // override; falls back to answers.guestCount
+  hours?: number;          // total event hours used for overtime math
+  notes: string;
+}
 
 export interface EmailDigestPrefs {
   emailLouis: string;
