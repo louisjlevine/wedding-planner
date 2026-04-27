@@ -127,7 +127,7 @@ export const usePlanStore = create<PlanState>()(
       activeTab: "overview",
       intakeComplete: false,
       emailPrefs: null,
-      vendorFilterHideRejected: false,
+      vendorFilterHideRejected: true,
       deletedVendorIds: [],
       deletedVendorDomains: [],
       comparison: EMPTY_COMPARISON,
@@ -416,6 +416,14 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = (persisted as Partial<PlanState>) ?? {};
+        if (version < 1) {
+          state.vendorFilterHideRejected = true;
+        }
+        return state as PlanState;
+      },
     }
   )
 );
