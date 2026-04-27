@@ -460,6 +460,7 @@ export function Guests() {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sideFilter, setSideFilter] = useState<GuestSide | "all">("all");
+  const [locationFilter, setLocationFilter] = useState<GuestLocation | "all">("all");
   const [form, setForm] = useState({
     name: "", email: "", address: "", totalGuests: "1", dietary: "", table: "",
     relationship: "" as GuestRelationship | "",
@@ -603,9 +604,13 @@ export function Guests() {
 
   // ── Derived counts ───────────────────────────────────────────────────────
 
-  const filteredGuests = sideFilter === "all"
-    ? guests
-    : guests.filter((g) => g.side === sideFilter || (sideFilter === "both" && g.side === "both"));
+  const filteredGuests = guests
+    .filter((g) =>
+      sideFilter === "all" ||
+      g.side === sideFilter ||
+      (sideFilter === "both" && g.side === "both")
+    )
+    .filter((g) => locationFilter === "all" || g.guestLocation === locationFilter);
 
   const byRsvp = (s: Guest["rsvp"]) => filteredGuests.filter((g) => g.rsvp === s);
   const counts = {
@@ -665,7 +670,7 @@ export function Guests() {
 
       {/* Side of family filter */}
       {guests.length > 0 && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {(["all", ...SIDES] as const).map((s) => (
             <button
               key={s}
@@ -679,6 +684,31 @@ export function Guests() {
               {s === "all" ? "All guests" : SIDE_LABELS[s]}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Location filter */}
+      {guests.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {(["all", ...LOCATIONS] as const).map((l) => {
+            const count = l === "all"
+              ? guests.reduce((s, g) => s + g.totalGuests, 0)
+              : guests.filter((g) => g.guestLocation === l).reduce((s, g) => s + g.totalGuests, 0);
+            const label = l === "all" ? "All locations" : LOCATION_LABELS[l];
+            return (
+              <button
+                key={l}
+                onClick={() => setLocationFilter(l)}
+                className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                  locationFilter === l
+                    ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                    : "border-gray-200 text-gray-500 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                }`}
+              >
+                {label} <span className={locationFilter === l ? "text-white/70" : "text-gray-400"}>({count})</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
