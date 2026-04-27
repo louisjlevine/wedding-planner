@@ -354,7 +354,7 @@ function EditGuestForm({
     relationship:  guest.relationship  ?? ("" as GuestRelationship | ""),
     guestLocation: guest.guestLocation ?? ("" as GuestLocation | ""),
     side:          guest.side          ?? ("" as GuestSide | ""),
-    totalGuests:   guest.totalGuests ?? 1,
+    totalGuests:   String(guest.totalGuests ?? 1),
     dietary:       guest.dietary ?? "",
     table:         guest.table   ?? "",
     rsvp:          guest.rsvp,
@@ -426,8 +426,8 @@ function EditGuestForm({
       </div>
       <div>
         <label className="text-xs text-gray-500 mb-1 block">Total guests</label>
-        <input type="number" min={1} max={20} value={d.totalGuests}
-          onChange={(e) => setD((x) => ({ ...x, totalGuests: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+        <input type="number" min={1} max={20} inputMode="numeric" value={d.totalGuests}
+          onChange={(e) => setD((x) => ({ ...x, totalGuests: e.target.value }))}
           className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
       </div>
       <div className="flex gap-2">
@@ -438,7 +438,7 @@ function EditGuestForm({
           relationship:  d.relationship  || undefined,
           guestLocation: d.guestLocation || undefined,
           side:          d.side          || undefined,
-          totalGuests:   d.totalGuests,
+          totalGuests:   Math.min(20, Math.max(1, parseInt(d.totalGuests, 10) || 1)),
           dietary:       d.dietary  || undefined,
           table:         d.table    || undefined,
           rsvp:          d.rsvp,
@@ -461,7 +461,7 @@ export function Guests() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sideFilter, setSideFilter] = useState<GuestSide | "all">("all");
   const [form, setForm] = useState({
-    name: "", email: "", address: "", totalGuests: 1, dietary: "", table: "",
+    name: "", email: "", address: "", totalGuests: "1", dietary: "", table: "",
     relationship: "" as GuestRelationship | "",
     guestLocation: "" as GuestLocation | "",
     side: "" as GuestSide | "",
@@ -482,7 +482,7 @@ export function Guests() {
       name:          form.name,
       email:         form.email         || undefined,
       address:       form.address       || undefined,
-      totalGuests:   form.totalGuests,
+      totalGuests:   Math.min(20, Math.max(1, parseInt(form.totalGuests, 10) || 1)),
       rsvp:          "pending",
       dietary:       form.dietary       || undefined,
       table:         form.table         || undefined,
@@ -490,7 +490,7 @@ export function Guests() {
       guestLocation: form.guestLocation || undefined,
       side:          form.side          || undefined,
     });
-    setForm({ name: "", email: "", address: "", totalGuests: 1, dietary: "", table: "", relationship: "", guestLocation: "", side: "" });
+    setForm({ name: "", email: "", address: "", totalGuests: "1", dietary: "", table: "", relationship: "", guestLocation: "", side: "" });
     setAdding(false);
   }
 
@@ -861,8 +861,8 @@ export function Guests() {
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Total guests</label>
-            <input type="number" min={1} max={20} value={form.totalGuests}
-              onChange={(e) => setForm((f) => ({ ...f, totalGuests: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+            <input type="number" min={1} max={20} inputMode="numeric" value={form.totalGuests}
+              onChange={(e) => setForm((f) => ({ ...f, totalGuests: e.target.value }))}
               className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
           </div>
           <div className="flex gap-2">
