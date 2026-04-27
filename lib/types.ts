@@ -67,7 +67,15 @@ export interface VendorCostModel {
   base?: number;            // flat fee (venue rental, catering minimum, bar setup)
   hoursIncluded?: number;   // venue: hours included in base price
   overtimeHourly?: number;  // venue: $ per extra hour
-  perPerson?: number;       // catering / bar: $ per guest
+  perPerson?: number;       // catering / bar: $ per guest (legacy — caterers now use packages)
+}
+
+export interface CatererPackage {
+  id: string;
+  name: string;
+  perPerson?: number;
+  base?: number;
+  description?: string;
 }
 
 export interface Vendor {
@@ -85,6 +93,9 @@ export interface Vendor {
   // Venue-specific fields
   rentalPeriod?: string;  // e.g. "8 hours", "full day"
   overtimeRate?: string;  // e.g. "$250/hour"
+  barAllowedModes?: BarMode[];  // venue: which bar modes the venue permits (default: both)
+  // Catering-specific
+  packages?: CatererPackage[];
   // Structured cost model used by the Compare dashboard
   costModel?: VendorCostModel;
 }
@@ -193,15 +204,19 @@ export type Tab =
 
 export type BarMode = "self_host" | "via_caterer";
 
+export interface VenueComparisonConfig {
+  catererId?: string;        // single caterer per venue
+  packageId?: string;        // selected package from that caterer
+  barMode?: BarMode;         // per-venue: self-host or through caterer
+  barFlatBudget?: number;    // self_host: total alcohol budget
+  barPerPerson?: number;     // via_caterer: $ added per guest
+}
+
 export interface ComparisonSelection {
   venueIds: string[];
-  cateringIds: string[];
-  barIds: string[];          // legacy; no longer surfaced in Compare UI
+  venueConfigs: Record<string, VenueComparisonConfig>;
   guestCount?: number;       // override; falls back to answers.guestCount
   hours?: number;            // total event hours used for overtime math
-  barMode?: BarMode;         // self_host = flat budget, via_caterer = $/person add-on
-  barFlatBudget?: number;    // self_host: total alcohol budget
-  barPerPerson?: number;     // via_caterer: $ added per guest by caterer
   notes: string;
 }
 

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePlanStore } from "@/lib/plan-store";
-import type { Vendor, VendorAttachment, VendorNote } from "@/lib/types";
+import type { Vendor, VendorAttachment, VendorNote, CatererPackage, BarMode } from "@/lib/types";
 import type { ResearchType } from "@/lib/research-prompts";
 
 // ── Attachment helpers ───────────────────────────────────────────────────────
@@ -384,6 +384,10 @@ function EditVendorForm({
     costOvertime:  vendor.costModel?.overtimeHourly?.toString() ?? firstNumber(vendor.overtimeRate),
     costPerPerson: vendor.costModel?.perPerson?.toString()      ?? "",
   });
+  const [packages, setPackages] = useState<CatererPackage[]>(vendor.packages ?? []);
+  const [barAllowedModes, setBarAllowedModes] = useState<BarMode[]>(
+    vendor.barAllowedModes ?? ["self_host", "via_caterer"]
+  );
   // Seed notesList from structured list, falling back to legacy notes string
   const [notesList, setNotesList] = useState<VendorNote[]>(() => {
     if (vendor.notesList && vendor.notesList.length > 0) return vendor.notesList;
@@ -395,18 +399,26 @@ function EditVendorForm({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const isVenue = draft.category === "Venue";
-  const isPerPerson = draft.category === "Catering" || draft.category === "Bar";
+  const isCatering = draft.category === "Catering";
+  const isPerPerson = isCatering || draft.category === "Bar";
 
   const buildUpdates = useCallback((): Partial<Vendor> => {
     const num = (s: string) => {
       const n = parseFloat(s);
       return Number.isFinite(n) ? n : undefined;
     };
-    const cm: Vendor["costModel"] = {
+    // Strip empty packages (no name and no costs) before persisting.
+    const cleanPackages = packages.filter(
+      (p) => p.name.trim() || p.perPerson || p.base || p.description?.trim()
+    );
+    // When a caterer has packages, ignore the legacy per-person fallback —
+    // package pricing is the source of truth.
+    const useLegacyPerPerson = isPerPerson && !(isCatering && cleanPackages.length > 0);
+    const cm = {
       base:           num(draft.costBase),
       hoursIncluded:  isVenue ? num(draft.costHours) : undefined,
       overtimeHourly: isVenue ? num(draft.costOvertime) : undefined,
-      perPerson:      isPerPerson ? num(draft.costPerPerson) : undefined,
+      perPerson:      useLegacyPerPerson ? num(draft.costPerPerson) : undefined,
     };
     const cmHasAny = Object.values(cm).some((v) => v !== undefined);
     return {
@@ -424,8 +436,10 @@ function EditVendorForm({
       tags:         draft.tags.length  ? draft.tags : undefined,
       costModel:    cmHasAny ? cm : undefined,
       attachments:  attachments.length ? attachments : undefined,
+      packages:     isCatering && cleanPackages.length ? cleanPackages : undefined,
+      barAllowedModes: isVenue ? barAllowedModes : undefined,
     };
-  }, [draft, notesList, attachments, isVenue, isPerPerson, vendor.name]);
+  }, [draft, notesList, attachments, isVenue, isCatering, isPerPerson, packages, barAllowedModes, vendor.name]);
 
   // Flush the draft to the store when the tab is hidden or closed — safety
   // net for mobile, where clicking "Save" may not be possible before the
@@ -587,7 +601,7 @@ function EditVendorForm({
               </div>
             </>
           )}
-          {isPerPerson && (
+          {isPerPerson && !isCatering && (
             <div>
               <label className="text-xs text-gray-500 mb-1 block">$ per person</label>
               <input type="number" value={draft.costPerPerson} onChange={(e) => setDraft((d) => ({ ...d, costPerPerson: e.target.value }))}
@@ -595,8 +609,135 @@ function EditVendorForm({
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
             </div>
           )}
+          {isCatering && packages.length === 0 && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">$ per person (no packages)</label>
+              <input type="number" value={draft.costPerPerson} onChange={(e) => setDraft((d) => ({ ...d, costPerPerson: e.target.value }))}
+                placeholder="e.g. 145"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Catering packages */}
+      {isCatering && (
+        <div className="border-t border-gray-200/70 pt-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Packages</p>
+            <button
+              type="button"
+              onClick={() => setPackages((p) => [
+                ...p,
+                { id: `pkg-${Date.now()}-${p.length}`, name: "", perPerson: undefined, base: undefined },
+              ])}
+              className="text-xs text-[var(--accent)] hover:opacity-80"
+            >
+              + Add package
+            </button>
+          </div>
+          {packages.length === 0 && (
+            <p className="text-[11px] text-gray-400 italic">
+              Add tiered packages here so each one shows up in the Compare picker.
+            </p>
+          )}
+          <div className="space-y-2">
+            {packages.map((pkg, idx) => (
+              <div key={pkg.id} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
+                <div className="flex items-start gap-2">
+                  <input
+                    value={pkg.name}
+                    onChange={(e) => setPackages((arr) => arr.map((p, i) => i === idx ? { ...p, name: e.target.value } : p))}
+                    placeholder="Package name (e.g. Plated, Buffet, Family-style)"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPackages((arr) => arr.filter((_, i) => i !== idx))}
+                    className="text-gray-300 hover:text-red-400 transition-colors shrink-0 mt-1.5"
+                    aria-label="Remove package"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M1 1l10 10M11 1L1 11" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-gray-500 mb-0.5 block">$ / person</label>
+                    <input
+                      type="number"
+                      value={pkg.perPerson ?? ""}
+                      onChange={(e) => {
+                        const n = parseFloat(e.target.value);
+                        setPackages((arr) => arr.map((p, i) => i === idx ? { ...p, perPerson: Number.isFinite(n) ? n : undefined } : p));
+                      }}
+                      placeholder="145"
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500 mb-0.5 block">Base / minimum ($)</label>
+                    <input
+                      type="number"
+                      value={pkg.base ?? ""}
+                      onChange={(e) => {
+                        const n = parseFloat(e.target.value);
+                        setPackages((arr) => arr.map((p, i) => i === idx ? { ...p, base: Number.isFinite(n) ? n : undefined } : p));
+                      }}
+                      placeholder="0"
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                </div>
+                <input
+                  value={pkg.description ?? ""}
+                  onChange={(e) => setPackages((arr) => arr.map((p, i) => i === idx ? { ...p, description: e.target.value } : p))}
+                  placeholder="Optional description (what's included)"
+                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Venue: bar-handling permissions */}
+      {isVenue && (
+        <div className="border-t border-gray-200/70 pt-3 space-y-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bar handling</p>
+          <p className="text-[11px] text-gray-400">Which bar setups this venue allows.</p>
+          <div className="flex flex-wrap gap-1.5">
+            {([
+              { id: "self_host",   label: "Self-host" },
+              { id: "via_caterer", label: "Through caterer" },
+            ] as const).map((opt) => {
+              const active = barAllowedModes.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setBarAllowedModes((modes) => {
+                    if (modes.includes(opt.id)) {
+                      const next = modes.filter((m) => m !== opt.id);
+                      // Keep at least one mode allowed.
+                      return next.length === 0 ? modes : next;
+                    }
+                    return [...modes, opt.id];
+                  })}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+                    active
+                      ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]/50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div className="space-y-2">
         <label className="text-xs text-gray-500 block">Notes</label>
         {notesList.length > 0 && (
