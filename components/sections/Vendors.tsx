@@ -301,6 +301,12 @@ function EditVendorForm({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
   const lastSaveRef = useRef<string>('');
+  // Number of file uploads currently being processed. While > 0, Save is
+  // disabled and outside-clicks don't close the form, so a still-processing
+  // photo isn't lost when the user taps Save or anywhere else too quickly.
+  const [processing, setProcessing] = useState(0);
+  const processingRef = useRef(0);
+  processingRef.current = processing;
   const [draft, setDraft] = useState({
     name:          vendor.name,
     category:      vendor.category,
@@ -370,6 +376,7 @@ function EditVendorForm({
     let cleanup = () => {};
     const t = setTimeout(() => {
       const handler = (e: PointerEvent) => {
+        if (processingRef.current > 0) return;
         if (formRef.current && !formRef.current.contains(e.target as Node)) {
           onCancel();
         }
@@ -384,14 +391,16 @@ function EditVendorForm({
   }, [onCancel]);
 
   async function handleFiles(files: FileList) {
+    setProcessing((n) => n + 1);
     try {
-      setSaveStatus('saving');
       const newAtts = await processFiles(files);
       setAttachments((prev) => [...prev, ...newAtts]);
     } catch (err) {
       setSaveStatus('error');
       setSaveError(err instanceof Error ? err.message : 'File upload failed');
       console.error('[Vendor] File processing failed:', err);
+    } finally {
+      setProcessing((n) => Math.max(0, n - 1));
     }
   }
 
@@ -550,17 +559,27 @@ function EditVendorForm({
         </div>
       </div>
       <div className="flex gap-2 items-center">
-        <button type="button" onClick={commit}
-          className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
+        <button
+          type="button"
+          onClick={commit}
+          disabled={processing > 0}
+          className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
           Save
         </button>
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
           Cancel
         </button>
-        
+
         {/* Save status indicator */}
         <div className="flex items-center gap-1.5 text-xs">
-          {saveStatus === 'saving' && (
+          {processing > 0 && (
+            <>
+              <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-gray-500">Adding photo…</span>
+            </>
+          )}
+          {processing === 0 && saveStatus === 'saving' && (
             <>
               <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
               <span className="text-gray-500">Saving...</span>
