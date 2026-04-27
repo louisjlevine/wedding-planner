@@ -210,7 +210,7 @@ const STATUS_DOT: Record<Vendor["status"], string> = {
 const TAGS = ["Toured", "Has Quote", "Priority", "Referred", "Waitlisted"] as const;
 
 const CATEGORIES = [
-  "Venue", "Photography", "Catering", "Florist", "Music",
+  "Venue", "Photography", "Catering", "Bar", "Florist", "Music",
   "Attire", "Hair & Makeup", "Transport", "Stationery", "Other",
 ];
 
@@ -317,6 +317,10 @@ function EditVendorForm({
     tags:          vendor.tags          ?? [] as string[],
     rentalPeriod:  vendor.rentalPeriod  ?? "",
     overtimeRate:  vendor.overtimeRate  ?? "",
+    costBase:         vendor.costModel?.base?.toString()           ?? "",
+    costHours:        vendor.costModel?.hoursIncluded?.toString()  ?? "",
+    costOvertime:     vendor.costModel?.overtimeHourly?.toString() ?? "",
+    costPerPerson:    vendor.costModel?.perPerson?.toString()      ?? "",
   });
   // Seed notesList from structured list, falling back to legacy notes string
   const [notesList, setNotesList] = useState<VendorNote[]>(() => {
@@ -328,21 +332,39 @@ function EditVendorForm({
   const [attachments, setAttachments] = useState<VendorAttachment[]>(vendor.attachments ?? []);
 
   const isVenue = draft.category === "Venue";
+  const isPerPerson = draft.category === "Catering" || draft.category === "Bar";
+  const showCostDetails = isVenue || isPerPerson;
 
-  const buildUpdates = useCallback((): Partial<Vendor> => ({
-    name:         draft.name.trim() || vendor.name,
-    category:     draft.category,
-    contact:      draft.contact      || undefined,
-    website:      draft.website      || undefined,
-    price:        draft.price        ? parseInt(draft.price) : undefined,
-    notes:        undefined,          // always migrate legacy notes into notesList
-    notesList:    notesList.length   ? notesList : undefined,
-    status:       draft.status,
-    tags:         draft.tags.length  ? draft.tags : undefined,
-    rentalPeriod: isVenue ? (draft.rentalPeriod || undefined) : undefined,
-    overtimeRate: isVenue ? (draft.overtimeRate || undefined) : undefined,
-    attachments:  attachments.length ? attachments : undefined,
-  }), [draft, notesList, attachments, isVenue, vendor.name]);
+  const buildUpdates = useCallback((): Partial<Vendor> => {
+    const num = (s: string) => {
+      const n = parseFloat(s);
+      return Number.isFinite(n) ? n : undefined;
+    };
+    const cm: Vendor["costModel"] = showCostDetails
+      ? {
+          base:           num(draft.costBase),
+          hoursIncluded:  isVenue ? num(draft.costHours) : undefined,
+          overtimeHourly: isVenue ? num(draft.costOvertime) : undefined,
+          perPerson:      isPerPerson ? num(draft.costPerPerson) : undefined,
+        }
+      : undefined;
+    const cmHasAny = cm && Object.values(cm).some((v) => v !== undefined);
+    return {
+      name:         draft.name.trim() || vendor.name,
+      category:     draft.category,
+      contact:      draft.contact      || undefined,
+      website:      draft.website      || undefined,
+      price:        draft.price        ? parseInt(draft.price) : undefined,
+      notes:        undefined,          // always migrate legacy notes into notesList
+      notesList:    notesList.length   ? notesList : undefined,
+      status:       draft.status,
+      tags:         draft.tags.length  ? draft.tags : undefined,
+      rentalPeriod: isVenue ? (draft.rentalPeriod || undefined) : undefined,
+      overtimeRate: isVenue ? (draft.overtimeRate || undefined) : undefined,
+      costModel:    cmHasAny ? cm : undefined,
+      attachments:  attachments.length ? attachments : undefined,
+    };
+  }, [draft, notesList, attachments, isVenue, isPerPerson, showCostDetails, vendor.name]);
 
   // Flush the draft to the store when the tab is hidden or closed — safety
   // net for mobile, where clicking "Save" may not be possible before the
@@ -499,6 +521,45 @@ function EditVendorForm({
           </>
         )}
       </div>
+      {showCostDetails && (
+        <div className="border-t border-gray-200/70 pt-3 space-y-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Cost details <span className="font-normal normal-case text-gray-400">— used in Compare</span>
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Base cost ($)</label>
+              <input type="number" value={draft.costBase} onChange={(e) => setDraft((d) => ({ ...d, costBase: e.target.value }))}
+                placeholder={isVenue ? "Rental fee" : "Setup / minimum"}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+            </div>
+            {isVenue && (
+              <>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Hours included</label>
+                  <input type="number" value={draft.costHours} onChange={(e) => setDraft((d) => ({ ...d, costHours: e.target.value }))}
+                    placeholder="e.g. 8"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Overtime $ / hour</label>
+                  <input type="number" value={draft.costOvertime} onChange={(e) => setDraft((d) => ({ ...d, costOvertime: e.target.value }))}
+                    placeholder="e.g. 500"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+                </div>
+              </>
+            )}
+            {isPerPerson && (
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">$ per person</label>
+                <input type="number" value={draft.costPerPerson} onChange={(e) => setDraft((d) => ({ ...d, costPerPerson: e.target.value }))}
+                  placeholder={draft.category === "Bar" ? "e.g. 55" : "e.g. 145"}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <div className="space-y-2">
         <label className="text-xs text-gray-500 block">Notes</label>
         {notesList.length > 0 && (

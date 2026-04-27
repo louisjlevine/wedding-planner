@@ -79,6 +79,16 @@ const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    id: "compare",
+    label: "Compare",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h18M3 18h18" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v18M15 3v18" />
+      </svg>
+    ),
+  },
+  {
     id: "guests",
     label: "Guests",
     icon: (

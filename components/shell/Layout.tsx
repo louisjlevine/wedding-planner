@@ -10,6 +10,7 @@ import { Overview } from "@/components/sections/Overview";
 import { Timeline } from "@/components/sections/Timeline";
 import { Budget } from "@/components/sections/Budget";
 import { Vendors } from "@/components/sections/Vendors";
+import { Compare } from "@/components/sections/Compare";
 import { Guests } from "@/components/sections/Guests";
 import { Advisor } from "@/components/sections/Advisor";
 import { DigestSettings } from "@/components/sections/DigestSettings";
@@ -27,6 +28,7 @@ export function Layout() {
     budget: <Budget />,
     timeline: <Timeline />,
     vendors: <Vendors />,
+    compare: <Compare />,
     guests: <Guests />,
     digest: <DigestSettings />,
   };
