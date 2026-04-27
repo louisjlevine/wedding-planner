@@ -301,6 +301,12 @@ function EditVendorForm({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
   const lastSaveRef = useRef<string>('');
+  // Number of file uploads currently being processed. While > 0, Save is
+  // disabled and outside-clicks don't close the form, so a still-processing
+  // photo isn't lost when the user taps Save or anywhere else too quickly.
+  const [processing, setProcessing] = useState(0);
+  const processingRef = useRef(0);
+  processingRef.current = processing;
   const [draft, setDraft] = useState({
     name:          vendor.name,
     category:      vendor.category,
@@ -360,15 +366,41 @@ function EditVendorForm({
     };
   }, [buildUpdates, onAutoSave]);
 
+  // Close-on-outside-click via pointerdown (works for both touch and mouse).
+  // Deferred one frame so the click that opened the form doesn't immediately
+  // close it, and uses pointer events so it fires reliably on mobile without
+  // being affected by keyboard-dismissal layout shifts that previously broke
+  // the mousedown approach.
+  const formRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let cleanup = () => {};
+    const t = setTimeout(() => {
+      const handler = (e: PointerEvent) => {
+        if (processingRef.current > 0) return;
+        if (formRef.current && !formRef.current.contains(e.target as Node)) {
+          onCancel();
+        }
+      };
+      document.addEventListener("pointerdown", handler);
+      cleanup = () => document.removeEventListener("pointerdown", handler);
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      cleanup();
+    };
+  }, [onCancel]);
+
   async function handleFiles(files: FileList) {
+    setProcessing((n) => n + 1);
     try {
-      setSaveStatus('saving');
       const newAtts = await processFiles(files);
       setAttachments((prev) => [...prev, ...newAtts]);
     } catch (err) {
       setSaveStatus('error');
       setSaveError(err instanceof Error ? err.message : 'File upload failed');
       console.error('[Vendor] File processing failed:', err);
+    } finally {
+      setProcessing((n) => Math.max(0, n - 1));
     }
   }
 
@@ -377,7 +409,7 @@ function EditVendorForm({
   }
 
   return (
-    <div className="bg-[var(--accent)]/5 border border-[var(--accent)] rounded-xl px-5 py-4 space-y-3">
+    <div ref={formRef} className="bg-[var(--accent)]/5 border border-[var(--accent)] rounded-xl px-5 py-4 space-y-3">
       <div>
         <label className="text-xs text-gray-500 mb-1.5 block">Status &amp; Tags</label>
         <div className="flex flex-wrap items-center gap-2">
@@ -527,17 +559,27 @@ function EditVendorForm({
         </div>
       </div>
       <div className="flex gap-2 items-center">
-        <button type="button" onClick={commit}
-          className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
+        <button
+          type="button"
+          onClick={commit}
+          disabled={processing > 0}
+          className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
           Save
         </button>
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
           Cancel
         </button>
-        
+
         {/* Save status indicator */}
         <div className="flex items-center gap-1.5 text-xs">
-          {saveStatus === 'saving' && (
+          {processing > 0 && (
+            <>
+              <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-gray-500">Adding photo…</span>
+            </>
+          )}
+          {processing === 0 && saveStatus === 'saving' && (
             <>
               <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
               <span className="text-gray-500">Saving...</span>
@@ -1145,25 +1187,13 @@ export function Vendors() {
 
               if (isEditing) {
                 return (
-                  <div key={vendor.id} className="relative">
-                    {/* Backdrop catches taps outside the form. Form sits above
-                        it via z-index, so taps on Save/Cancel/inputs reach the
-                        form normally. More reliable on mobile than a document
-                        mousedown listener (keyboard dismissal can shift the
-                        layout and misroute the synthesized mouse event). */}
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setEditingId(null)}
-                    />
-                    <div className="relative z-20">
-                      <EditVendorForm
-                        vendor={vendor}
-                        onSave={(updates) => { updateVendor(vendor.id, updates); setEditingId(null); }}
-                        onCancel={() => setEditingId(null)}
-                        onAutoSave={(updates) => updateVendor(vendor.id, updates)}
-                      />
-                    </div>
-                  </div>
+                  <EditVendorForm
+                    key={vendor.id}
+                    vendor={vendor}
+                    onSave={(updates) => { updateVendor(vendor.id, updates); setEditingId(null); }}
+                    onCancel={() => setEditingId(null)}
+                    onAutoSave={(updates) => updateVendor(vendor.id, updates)}
+                  />
                 );
               }
 
@@ -1178,7 +1208,9 @@ export function Vendors() {
                       vendor={vendor}
                       onUpdate={(updates) => updateVendor(vendor.id, updates)}
                     />
-                    <p className="text-sm font-medium text-gray-900 truncate">{vendor.name}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate flex-1 min-w-0">
+                      {vendor.name?.trim() || <span className="italic text-gray-400">Untitled vendor</span>}
+                    </p>
                     {vendor.tags && vendor.tags.length > 0 && (
                       <div className="flex items-center gap-1 shrink-0">
                         {vendor.tags.map((tag) => (
