@@ -157,16 +157,39 @@ export const usePlanStore = create<PlanState>()(
           deletedVendorIds: state.deletedVendorIds.filter((id) => id !== vendor.id),
         })),
 
-      // Merge incoming vendors from server — adds new ones (by id), updates existing
-      // But skip any vendors that were locally deleted to prevent re-import
+      // Merge incoming vendors from server. Local is the source of truth for
+      // any field defined locally — the server can only ADD new vendors and
+      // FILL IN fields that aren't set locally yet. Replacing existing vendors
+      // wholesale (the previous behaviour) wiped local edits like
+      // miscLineItems / costModel / packages / attachments whenever a poll
+      // raced ahead of the 1.5s useServerSync debounce.
       mergeVendors: (incoming) =>
         set((state) => {
           const localById = new Map(state.vendors.map((v) => [v.id, v]));
           incoming.forEach((v) => {
-            // Skip vendors that were locally deleted
-            if (!state.deletedVendorIds.includes(v.id)) {
+            if (state.deletedVendorIds.includes(v.id)) return;
+            const existing = localById.get(v.id);
+            if (!existing) {
               localById.set(v.id, v);
+              return;
             }
+            // Start with server values, then overlay locally-defined fields
+            // so local edits always win. Undefined locals fall through to the
+            // server value (lets the iOS-shortcut importer backfill missing
+            // contact / website / etc.).
+            const localDefined = Object.fromEntries(
+              Object.entries(existing).filter(([, val]) => val !== undefined)
+            );
+            const merged: Vendor = { ...v, ...localDefined } as Vendor;
+            // Notes are append-only across sources (iOS shortcut / email
+            // importer add notes to the same vendor by id), so union them.
+            const localNotes = existing.notesList ?? [];
+            const localNoteIds = new Set(localNotes.map((n) => n.id));
+            const newServerNotes = (v.notesList ?? []).filter((n) => !localNoteIds.has(n.id));
+            if (newServerNotes.length > 0) {
+              merged.notesList = [...localNotes, ...newServerNotes];
+            }
+            localById.set(v.id, merged);
           });
           return { vendors: Array.from(localById.values()) };
         }),
