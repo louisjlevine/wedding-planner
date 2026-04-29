@@ -26,38 +26,34 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - uses: anthropics/claude-code-action@beta
+        env:
+          LINEAR_ACCESS_TOKEN: ${{ secrets.LINEAR_ACCESS_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           mode: agent
-          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep,mcp__linear__*"
-          mcp_config: |
-            {
-              "mcpServers": {
-                "linear": {
-                  "type": "connector",
-                  "connectorId": "8c0518ab-9c19-4121-a304-3cb7c9c4b97c"
-                }
-              }
-            }
+          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep"
           direct_prompt: |
             You are an automated issue worker for the Wedding Planner project
             (https://github.com/louisjlevine/wedding-planner).
 
-            You have access to the Linear MCP connector. Use the mcp__linear__*
-            tools to interact with Linear (list issues, get issue details, update
-            issue status, etc.).
+            You have access to the Linear GraphQL API via the LINEAR_ACCESS_TOKEN
+            environment variable. Use curl to call https://api.linear.app/graphql
+            with header `Authorization: $LINEAR_ACCESS_TOKEN`.
 
             ── STEP 0 — PRE-FLIGHT STATUS CHECK ──────────────────────────────
 
             BEFORE doing any implementation work, you MUST verify the ticket is
-            in an actionable state. Use mcp__linear__list_issues to fetch issues
-            from the "Wedding Website" project, sorted by priority.
+            in an actionable state.
+
+            Query the "Wedding Website" project's open issues, sorted by priority:
+              curl -s -X POST https://api.linear.app/graphql \
+                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{"query": "{ issues(filter: { project: { name: { eq: \"Wedding Website\" } }, state: { type: { in: [\"unstarted\", \"started\"] } } }, orderBy: priority) { nodes { id identifier title priority state { name type } description url team { id } } } }"}'
 
             Pick the highest-priority issue (priority: 1=Urgent, 2=High, 3=Medium,
             4=Low, 0=No priority — treat 0 as lowest).
-
-            Then use mcp__linear__get_issue_status to confirm its state.
 
             ONLY PROCEED if the state type is "unstarted" or "started" AND the
             state name is NOT any of: "In Review", "Done", "Cancelled", "Closed",
@@ -70,7 +66,7 @@ jobs:
 
             ── STEP 1 — IMPLEMENT THE ISSUE ───────────────────────────────────
 
-            Use mcp__linear__get_issue to read the full description.
+            Read the full issue description from the Step 0 response.
             Read CLAUDE.md for project coding standards.
             Implement the changes. Follow these rules:
             - Tailwind only, no inline styles
@@ -95,8 +91,16 @@ jobs:
 
             ── STEP 4 — MARK ISSUE IN REVIEW ───────────────────────────────────
 
-            Use mcp__linear__list_issue_statuses to find the "In Review" state ID
-            for the issue's team. Then use mcp__linear__save_issue to update the
-            issue's state to "In Review".
+            Find the "In Review" workflow state ID for the issue's team:
+              curl -s -X POST https://api.linear.app/graphql \
+                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{"query": "{ workflowStates(filter: { team: { id: { eq: \"<TEAM_ID>\" } }, name: { eq: \"In Review\" } }) { nodes { id name type } } }"}'
 
-            Confirm the status was updated before finishing.
+            Then update the issue's state:
+              curl -s -X POST https://api.linear.app/graphql \
+                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{"query": "mutation { issueUpdate(id: \"<ISSUE_ID>\", input: { stateId: \"<IN_REVIEW_STATE_ID>\" }) { success } }"}'
+
+            Confirm the mutation returned success: true before finishing.
