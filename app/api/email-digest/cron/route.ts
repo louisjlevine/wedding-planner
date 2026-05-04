@@ -77,14 +77,17 @@ export async function GET(req: NextRequest) {
   );
 
   const budgetOverrides =
-    (planState.budgetOverrides as Record<string, { percentage: number; spent: number }> | undefined) ?? {};
+    (planState.budgetOverrides as Record<string, { amount: number; spent: number }> | undefined) ?? {};
   const budgetCategories = buildBudgetCategories(answers).map((cat) => {
     const override = budgetOverrides[cat.id];
     if (!override) return cat;
+    const amount = Math.max(0, Math.round(override.amount));
+    const percentage =
+      answers.budget > 0 ? Math.round((amount / answers.budget) * 1000) / 10 : 0;
     return {
       ...cat,
-      percentage: override.percentage,
-      amount: Math.round((override.percentage / 100) * answers.budget),
+      amount,
+      percentage,
       spent: override.spent,
     };
   });

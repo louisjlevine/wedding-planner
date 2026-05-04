@@ -13,15 +13,20 @@ export function usePlan() {
       )
     : [];
 
+  const startingBudget = store.answers?.budget ?? 0;
   const budgetCategories = store.answers
     ? buildBudgetCategories(store.answers).map((cat) => {
         const override = store.budgetOverrides[cat.id];
         if (!override) return cat;
-        const pct = override.percentage;
+        const amount = Math.max(0, Math.round(override.amount));
+        const percentage =
+          startingBudget > 0
+            ? Math.round((amount / startingBudget) * 1000) / 10
+            : 0;
         return {
           ...cat,
-          percentage: pct,
-          amount: Math.round((pct / 100) * store.answers!.budget),
+          amount,
+          percentage,
           spent: override.spent,
         };
       })
