@@ -11,12 +11,12 @@ import type { BudgetCategory } from "@/lib/types";
 
 function BudgetRow({
   cat,
-  totalBudget,
+  startingBudget,
   onUpdate,
 }: {
   cat: BudgetCategory;
-  totalBudget: number;
-  onUpdate: (id: string, pct: number, spent: number) => void;
+  startingBudget: number;
+  onUpdate: (id: string, amount: number, spent: number) => void;
 }) {
   const [editingAmt, setEditingAmt]     = useState(false);
   const [editingPct, setEditingPct]     = useState(false);
@@ -51,8 +51,7 @@ function BudgetRow({
   function commitAmt() {
     const raw = parseFloat(draftAmt.replace(/[$,]/g, ""));
     if (!isNaN(raw) && raw >= 0) {
-      const newPct = Math.round((raw / totalBudget) * 1000) / 10;
-      onUpdate(cat.id, newPct, cat.spent);
+      onUpdate(cat.id, Math.round(raw), cat.spent);
     } else {
       setDraftAmt(cat.amount.toString());
     }
@@ -61,8 +60,9 @@ function BudgetRow({
 
   function commitPct() {
     const raw = parseFloat(draftPct.replace(/%/g, ""));
-    if (!isNaN(raw) && raw >= 0 && raw <= 100) {
-      onUpdate(cat.id, raw, cat.spent);
+    if (!isNaN(raw) && raw >= 0) {
+      const amount = Math.round((raw / 100) * startingBudget);
+      onUpdate(cat.id, amount, cat.spent);
     } else {
       setDraftPct(cat.percentage.toString());
     }
@@ -72,7 +72,7 @@ function BudgetRow({
   function commitSpent() {
     const raw = parseFloat(draftSpent.replace(/[$,]/g, ""));
     if (!isNaN(raw) && raw >= 0) {
-      onUpdate(cat.id, cat.percentage, raw);
+      onUpdate(cat.id, cat.amount, raw);
     } else {
       setDraftSpent(cat.spent.toString());
     }
@@ -209,8 +209,10 @@ function BudgetRow({
             </div>
           )}
           <div className="flex items-center justify-between border-t border-gray-200 pt-1 mt-1">
-            <span className="text-gray-500">Final allocation (scaled to 100%)</span>
-            <span className="tabular-nums font-semibold text-gray-800">{cat.percentage}%</span>
+            <span className="text-gray-500">Current allocation</span>
+            <span className="tabular-nums font-semibold text-gray-800">
+              ${cat.amount.toLocaleString()} ({cat.percentage}% of starting)
+            </span>
           </div>
         </div>
       )}
@@ -226,14 +228,16 @@ export function Budget() {
 
   if (!answers) return null;
 
-  const totalSpent   = budgetCategories.reduce((sum, c) => sum + c.spent, 0);
-  const remaining    = answers.budget - totalSpent;
-  const spentPct     = Math.round((totalSpent / answers.budget) * 100);
-  const allocatedPct = Math.round(budgetCategories.reduce((sum, c) => sum + c.percentage, 0));
-  const hasOverrides = Object.keys(budgetOverrides).length > 0;
+  const startingBudget = answers.budget;
+  const allocated      = budgetCategories.reduce((sum, c) => sum + c.amount, 0);
+  const allocationDiff = allocated - startingBudget;
+  const totalSpent     = budgetCategories.reduce((sum, c) => sum + c.spent, 0);
+  const remaining      = allocated - totalSpent;
+  const spentPct       = allocated > 0 ? Math.round((totalSpent / allocated) * 100) : 0;
+  const hasOverrides   = Object.keys(budgetOverrides).length > 0;
 
-  function handleUpdate(id: string, pct: number, spent: number) {
-    setBudgetOverride(id, { percentage: pct, spent });
+  function handleUpdate(id: string, amount: number, spent: number) {
+    setBudgetOverride(id, { amount, spent });
   }
 
   return (
@@ -242,7 +246,7 @@ export function Budget() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Budget</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            ${answers.budget.toLocaleString()} total &middot; click any value to edit
+            ${startingBudget.toLocaleString()} starting &middot; click any value to edit
           </p>
         </div>
         {hasOverrides && (
@@ -256,11 +260,19 @@ export function Budget() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <MetricCard label="Total budget" value={`$${answers.budget.toLocaleString()}`} />
+        <MetricCard
+          label="Current allocation"
+          value={`$${allocated.toLocaleString()}`}
+          sub={
+            allocationDiff === 0
+              ? `matches starting $${startingBudget.toLocaleString()}`
+              : `${allocationDiff > 0 ? "+" : "−"}$${Math.abs(allocationDiff).toLocaleString()} vs starting $${startingBudget.toLocaleString()}`
+          }
+        />
         <MetricCard
           label="Spent so far"
           value={`$${totalSpent.toLocaleString()}`}
-          sub={`${spentPct}% of total`}
+          sub={`${spentPct}% of allocation`}
         />
         <MetricCard
           label="Remaining"
@@ -269,22 +281,30 @@ export function Budget() {
         />
       </div>
 
-      {allocatedPct !== 100 && (
-        <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          Allocations total {allocatedPct}% — adjust percentages to reach 100%
+      {allocationDiff !== 0 && (
+        <div
+          className={`text-xs rounded-lg px-3 py-2 border ${
+            allocationDiff > 0
+              ? "text-amber-700 bg-amber-50 border-amber-200"
+              : "text-blue-700 bg-blue-50 border-blue-200"
+          }`}
+        >
+          {allocationDiff > 0
+            ? `Allocations total $${allocated.toLocaleString()} — $${allocationDiff.toLocaleString()} over your starting $${startingBudget.toLocaleString()}.`
+            : `Allocations total $${allocated.toLocaleString()} — $${Math.abs(allocationDiff).toLocaleString()} under your starting $${startingBudget.toLocaleString()}.`}
         </div>
       )}
 
       <Panel title="Budget breakdown">
         <p className="text-xs text-gray-400 mb-4">
-          Click a dollar amount to set allocation by $, click a % to set by percentage. Click &ldquo;spent&rdquo; to track actuals.
+          Percentages set the initial split of your starting budget. After that, edit dollar amounts directly — they don&rsquo;t need to add up to your starting total.
         </p>
         <div className="space-y-5">
           {budgetCategories.map((cat) => (
             <BudgetRow
               key={cat.id}
               cat={cat}
-              totalBudget={answers.budget}
+              startingBudget={startingBudget}
               onUpdate={handleUpdate}
             />
           ))}

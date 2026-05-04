@@ -26,8 +26,8 @@ const EMPTY_COMPARISON: ComparisonSelection = {
 };
 
 interface BudgetOverride {
-  percentage: number; // user-set allocation %
-  spent: number;      // user-tracked spend
+  amount: number;  // user-set dollar allocation
+  spent: number;   // user-tracked spend
 }
 
 interface PlanState {
@@ -459,7 +459,7 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
-      version: 3,
+      version: 4,
       migrate: (persisted, version) => {
         const state = (persisted as Partial<PlanState>) ?? {};
         if (version < 1) {
@@ -499,6 +499,27 @@ export const usePlanStore = create<PlanState>()(
               cleaned[venueId] = rest;
             }
             state.comparison = { ...state.comparison, venueConfigs: cleaned };
+          }
+        }
+        if (version < 4) {
+          // Budget overrides moved from `{ percentage, spent }` to `{ amount, spent }`
+          // so dollar edits aren't lossily round-tripped through percentages.
+          const total = state.answers?.budget ?? 0;
+          const old = state.budgetOverrides as
+            | Record<string, { percentage?: number; amount?: number; spent: number }>
+            | undefined;
+          if (old && total > 0) {
+            const migrated: Record<string, BudgetOverride> = {};
+            for (const [id, ov] of Object.entries(old)) {
+              const amount =
+                typeof ov.amount === "number"
+                  ? ov.amount
+                  : Math.round(((ov.percentage ?? 0) / 100) * total);
+              migrated[id] = { amount, spent: ov.spent ?? 0 };
+            }
+            state.budgetOverrides = migrated;
+          } else {
+            state.budgetOverrides = {};
           }
         }
         return state as PlanState;
