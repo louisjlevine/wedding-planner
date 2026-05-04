@@ -26,47 +26,50 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - uses: anthropics/claude-code-action@beta
-        env:
-          LINEAR_ACCESS_TOKEN: ${{ secrets.LINEAR_ACCESS_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           mode: agent
-          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep"
+          allowed_tools: "Bash,Read,Write,Edit,Glob,Grep,mcp__linear__list_issues,mcp__linear__list_issue_statuses,mcp__linear__get_issue,mcp__linear__save_issue,mcp__linear__list_projects,mcp__linear__list_teams"
+          mcp_config: |
+            {
+              "mcpServers": {
+                "linear": {
+                  "type": "connector",
+                  "connector_id": "8c0518ab-9c19-4121-a304-3cb7c9c4b97c"
+                }
+              }
+            }
           direct_prompt: |
             You are an automated issue worker for the Wedding Planner project
             (https://github.com/louisjlevine/wedding-planner).
 
-            You have access to the Linear GraphQL API via the LINEAR_ACCESS_TOKEN
-            environment variable. Use curl to call https://api.linear.app/graphql
-            with header `Authorization: $LINEAR_ACCESS_TOKEN`.
+            You have the Linear MCP connector attached. Use the mcp__linear__
+            tools to interact with Linear — do NOT use curl for Linear API calls.
 
             ── STEP 0 — PRE-FLIGHT STATUS CHECK ──────────────────────────────
 
-            BEFORE doing any implementation work, you MUST verify the ticket is
-            in an actionable state.
+            BEFORE doing any implementation work, you MUST verify there is an
+            actionable ticket.
 
-            Query the "Wedding Website" project's open issues, sorted by priority:
-              curl -s -X POST https://api.linear.app/graphql \
-                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d '{"query": "{ issues(filter: { project: { name: { eq: \"Wedding Website\" } }, state: { type: { in: [\"unstarted\", \"started\"] } } }, orderBy: priority) { nodes { id identifier title priority state { name type } description url team { id } } } }"}'
+            Use mcp__linear__list_issues with project "Wedding Website" and
+            includeArchived: false to fetch issues. Examine each issue's
+            statusType and status fields.
 
-            Pick the highest-priority issue (priority: 1=Urgent, 2=High, 3=Medium,
-            4=Low, 0=No priority — treat 0 as lowest).
+            Pick the highest-priority issue where:
+            - priority: 1=Urgent, 2=High, 3=Medium, 4=Low, 0=No priority
+              (treat 0 as lowest)
+            - statusType is one of: "unstarted", "backlog", or "started"
+            - status name is NOT any of: "In Review", "Done", "Cancelled",
+              "Closed", "Completed", "Archived", "Duplicate"
 
-            ONLY PROCEED if the state type is "unstarted" or "started" AND the
-            state name is NOT any of: "In Review", "Done", "Cancelled", "Closed",
-            "Completed", "Archived", "Duplicate".
-
-            If the ticket is in any closed/review/done state, or if no open issues
-            exist, print:
+            If NO actionable issues exist, print:
               "No actionable issues — skipping this run."
-            and STOP IMMEDIATELY. Do not create branches or PRs.
+            and STOP IMMEDIATELY. Do not create branches, commits, or PRs.
 
             ── STEP 1 — IMPLEMENT THE ISSUE ───────────────────────────────────
 
-            Read the full issue description from the Step 0 response.
+            Use mcp__linear__get_issue to fetch the full issue description.
             Read CLAUDE.md for project coding standards.
             Implement the changes. Follow these rules:
             - Tailwind only, no inline styles
@@ -79,7 +82,7 @@ jobs:
 
             Create a branch named linear/<issue-identifier>-<short-slug>.
             Commit all changes with a message referencing the Linear issue
-            identifier (e.g. "WED-42: Add guest RSVP tracking").
+            identifier (e.g. "LJL-42: Add guest RSVP tracking").
             Push the branch to origin.
 
             ── STEP 3 — CREATE A PULL REQUEST ──────────────────────────────────
@@ -91,16 +94,10 @@ jobs:
 
             ── STEP 4 — MARK ISSUE IN REVIEW ───────────────────────────────────
 
-            Find the "In Review" workflow state ID for the issue's team:
-              curl -s -X POST https://api.linear.app/graphql \
-                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d '{"query": "{ workflowStates(filter: { team: { id: { eq: \"<TEAM_ID>\" } }, name: { eq: \"In Review\" } }) { nodes { id name type } } }"}'
+            First, use mcp__linear__list_issue_statuses with the issue's team
+            name to find the "In Review" state ID.
 
-            Then update the issue's state:
-              curl -s -X POST https://api.linear.app/graphql \
-                -H "Authorization: $LINEAR_ACCESS_TOKEN" \
-                -H "Content-Type: application/json" \
-                -d '{"query": "mutation { issueUpdate(id: \"<ISSUE_ID>\", input: { stateId: \"<IN_REVIEW_STATE_ID>\" }) { success } }"}'
+            Then use mcp__linear__save_issue to update the issue:
+            - Set the status to "In Review" using the state ID found above
 
-            Confirm the mutation returned success: true before finishing.
+            Confirm the update succeeded before finishing.
