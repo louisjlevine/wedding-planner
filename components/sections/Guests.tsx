@@ -10,8 +10,18 @@ import {
   RELATIONSHIP_LABELS,
   LOCATION_LABELS,
 } from "@/lib/guest-probability";
+import {
+  PRIORITY_TIERS,
+  PRIORITY_LABELS,
+  PRIORITY_SHORT_LABELS,
+  priorityFromRelationship,
+  effectivePriority,
+  compareGuestRank,
+  applyCutoff,
+  type CutoffMode,
+} from "@/lib/guest-priority";
 import type ExcelJS from "exceljs";
-import type { Guest, GuestRelationship, GuestLocation, GuestSide } from "@/lib/types";
+import type { Guest, GuestRelationship, GuestLocation, GuestSide, GuestPriority } from "@/lib/types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -358,6 +368,7 @@ function EditGuestForm({
     dietary:       guest.dietary ?? "",
     table:         guest.table   ?? "",
     rsvp:          guest.rsvp,
+    priority:      effectivePriority(guest),
   });
 
   return (
@@ -408,6 +419,13 @@ function EditGuestForm({
           </select>
         </div>
         <div>
+          <label className="text-xs text-gray-500 mb-1 block">Priority</label>
+          <select value={d.priority} onChange={(e) => setD((x) => ({ ...x, priority: e.target.value as GuestPriority }))}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
+            {PRIORITY_TIERS.map((p) => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}
+          </select>
+        </div>
+        <div>
           <label className="text-xs text-gray-500 mb-1 block">Table</label>
           <input value={d.table} onChange={(e) => setD((x) => ({ ...x, table: e.target.value }))}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
@@ -442,6 +460,7 @@ function EditGuestForm({
           dietary:       d.dietary  || undefined,
           table:         d.table    || undefined,
           rsvp:          d.rsvp,
+          priority:      d.priority,
         })}
           className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
           Save
@@ -461,11 +480,14 @@ export function Guests() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sideFilter, setSideFilter] = useState<GuestSide | "all">("all");
   const [locationFilter, setLocationFilter] = useState<GuestLocation | "all">("all");
+  const [cutoffMode, setCutoffMode] = useState<CutoffMode>("attending");
+  const [cutoffInput, setCutoffInput] = useState<string>("");
   const [form, setForm] = useState({
     name: "", email: "", address: "", totalGuests: "1", dietary: "", table: "",
     relationship: "" as GuestRelationship | "",
     guestLocation: "" as GuestLocation | "",
     side: "" as GuestSide | "",
+    priority: "want" as GuestPriority,
   });
 
   const csvInputRef  = useRef<HTMLInputElement>(null);
@@ -490,8 +512,9 @@ export function Guests() {
       relationship:  form.relationship  || undefined,
       guestLocation: form.guestLocation || undefined,
       side:          form.side          || undefined,
+      priority:      form.priority,
     });
-    setForm({ name: "", email: "", address: "", totalGuests: "1", dietary: "", table: "", relationship: "", guestLocation: "", side: "" });
+    setForm({ name: "", email: "", address: "", totalGuests: "1", dietary: "", table: "", relationship: "", guestLocation: "", side: "", priority: "want" });
     setAdding(false);
   }
 
@@ -566,6 +589,7 @@ export function Guests() {
           relationship:  g.relationship,
           guestLocation: g.guestLocation,
           side:          g.side,
+          priority:      priorityFromRelationship(g.relationship),
         });
       }
     });
@@ -595,6 +619,7 @@ export function Guests() {
           address: g.address,
           totalGuests: 1,
           rsvp:        "pending",
+          priority:    "want",
         });
       });
     };
@@ -610,7 +635,17 @@ export function Guests() {
       g.side === sideFilter ||
       (sideFilter === "both" && g.side === "both")
     )
-    .filter((g) => locationFilter === "all" || g.guestLocation === locationFilter);
+    .filter((g) => locationFilter === "all" || g.guestLocation === locationFilter)
+    .slice()
+    .sort(compareGuestRank);
+
+  // Cutoff is computed against the FULL guest list (not the filtered/sorted
+  // view) so the "would cut" set is stable as the user toggles filters.
+  const parsedCutoff = parseInt(cutoffInput, 10);
+  const cutoffTarget = Number.isFinite(parsedCutoff) && parsedCutoff > 0 ? parsedCutoff : null;
+  const cutoff = applyCutoff(guests, cutoffTarget, cutoffMode);
+  const cutCount = cutoff.cutIds.size;
+  const totalSeats = guests.reduce((s, g) => s + g.totalGuests, 0);
 
   const byRsvp = (s: Guest["rsvp"]) => filteredGuests.filter((g) => g.rsvp === s);
   const counts = {
@@ -709,6 +744,84 @@ export function Guests() {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Cutoff planner */}
+      {guests.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700">Cutoff planner</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Rank by tier, then enter a target. Guests below the line are flagged as &ldquo;would cut&rdquo;.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex border border-gray-200 rounded-lg overflow-hidden">
+                {(["attending", "invited"] as CutoffMode[]).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setCutoffMode(m)}
+                    className={`px-3 py-1.5 text-xs transition-colors ${
+                      cutoffMode === m
+                        ? "bg-[var(--accent)] text-white"
+                        : "bg-white text-gray-500 hover:text-[var(--accent)]"
+                    }`}
+                  >
+                    {m === "attending" ? "By est. attending" : "By invitations"}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={cutoffInput}
+                onChange={(e) => setCutoffInput(e.target.value)}
+                placeholder={cutoffMode === "attending" ? "e.g. 80" : "e.g. 100"}
+                className="w-28 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)]"
+              />
+              {cutoffInput && (
+                <button
+                  onClick={() => setCutoffInput("")}
+                  className="text-xs text-gray-400 hover:text-gray-600 px-2"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+          {cutoffTarget !== null && (
+            <div className="flex items-center gap-4 flex-wrap text-xs">
+              <div>
+                <span className="text-gray-400">Inviting</span>{" "}
+                <span className="font-semibold text-gray-700 tabular-nums">
+                  {guests.length - cutCount}
+                </span>{" "}
+                <span className="text-gray-400">of {guests.length} guests</span>
+              </div>
+              <div>
+                <span className="text-gray-400">Seats</span>{" "}
+                <span className="font-semibold text-gray-700 tabular-nums">
+                  {cutoff.invitedSeats}
+                </span>{" "}
+                <span className="text-gray-400">/ {totalSeats}</span>
+              </div>
+              <div>
+                <span className="text-gray-400">Est. attending</span>{" "}
+                <span className="font-semibold text-[var(--accent)] tabular-nums">
+                  {cutoff.estimatedAttending}
+                </span>
+              </div>
+              {cutCount > 0 && (
+                <div>
+                  <span className="font-semibold text-red-500 tabular-nums">{cutCount}</span>{" "}
+                  <span className="text-gray-400">would be cut</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -877,6 +990,13 @@ export function Guests() {
               </select>
             </div>
             <div>
+              <label className="text-xs text-gray-500 mb-1 block">Priority</label>
+              <select value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value as GuestPriority }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
+                {PRIORITY_TIERS.map((p) => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}
+              </select>
+            </div>
+            <div>
               <label className="text-xs text-gray-500 mb-1 block">Dietary needs</label>
               <input value={form.dietary} onChange={(e) => setForm((f) => ({ ...f, dietary: e.target.value }))}
                 placeholder="e.g. vegetarian"
@@ -949,6 +1069,7 @@ export function Guests() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="text-left text-xs font-medium text-gray-400 px-4 py-2.5">Name</th>
+                <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5">Priority</th>
                 <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5">RSVP</th>
                 <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5 hidden sm:table-cell">Relationship</th>
                 <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5 hidden md:table-cell">Location</th>
@@ -962,11 +1083,13 @@ export function Guests() {
               {filteredGuests.map((guest) => {
                 const prob = getBaseProbability(guest);
                 const showProb = guest.rsvp === "pending" || guest.rsvp === "maybe";
+                const isCut = cutoff.cutIds.has(guest.id);
+                const guestPriority = effectivePriority(guest);
 
                 if (editingId === guest.id) {
                   return (
                     <tr key={guest.id}>
-                      <td colSpan={8} className="p-3">
+                      <td colSpan={9} className="p-3">
                         <EditGuestForm
                           guest={guest}
                           onSave={(u) => { updateGuest(guest.id, u); setEditingId(null); }}
@@ -981,12 +1104,21 @@ export function Guests() {
                   <tr
                     key={guest.id}
                     onClick={() => setEditingId(guest.id)}
-                    className="cursor-pointer hover:bg-gray-50 transition-colors"
+                    className={`cursor-pointer transition-colors ${
+                      isCut ? "bg-red-50/40 hover:bg-red-50/70 opacity-60" : "hover:bg-gray-50"
+                    }`}
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">{guest.name}</span>
+                        <span className={`font-medium ${isCut ? "text-gray-500 line-through" : "text-gray-900"}`}>
+                          {guest.name}
+                        </span>
                         {guest.totalGuests > 1 && <Badge variant="blue">×{guest.totalGuests}</Badge>}
+                        {isCut && (
+                          <span className="text-[10px] font-medium uppercase tracking-wide bg-red-100 text-red-600 px-1.5 py-0.5 rounded">
+                            Cut
+                          </span>
+                        )}
                       </div>
                       {(guest.email || guest.dietary) && (
                         <div className="flex gap-2 mt-0.5">
@@ -994,6 +1126,17 @@ export function Guests() {
                           {guest.dietary && <span className="text-xs text-gray-400">{guest.dietary}</span>}
                         </div>
                       )}
+                    </td>
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <select
+                        value={guestPriority}
+                        onChange={(e) => updateGuest(guest.id, { priority: e.target.value as GuestPriority })}
+                        className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-[var(--accent)]"
+                      >
+                        {PRIORITY_TIERS.map((p) => (
+                          <option key={p} value={p}>{PRIORITY_SHORT_LABELS[p]}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                       <select

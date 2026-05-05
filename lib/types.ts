@@ -121,6 +121,7 @@ export interface Task {
 export type GuestRelationship = "family" | "close_friend" | "friend" | "acquaintance";
 export type GuestLocation    = "local" | "out_of_town";
 export type GuestSide        = "bride" | "groom" | "both";
+export type GuestPriority    = "must" | "want" | "ifSpace";
 
 export interface Guest {
   id: string;
@@ -134,6 +135,7 @@ export interface Guest {
   relationship?: GuestRelationship;
   guestLocation?: GuestLocation;
   side?: GuestSide;
+  priority?: GuestPriority;
 }
 
 export interface TimelineItem {
