@@ -18,6 +18,7 @@ import type {
   VenueComparisonConfig,
   BarMode,
 } from "./types";
+import { priorityFromRelationship } from "./guest-priority";
 
 const EMPTY_COMPARISON: ComparisonSelection = {
   venueIds: [],
@@ -114,6 +115,73 @@ interface PlanState {
 
 function emptySession(state: PlanState, type: string): ResearchSession {
   return state.researchSessions[type] ?? { notes: "", recommendations: [], chatMessages: [] };
+}
+
+export function migratePlanStore(persisted: unknown, version: number): PlanState {
+  const state = (persisted as Partial<PlanState>) ?? {};
+  if (version < 1) {
+    state.vendorFilterHideRejected = true;
+  }
+  if (version < 2) {
+    state.comparison = EMPTY_COMPARISON;
+  }
+  if (version < 3) {
+    if (Array.isArray(state.vendors)) {
+      state.vendors = state.vendors.map((v) => {
+        const old = v as Vendor & { barAllowedModes?: BarMode[] };
+        if (old.barAllowedModes && old.barAllowedModes.length > 0 && !old.barMode) {
+          const { barAllowedModes, ...rest } = old;
+          void barAllowedModes;
+          return { ...rest, barMode: old.barAllowedModes[0] };
+        }
+        if (old.barAllowedModes) {
+          const { barAllowedModes, ...rest } = old;
+          void barAllowedModes;
+          return rest;
+        }
+        return v;
+      });
+    }
+    if (state.comparison?.venueConfigs) {
+      const cleaned: Record<string, VenueComparisonConfig> = {};
+      for (const [venueId, cfg] of Object.entries(state.comparison.venueConfigs)) {
+        const { barMode: _drop, ...rest } = cfg as VenueComparisonConfig & { barMode?: BarMode };
+        void _drop;
+        cleaned[venueId] = rest;
+      }
+      state.comparison = { ...state.comparison, venueConfigs: cleaned };
+    }
+  }
+  if (version < 4) {
+    const total = state.answers?.budget ?? 0;
+    const old = state.budgetOverrides as
+      | Record<string, { percentage?: number; amount?: number; spent: number }>
+      | undefined;
+    if (old && total > 0) {
+      const migrated: Record<string, BudgetOverride> = {};
+      for (const [id, ov] of Object.entries(old)) {
+        const amount =
+          typeof ov.amount === "number"
+            ? ov.amount
+            : Math.round(((ov.percentage ?? 0) / 100) * total);
+        migrated[id] = { amount, spent: ov.spent ?? 0 };
+      }
+      state.budgetOverrides = migrated;
+    } else {
+      state.budgetOverrides = {};
+    }
+  }
+  if (version < 5) {
+    // Pre-seed `priority` on existing guests so the new ranking/cutoff UI has
+    // a sensible default for each guest. Family/close friends start as
+    // "must", acquaintances as "ifSpace", everyone else "want".
+    if (Array.isArray(state.guests)) {
+      state.guests = state.guests.map((g) =>
+        g.priority ? g : { ...g, priority: priorityFromRelationship(g.relationship) }
+      );
+    }
+  }
+  return state as PlanState;
 }
 
 export const usePlanStore = create<PlanState>()(
@@ -459,71 +527,8 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
-      version: 4,
-      migrate: (persisted, version) => {
-        const state = (persisted as Partial<PlanState>) ?? {};
-        if (version < 1) {
-          state.vendorFilterHideRejected = true;
-        }
-        if (version < 2) {
-          // Comparison schema changed: cartesian-product caterer scenarios →
-          // per-venue config with single caterer, package, and bar mode.
-          // Reset rather than attempt a lossy conversion.
-          state.comparison = EMPTY_COMPARISON;
-        }
-        if (version < 3) {
-          // Bar mode moved from a per-venue array (`barAllowedModes`) and a
-          // per-comparison-config field to a single `barMode` on the venue
-          // vendor. Migrate vendors forward; clear stray config.barMode.
-          if (Array.isArray(state.vendors)) {
-            state.vendors = state.vendors.map((v) => {
-              const old = v as Vendor & { barAllowedModes?: BarMode[] };
-              if (old.barAllowedModes && old.barAllowedModes.length > 0 && !old.barMode) {
-                const { barAllowedModes, ...rest } = old;
-                void barAllowedModes;
-                return { ...rest, barMode: old.barAllowedModes[0] };
-              }
-              if (old.barAllowedModes) {
-                const { barAllowedModes, ...rest } = old;
-                void barAllowedModes;
-                return rest;
-              }
-              return v;
-            });
-          }
-          if (state.comparison?.venueConfigs) {
-            const cleaned: Record<string, VenueComparisonConfig> = {};
-            for (const [venueId, cfg] of Object.entries(state.comparison.venueConfigs)) {
-              const { barMode: _drop, ...rest } = cfg as VenueComparisonConfig & { barMode?: BarMode };
-              void _drop;
-              cleaned[venueId] = rest;
-            }
-            state.comparison = { ...state.comparison, venueConfigs: cleaned };
-          }
-        }
-        if (version < 4) {
-          // Budget overrides moved from `{ percentage, spent }` to `{ amount, spent }`
-          // so dollar edits aren't lossily round-tripped through percentages.
-          const total = state.answers?.budget ?? 0;
-          const old = state.budgetOverrides as
-            | Record<string, { percentage?: number; amount?: number; spent: number }>
-            | undefined;
-          if (old && total > 0) {
-            const migrated: Record<string, BudgetOverride> = {};
-            for (const [id, ov] of Object.entries(old)) {
-              const amount =
-                typeof ov.amount === "number"
-                  ? ov.amount
-                  : Math.round(((ov.percentage ?? 0) / 100) * total);
-              migrated[id] = { amount, spent: ov.spent ?? 0 };
-            }
-            state.budgetOverrides = migrated;
-          } else {
-            state.budgetOverrides = {};
-          }
-        }
-        return state as PlanState;
-      },
+      version: 5,
+      migrate: (persisted, version) => migratePlanStore(persisted, version),
     }
   )
 );

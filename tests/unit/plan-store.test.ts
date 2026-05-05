@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Vendor, VendorNote, MiscLineItem, VendorCostModel } from "@/lib/types";
+import type { Guest, Vendor, VendorNote, MiscLineItem, VendorCostModel } from "@/lib/types";
 
 // Zustand's persist middleware needs a localStorage shim in the node test env.
 const memStorage = (() => {
@@ -15,7 +15,7 @@ const memStorage = (() => {
 })();
 vi.stubGlobal("localStorage", memStorage);
 
-const { usePlanStore } = await import("@/lib/plan-store");
+const { usePlanStore, migratePlanStore } = await import("@/lib/plan-store");
 
 const baseVendor = (overrides: Partial<Vendor> = {}): Vendor => ({
   id: "vendor-1",
@@ -123,5 +123,57 @@ describe("mergeVendors", () => {
     });
     usePlanStore.getState().mergeVendors([baseVendor({ id: "v1", status: "considering" })]);
     expect(usePlanStore.getState().vendors[0].status).toBe("booked");
+  });
+});
+
+describe("migratePlanStore — v4 → v5 guest priority backfill", () => {
+  const guest = (over: Partial<Guest> = {}): Guest => ({
+    id:          over.id ?? "g",
+    name:        over.name ?? "Guest",
+    totalGuests: over.totalGuests ?? 1,
+    rsvp:        over.rsvp ?? "pending",
+    ...over,
+  });
+
+  it("pre-seeds priority on existing guests based on relationship", () => {
+    const persisted = {
+      guests: [
+        guest({ id: "fam", relationship: "family" }),
+        guest({ id: "cf",  relationship: "close_friend" }),
+        guest({ id: "fr",  relationship: "friend" }),
+        guest({ id: "ac",  relationship: "acquaintance" }),
+        guest({ id: "no" }), // no relationship set
+      ],
+    };
+    const migrated = migratePlanStore(persisted, 4);
+    const byId = Object.fromEntries(migrated.guests.map((g) => [g.id, g.priority]));
+    expect(byId).toEqual({
+      fam: "must",
+      cf:  "must",
+      fr:  "want",
+      ac:  "ifSpace",
+      no:  "want",
+    });
+  });
+
+  it("does not overwrite an explicit priority that was already set", () => {
+    const persisted = {
+      guests: [guest({ id: "x", relationship: "family", priority: "ifSpace" })],
+    };
+    const migrated = migratePlanStore(persisted, 4);
+    expect(migrated.guests[0].priority).toBe("ifSpace");
+  });
+
+  it("is a no-op for v5+ payloads (priority already present)", () => {
+    const persisted = {
+      guests: [guest({ id: "x", priority: "want" })],
+    };
+    const migrated = migratePlanStore(persisted, 5);
+    expect(migrated.guests[0].priority).toBe("want");
+  });
+
+  it("handles a payload with no guests array", () => {
+    const migrated = migratePlanStore({}, 4);
+    expect(migrated.guests).toBeUndefined();
   });
 });
