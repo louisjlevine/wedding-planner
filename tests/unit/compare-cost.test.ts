@@ -209,19 +209,28 @@ describe("computeMiscCost", () => {
     };
   }
 
-  it("aggregates misc items from venue and caterer with source tags", () => {
+  it("counts only the venue's misc items — caterer-side data is ignored to avoid double counts", () => {
     const venue = withMisc("Venue", [
       { id: "m1", label: "Cleanup", cost: 500 },
       { id: "m2", label: "Chairs",  cost: 300 },
     ]);
     const caterer = withMisc("Catering", [
+      { id: "m1", label: "Cleanup", cost: 700 }, // same library id — pre-fix this would double up
       { id: "m3", label: "Vendor meals", cost: 240 },
     ]);
     const r = computeMiscCost(venue, caterer);
-    expect(r.total).toBe(500 + 300 + 240);
-    expect(r.items).toHaveLength(3);
-    expect(r.items.filter((i) => i.source === "venue")).toHaveLength(2);
-    expect(r.items.filter((i) => i.source === "caterer")).toHaveLength(1);
+    expect(r.total).toBe(500 + 300);
+    expect(r.items).toHaveLength(2);
+  });
+
+  it("dedupes within the venue if the same library id appears twice", () => {
+    const venue = withMisc("Venue", [
+      { id: "m1", label: "Cleanup", cost: 500 },
+      { id: "m1", label: "Cleanup", cost: 700 }, // duplicate id
+    ]);
+    const r = computeMiscCost(venue, undefined);
+    expect(r.total).toBe(500);
+    expect(r.items).toHaveLength(1);
   });
 
   it("returns zero total when no misc items are set", () => {
@@ -303,13 +312,14 @@ describe("computeScenario", () => {
     expect(s.total).toBe(12000 + 1000);
   });
 
-  it("includes misc line items from venue and caterer in the total", () => {
+  it("includes misc line items from the venue (only) in the total", () => {
     const v: Vendor = {
       ...venue({ base: 10000, hoursIncluded: 8 }),
       miscLineItems: [{ id: "m1", label: "Cleanup", cost: 500 }],
     };
     const c: Vendor = {
       ...legacyCaterer(100),
+      // Caterer-side misc is preserved on the record but no longer summed.
       miscLineItems: [{ id: "m2", label: "Vendor meals", cost: 200 }],
     };
     const s = computeScenario(
@@ -320,8 +330,8 @@ describe("computeScenario", () => {
       50,
       8
     );
-    // venue 10000 + catering 100*50 + bar 1000 + misc 500+200
-    expect(s.total).toBe(10000 + 5000 + 1000 + 700);
-    expect(s.misc.total).toBe(700);
+    // venue 10000 + catering 100*50 + bar 1000 + misc 500
+    expect(s.total).toBe(10000 + 5000 + 1000 + 500);
+    expect(s.misc.total).toBe(500);
   });
 });

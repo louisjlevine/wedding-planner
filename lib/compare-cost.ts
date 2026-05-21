@@ -138,7 +138,6 @@ export function computeBarCost(addon: BarAddon, guestCount: number, barVendor?: 
 }
 
 export interface MiscEntry {
-  source: "venue" | "caterer";
   label: string;
   cost: number;
 }
@@ -148,20 +147,26 @@ export interface MiscBreakdown {
   total: number;
 }
 
+// Misc totals are owned by the venue (the column identity on Compare). The
+// caterer parameter is intentionally ignored — historically caterer-side
+// miscLineItems were summed in too, but that caused double counts after the
+// shared-library migration (the same library id can appear on both vendors).
+// Caterer-side misc data is preserved on the vendor record but no longer
+// folded into the per-venue scenario total.
 export function computeMiscCost(
   venue: Vendor | undefined,
-  catering: Vendor | undefined
+  _catering?: Vendor | undefined,
 ): MiscBreakdown {
+  void _catering;
   const items: MiscEntry[] = [];
+  const seen = new Set<string>();
   for (const m of venue?.miscLineItems ?? []) {
-    if (Number.isFinite(m.cost)) {
-      items.push({ source: "venue", label: m.label, cost: m.cost });
-    }
-  }
-  for (const m of catering?.miscLineItems ?? []) {
-    if (Number.isFinite(m.cost)) {
-      items.push({ source: "caterer", label: m.label, cost: m.cost });
-    }
+    if (!Number.isFinite(m.cost)) continue;
+    // Dedupe by library id so a vendor that somehow ended up with two rows
+    // for the same id (legacy + migrated) doesn't get counted twice.
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    items.push({ label: m.label, cost: m.cost });
   }
   const total = items.reduce((sum, m) => sum + m.cost, 0);
   return { items, total };

@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { usePlanStore } from "@/lib/plan-store";
 import { Panel } from "@/components/ui/Panel";
-import type { Vendor, BarMode, VenueComparisonConfig } from "@/lib/types";
+import type { Vendor, BarMode, VenueComparisonConfig, CatererPackage } from "@/lib/types";
 import { computeScenario, resolvePackage, type BarAddon } from "@/lib/compare-cost";
+import { EditableMoneyCell, EditableNumberCell, fmtMoney } from "@/components/ui/EditableMoneyCell";
 
 const STATUS_DOT: Record<Vendor["status"], string> = {
   considering: "bg-gray-400",
@@ -17,11 +18,6 @@ const BAR_MODE_LABEL: Record<BarMode, string> = {
   self_host:   "Self-host",
   via_caterer: "Through vendor",
 };
-
-function fmtMoney(n: number): string {
-  if (!Number.isFinite(n) || n === 0) return "—";
-  return `$${Math.round(n).toLocaleString()}`;
-}
 
 function fmtSigned(n: number): string {
   if (!Number.isFinite(n) || n === 0) return "$0";
@@ -205,64 +201,12 @@ function VenueConfigCard({
 
 type Scenario = ReturnType<typeof computeScenario>;
 
+// Read-only money cell, used for derived subtotals that shouldn't be edited.
 function MoneyCell({ value, faded }: { value: number; faded?: boolean }) {
   return (
     <td className={`px-3 py-2 text-right tabular-nums ${faded ? "text-gray-400" : "text-gray-700"}`}>
       {fmtMoney(value)}
     </td>
-  );
-}
-
-// Inline-edit input for a misc line item cost on the Compare page. Uses a
-// local string so a freshly-cleared field doesn't immediately snap back to 0.
-function MiscCostInput({
-  vendorId,
-  labelId,
-  existing,
-  onCommit,
-}: {
-  vendorId: string;
-  labelId: string;
-  label: string;
-  existing: number | undefined;
-  onCommit: (raw: string) => void;
-}) {
-  const initial = existing !== undefined && Number.isFinite(existing) && existing !== 0
-    ? String(existing)
-    : "";
-  // Remount when initial changes — e.g. a different vendor in the same column,
-  // or external write — so our local string mirrors the freshly-loaded value.
-  return (
-    <MiscCostInputInner
-      key={`${vendorId}:${labelId}:${initial}`}
-      initial={initial}
-      onCommit={onCommit}
-    />
-  );
-}
-
-function MiscCostInputInner({
-  initial,
-  onCommit,
-}: {
-  initial: string;
-  onCommit: (raw: string) => void;
-}) {
-  const [raw, setRaw] = useState(initial);
-  return (
-    <input
-      type="number"
-      value={raw}
-      onChange={(e) => setRaw(e.target.value)}
-      onBlur={() => {
-        if (raw !== initial) onCommit(raw);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-      placeholder="—"
-      className="w-20 text-right tabular-nums border border-transparent rounded px-2 py-1 text-xs hover:border-gray-200 focus:border-[var(--accent)] focus:outline-none"
-    />
   );
 }
 
@@ -344,24 +288,56 @@ export function Compare() {
     [miscLineItemLabels],
   );
 
-  // Inline-edit a cost cell on Compare. Writes through to the underlying
-  // vendor so the change is also reflected on the Vendors tab.
-  function updateLineItemCost(vendorId: string, labelId: string, label: string, raw: string) {
+  // ── Write-through helpers ─────────────────────────────────────────────────
+  // Each editable cell on the table is wired to one of these. They all write
+  // straight back to the source vendor so changes show up on the Vendors tab
+  // immediately and the next render reflects the new totals.
+
+  function updateLineItemCost(vendorId: string, labelId: string, label: string, next: number | undefined) {
     const vendor = vendors.find((v) => v.id === vendorId);
     if (!vendor) return;
     const existing = vendor.miscLineItems ?? [];
-    const trimmed = raw.trim();
-    const n = parseFloat(raw);
-    if (trimmed === "" || !Number.isFinite(n)) {
-      const next = existing.filter((m) => m.id !== labelId);
-      updateVendor(vendorId, { miscLineItems: next.length ? next : undefined });
+    if (next === undefined || !Number.isFinite(next)) {
+      const filtered = existing.filter((m) => m.id !== labelId);
+      updateVendor(vendorId, { miscLineItems: filtered.length ? filtered : undefined });
       return;
     }
     const idx = existing.findIndex((m) => m.id === labelId);
-    const next = idx === -1
-      ? [...existing, { id: labelId, label, cost: n }]
-      : existing.map((m, i) => (i === idx ? { ...m, label, cost: n } : m));
-    updateVendor(vendorId, { miscLineItems: next });
+    const rows = idx === -1
+      ? [...existing, { id: labelId, label, cost: next }]
+      : existing.map((m, i) => (i === idx ? { ...m, label, cost: next } : m));
+    updateVendor(vendorId, { miscLineItems: rows });
+  }
+
+  function updateCostModel(vendorId: string, field: "base" | "hoursIncluded" | "overtimeHourly" | "perPerson", next: number | undefined) {
+    const vendor = vendors.find((v) => v.id === vendorId);
+    if (!vendor) return;
+    const cm = { ...(vendor.costModel ?? {}) };
+    if (next === undefined) delete cm[field]; else cm[field] = next;
+    const hasAny = Object.values(cm).some((v) => v !== undefined);
+    updateVendor(vendorId, { costModel: hasAny ? cm : undefined });
+  }
+
+  function updateBarCostModel(vendorId: string, field: "base" | "perPerson", next: number | undefined) {
+    const vendor = vendors.find((v) => v.id === vendorId);
+    if (!vendor) return;
+    const cm = { ...(vendor.barCostModel ?? {}) };
+    if (next === undefined) delete cm[field]; else cm[field] = next;
+    const hasAny = Object.values(cm).some((v) => v !== undefined);
+    updateVendor(vendorId, { barCostModel: hasAny ? cm : undefined });
+  }
+
+  function updatePackageField(vendorId: string, packageId: string, field: "perPerson" | "base", next: number | undefined) {
+    const vendor = vendors.find((v) => v.id === vendorId);
+    if (!vendor?.packages) return;
+    const packages: CatererPackage[] = vendor.packages.map((p) =>
+      p.id === packageId ? { ...p, [field]: next } : p,
+    );
+    updateVendor(vendorId, { packages });
+  }
+
+  function updateBarSelfHostAmount(vendorId: string, next: number | undefined) {
+    updateVendor(vendorId, { barSelfHostAmount: next });
   }
 
   return (
@@ -388,11 +364,14 @@ export function Compare() {
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Guest count</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={comparison.guestCount ?? answers?.guestCount ?? ""}
               placeholder={(answers?.guestCount ?? 100).toString()}
               onChange={(e) => {
-                const n = parseInt(e.target.value);
+                const cleaned = e.target.value.replace(/[^\d]/g, "");
+                if (cleaned === "") { updateComparison({ guestCount: undefined }); return; }
+                const n = parseInt(cleaned);
                 updateComparison({ guestCount: Number.isFinite(n) ? n : undefined });
               }}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
@@ -402,10 +381,13 @@ export function Compare() {
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Event hours</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={comparison.hours ?? 8}
               onChange={(e) => {
-                const n = parseInt(e.target.value);
+                const cleaned = e.target.value.replace(/[^\d]/g, "");
+                if (cleaned === "") { updateComparison({ hours: undefined }); return; }
+                const n = parseInt(cleaned);
                 updateComparison({ hours: Number.isFinite(n) ? n : undefined });
               }}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
@@ -474,14 +456,38 @@ export function Compare() {
                 <tr className="border-t border-gray-100">
                   <td className="px-3 py-2 text-gray-500">Base cost</td>
                   {columns.map((col) => (
-                    <MoneyCell key={col.key} value={col.scenario.venue.base} />
+                    <td key={col.key} className="px-3 py-1 text-right">
+                      <EditableMoneyCell
+                        value={col.venue.costModel?.base}
+                        onCommit={(n) => updateCostModel(col.venue.id, "base", n)}
+                        ariaLabel={`${col.venue.name} base cost`}
+                      />
+                    </td>
                   ))}
                 </tr>
                 <tr className="border-t border-gray-100">
                   <td className="px-3 py-2 text-gray-500">Hours included</td>
                   {columns.map((col) => (
-                    <td key={col.key} className="px-3 py-2 text-right text-gray-700 tabular-nums">
-                      {col.venue.costModel?.hoursIncluded ?? "—"}
+                    <td key={col.key} className="px-3 py-1 text-right">
+                      <EditableNumberCell
+                        value={col.venue.costModel?.hoursIncluded}
+                        onCommit={(n) => updateCostModel(col.venue.id, "hoursIncluded", n)}
+                        ariaLabel={`${col.venue.name} hours included`}
+                        suffix="h"
+                      />
+                    </td>
+                  ))}
+                </tr>
+                <tr className="border-t border-gray-100">
+                  <td className="px-3 py-2 text-gray-500">Overtime $ / hour</td>
+                  {columns.map((col) => (
+                    <td key={col.key} className="px-3 py-1 text-right">
+                      <EditableMoneyCell
+                        value={col.venue.costModel?.overtimeHourly}
+                        onCommit={(n) => updateCostModel(col.venue.id, "overtimeHourly", n)}
+                        ariaLabel={`${col.venue.name} overtime hourly`}
+                        fadeEmpty
+                      />
                     </td>
                   ))}
                 </tr>
@@ -501,31 +507,44 @@ export function Compare() {
                 <tr className="border-t border-gray-100">
                   <td className="px-3 py-2 text-gray-500">Caterer</td>
                   {columns.map((col) => (
-                    <td key={col.key} className="px-3 py-2 text-right font-medium text-gray-900 whitespace-nowrap">
-                      {col.caterer ? (
-                        <span className="inline-flex items-center gap-1.5 justify-end">
-                          <span>{col.caterer.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => openVendorEditor(col.caterer!.id)}
-                            className="text-gray-300 hover:text-[var(--accent)] transition-colors"
-                            title="Edit caterer costs"
-                            aria-label={`Edit ${col.caterer.name} costs`}
-                          >
-                            <EditPencil />
-                          </button>
-                        </span>
-                      ) : "—"}
+                    <td key={col.key} className="px-3 py-1 text-right text-gray-700 whitespace-nowrap">
+                      <select
+                        value={col.config.catererId ?? ""}
+                        onChange={(e) => {
+                          const catererId = e.target.value || undefined;
+                          updateVenueConfig(col.venue.id, { catererId, packageId: undefined });
+                        }}
+                        className="w-full text-right text-xs border border-transparent hover:border-gray-200 focus:border-[var(--accent)] focus:outline-none rounded px-2 py-1 bg-transparent"
+                      >
+                        <option value="">— none —</option>
+                        {cateringOptions.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name?.trim() || "Untitled"}</option>
+                        ))}
+                      </select>
                     </td>
                   ))}
                 </tr>
                 <tr className="border-t border-gray-100">
                   <td className="px-3 py-2 text-gray-500">Package</td>
                   {columns.map((col) => {
-                    const pkg = resolvePackage(col.caterer, col.config.packageId);
+                    const pkgs = col.caterer?.packages ?? [];
+                    if (pkgs.length === 0) {
+                      return (
+                        <td key={col.key} className="px-3 py-2 text-right text-gray-300">—</td>
+                      );
+                    }
+                    const selected = resolvePackage(col.caterer, col.config.packageId)?.id ?? pkgs[0].id;
                     return (
-                      <td key={col.key} className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">
-                        {pkg?.name ?? "—"}
+                      <td key={col.key} className="px-3 py-1 text-right whitespace-nowrap">
+                        <select
+                          value={selected}
+                          onChange={(e) => updateVenueConfig(col.venue.id, { packageId: e.target.value })}
+                          className="w-full text-right text-xs border border-transparent hover:border-gray-200 focus:border-[var(--accent)] focus:outline-none rounded px-2 py-1 bg-transparent"
+                        >
+                          {pkgs.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name || "Untitled"}</option>
+                          ))}
+                        </select>
                       </td>
                     );
                   })}
@@ -534,8 +553,60 @@ export function Compare() {
                   <td className="px-3 py-2 text-gray-500">$ / person</td>
                   {columns.map((col) => {
                     const pkg = resolvePackage(col.caterer, col.config.packageId);
-                    const pp = pkg?.perPerson ?? col.caterer?.costModel?.perPerson ?? 0;
-                    return <MoneyCell key={col.key} value={pp} />;
+                    if (col.caterer && pkg) {
+                      return (
+                        <td key={col.key} className="px-3 py-1 text-right">
+                          <EditableMoneyCell
+                            value={pkg.perPerson}
+                            onCommit={(n) => updatePackageField(col.caterer!.id, pkg.id, "perPerson", n)}
+                            ariaLabel={`${col.caterer.name} ${pkg.name} per person`}
+                          />
+                        </td>
+                      );
+                    }
+                    if (col.caterer) {
+                      return (
+                        <td key={col.key} className="px-3 py-1 text-right">
+                          <EditableMoneyCell
+                            value={col.caterer.costModel?.perPerson}
+                            onCommit={(n) => updateCostModel(col.caterer!.id, "perPerson", n)}
+                            ariaLabel={`${col.caterer.name} per person`}
+                          />
+                        </td>
+                      );
+                    }
+                    return <td key={col.key} className="px-3 py-2 text-right text-gray-300">—</td>;
+                  })}
+                </tr>
+                <tr className="border-t border-gray-100">
+                  <td className="px-3 py-2 text-gray-500">Catering base</td>
+                  {columns.map((col) => {
+                    const pkg = resolvePackage(col.caterer, col.config.packageId);
+                    if (col.caterer && pkg) {
+                      return (
+                        <td key={col.key} className="px-3 py-1 text-right">
+                          <EditableMoneyCell
+                            value={pkg.base}
+                            onCommit={(n) => updatePackageField(col.caterer!.id, pkg.id, "base", n)}
+                            ariaLabel={`${col.caterer.name} ${pkg.name} base`}
+                            fadeEmpty
+                          />
+                        </td>
+                      );
+                    }
+                    if (col.caterer) {
+                      return (
+                        <td key={col.key} className="px-3 py-1 text-right">
+                          <EditableMoneyCell
+                            value={col.caterer.costModel?.base}
+                            onCommit={(n) => updateCostModel(col.caterer!.id, "base", n)}
+                            ariaLabel={`${col.caterer.name} base`}
+                            fadeEmpty
+                          />
+                        </td>
+                      );
+                    }
+                    return <td key={col.key} className="px-3 py-2 text-right text-gray-300">—</td>;
                   })}
                 </tr>
                 <tr className="border-t border-gray-100">
@@ -555,7 +626,15 @@ export function Compare() {
                   <td className="px-3 py-2 text-gray-500">Mode</td>
                   {columns.map((col) => (
                     <td key={col.key} className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">
-                      {col.venue.barMode ? BAR_MODE_LABEL[col.venue.barMode] : "—"}
+                      {col.venue.barMode ? BAR_MODE_LABEL[col.venue.barMode] : (
+                        <button
+                          type="button"
+                          onClick={() => openVendorEditor(col.venue.id)}
+                          className="text-[var(--accent)] hover:opacity-80 text-xs"
+                        >
+                          Set on venue →
+                        </button>
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -582,17 +661,70 @@ export function Compare() {
                     </td>
                   ))}
                 </tr>
+                {/* Self-host total budget — editable when applicable */}
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Base / setup</td>
-                  {columns.map((col) => (
-                    <MoneyCell key={col.key} value={col.scenario.bar.base} faded={col.scenario.bar.base === 0} />
-                  ))}
+                  <td className="px-3 py-2 text-gray-500">Self-host budget</td>
+                  {columns.map((col) => {
+                    if (col.venue.barMode !== "self_host") {
+                      return <td key={col.key} className="px-3 py-2 text-right text-gray-300">—</td>;
+                    }
+                    return (
+                      <td key={col.key} className="px-3 py-1 text-right">
+                        <EditableMoneyCell
+                          value={col.venue.barSelfHostAmount}
+                          onCommit={(n) => updateBarSelfHostAmount(col.venue.id, n)}
+                          ariaLabel={`${col.venue.name} self-host bar budget`}
+                        />
+                      </td>
+                    );
+                  })}
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">$ / person × {guestCount}</td>
-                  {columns.map((col) => (
-                    <MoneyCell key={col.key} value={col.scenario.bar.perPerson} faded={col.scenario.bar.perPerson === 0} />
-                  ))}
+                  <td className="px-3 py-2 text-gray-500">Base / setup</td>
+                  {columns.map((col) => {
+                    if (col.venue.barMode !== "via_caterer" || !col.barVendor) {
+                      return <MoneyCell key={col.key} value={col.scenario.bar.base} faded={col.scenario.bar.base === 0} />;
+                    }
+                    const isCaterer = col.barVendor.category === "Catering";
+                    const currentBase = isCaterer ? col.barVendor.barCostModel?.base : col.barVendor.costModel?.base;
+                    return (
+                      <td key={col.key} className="px-3 py-1 text-right">
+                        <EditableMoneyCell
+                          value={currentBase}
+                          onCommit={(n) =>
+                            isCaterer
+                              ? updateBarCostModel(col.barVendor!.id, "base", n)
+                              : updateCostModel(col.barVendor!.id, "base", n)
+                          }
+                          ariaLabel={`${col.barVendor.name} bar base`}
+                          fadeEmpty
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+                <tr className="border-t border-gray-100">
+                  <td className="px-3 py-2 text-gray-500">Bar $ / person</td>
+                  {columns.map((col) => {
+                    if (col.venue.barMode !== "via_caterer" || !col.barVendor) {
+                      return <td key={col.key} className="px-3 py-2 text-right text-gray-300">—</td>;
+                    }
+                    const isCaterer = col.barVendor.category === "Catering";
+                    const currentPerPerson = isCaterer ? col.barVendor.barCostModel?.perPerson : col.barVendor.costModel?.perPerson;
+                    return (
+                      <td key={col.key} className="px-3 py-1 text-right">
+                        <EditableMoneyCell
+                          value={currentPerPerson}
+                          onCommit={(n) =>
+                            isCaterer
+                              ? updateBarCostModel(col.barVendor!.id, "perPerson", n)
+                              : updateCostModel(col.barVendor!.id, "perPerson", n)
+                          }
+                          ariaLabel={`${col.barVendor.name} bar per person`}
+                        />
+                      </td>
+                    );
+                  })}
                 </tr>
                 <tr className="border-t border-gray-100">
                   <td className="px-3 py-2 text-gray-500">Subtotal</td>
@@ -631,17 +763,19 @@ export function Compare() {
                             </button>
                           </span>
                         </td>
-                        {columns.map((col) => (
-                          <td key={col.key} className="px-3 py-1 text-right">
-                            <MiscCostInput
-                              vendorId={col.venue.id}
-                              labelId={lbl.id}
-                              label={lbl.label}
-                              existing={col.venue.miscLineItems?.find((m) => m.id === lbl.id)?.cost}
-                              onCommit={(raw) => updateLineItemCost(col.venue.id, lbl.id, lbl.label, raw)}
-                            />
-                          </td>
-                        ))}
+                        {columns.map((col) => {
+                          const existing = col.venue.miscLineItems?.find((m) => m.id === lbl.id)?.cost;
+                          return (
+                            <td key={col.key} className="px-3 py-1 text-right">
+                              <EditableMoneyCell
+                                value={existing}
+                                onCommit={(n) => updateLineItemCost(col.venue.id, lbl.id, lbl.label, n)}
+                                ariaLabel={`${col.venue.name} ${lbl.label}`}
+                                fadeEmpty
+                              />
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                     <tr className="border-t border-gray-100">

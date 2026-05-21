@@ -85,9 +85,10 @@ export function MiscLineItemsEditor({ items, onChange }: Props) {
               <div key={lbl.id} className="flex items-center gap-2">
                 <span className="flex-1 text-sm text-gray-700 truncate">{lbl.label}</span>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={raw}
-                  onChange={(e) => setCostForLabel(lbl.id, lbl.label, e.target.value)}
+                  onChange={(e) => setCostForLabel(lbl.id, lbl.label, e.target.value.replace(/[^\d.,\-]/g, ""))}
                   placeholder="Cost"
                   className="w-28 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)]"
                 />

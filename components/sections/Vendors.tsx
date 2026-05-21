@@ -610,7 +610,7 @@ function EditVendorForm({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Base cost ($)</label>
-            <input type="number" value={draft.costBase} onChange={(e) => setDraft((d) => ({ ...d, costBase: e.target.value }))}
+            <input type="text" inputMode="decimal" value={draft.costBase} onChange={(e) => setDraft((d) => ({ ...d, costBase: e.target.value }))}
               placeholder={isVenue ? "Rental fee" : isPerPerson ? "Setup / minimum" : "0"}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
           </div>
@@ -618,13 +618,13 @@ function EditVendorForm({
             <>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Hours included</label>
-                <input type="number" value={draft.costHours} onChange={(e) => setDraft((d) => ({ ...d, costHours: e.target.value }))}
+                <input type="text" inputMode="decimal" value={draft.costHours} onChange={(e) => setDraft((d) => ({ ...d, costHours: e.target.value }))}
                   placeholder="e.g. 8"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Overtime $ / hour</label>
-                <input type="number" value={draft.costOvertime} onChange={(e) => setDraft((d) => ({ ...d, costOvertime: e.target.value }))}
+                <input type="text" inputMode="decimal" value={draft.costOvertime} onChange={(e) => setDraft((d) => ({ ...d, costOvertime: e.target.value }))}
                   placeholder="e.g. 500"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
               </div>
@@ -633,7 +633,7 @@ function EditVendorForm({
           {isPerPerson && !isCatering && (
             <div>
               <label className="text-xs text-gray-500 mb-1 block">$ per person</label>
-              <input type="number" value={draft.costPerPerson} onChange={(e) => setDraft((d) => ({ ...d, costPerPerson: e.target.value }))}
+              <input type="text" inputMode="decimal" value={draft.costPerPerson} onChange={(e) => setDraft((d) => ({ ...d, costPerPerson: e.target.value }))}
                 placeholder={draft.category === "Bar" ? "e.g. 55" : "e.g. 145"}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
             </div>
@@ -641,7 +641,7 @@ function EditVendorForm({
           {isCatering && packages.length === 0 && (
             <div>
               <label className="text-xs text-gray-500 mb-1 block">$ per person (no packages)</label>
-              <input type="number" value={draft.costPerPerson} onChange={(e) => setDraft((d) => ({ ...d, costPerPerson: e.target.value }))}
+              <input type="text" inputMode="decimal" value={draft.costPerPerson} onChange={(e) => setDraft((d) => ({ ...d, costPerPerson: e.target.value }))}
                 placeholder="e.g. 145"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
             </div>
@@ -695,7 +695,7 @@ function EditVendorForm({
                   <div>
                     <label className="text-[10px] text-gray-500 mb-0.5 block">$ / person</label>
                     <input
-                      type="number"
+                      type="text" inputMode="decimal"
                       value={pkg.perPerson ?? ""}
                       onChange={(e) => {
                         const n = parseFloat(e.target.value);
@@ -708,7 +708,7 @@ function EditVendorForm({
                   <div>
                     <label className="text-[10px] text-gray-500 mb-0.5 block">Base / minimum ($)</label>
                     <input
-                      type="number"
+                      type="text" inputMode="decimal"
                       value={pkg.base ?? ""}
                       onChange={(e) => {
                         const n = parseFloat(e.target.value);
@@ -750,7 +750,7 @@ function EditVendorForm({
             <div className="max-w-xs">
               <label className="text-xs text-gray-500 mb-1 block">Total alcohol budget ($)</label>
               <input
-                type="number"
+                type="text" inputMode="decimal"
                 value={barSelfHostAmount}
                 onChange={(e) => setBarSelfHostAmount(e.target.value)}
                 placeholder="e.g. 2500"
@@ -805,7 +805,7 @@ function EditVendorForm({
             <div>
               <label className="text-xs text-gray-500 mb-1 block">$ per person</label>
               <input
-                type="number"
+                type="text" inputMode="decimal"
                 value={barCateringPerPerson}
                 onChange={(e) => setBarCateringPerPerson(e.target.value)}
                 placeholder="e.g. 25"
@@ -815,7 +815,7 @@ function EditVendorForm({
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Base ($)</label>
               <input
-                type="number"
+                type="text" inputMode="decimal"
                 value={barCateringBase}
                 onChange={(e) => setBarCateringBase(e.target.value)}
                 placeholder="e.g. 500"
@@ -1329,7 +1329,7 @@ export function Vendors() {
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Base cost ($)</label>
               <input
-                type="number"
+                type="text" inputMode="decimal"
                 value={form.costBase}
                 onChange={(e) => setForm((f) => ({ ...f, costBase: e.target.value }))}
                 placeholder="0"
@@ -1341,7 +1341,7 @@ export function Vendors() {
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Hours included</label>
                   <input
-                    type="number"
+                    type="text" inputMode="decimal"
                     value={form.costHours}
                     onChange={(e) => setForm((f) => ({ ...f, costHours: e.target.value }))}
                     placeholder="e.g. 8"
@@ -1351,7 +1351,7 @@ export function Vendors() {
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Overtime $ / hour</label>
                   <input
-                    type="number"
+                    type="text" inputMode="decimal"
                     value={form.costOvertime}
                     onChange={(e) => setForm((f) => ({ ...f, costOvertime: e.target.value }))}
                     placeholder="e.g. 500"
@@ -1364,7 +1364,7 @@ export function Vendors() {
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">$ per person</label>
                 <input
-                  type="number"
+                  type="text" inputMode="decimal"
                   value={form.costPerPerson}
                   onChange={(e) => setForm((f) => ({ ...f, costPerPerson: e.target.value }))}
                   placeholder={form.category === "Bar" ? "e.g. 55" : "e.g. 145"}

@@ -1,229 +1,88 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
 import { usePlan } from "@/hooks/usePlan";
 import { usePlanStore } from "@/lib/plan-store";
 import { Panel } from "@/components/ui/Panel";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { EditableMoneyCell, EditableNumberCell } from "@/components/ui/EditableMoneyCell";
 import type { BudgetCategory } from "@/lib/types";
 
-// ── Editable budget row ───────────────────────────────────────────────────────
-
-function BudgetRow({
+// One table row per category. All numeric cells share the same spinner-free
+// editable-input plumbing as the Compare page, with currency formatting.
+function BudgetTableRow({
   cat,
+  estimate,
   startingBudget,
   onUpdate,
 }: {
   cat: BudgetCategory;
+  estimate: number;
   startingBudget: number;
   onUpdate: (id: string, amount: number, spent: number) => void;
 }) {
-  const [editingAmt, setEditingAmt]     = useState(false);
-  const [editingPct, setEditingPct]     = useState(false);
-  const [editingSpent, setEditingSpent] = useState(false);
-  const [showWhy, setShowWhy]           = useState(false);
+  const isOver = cat.spent > cat.amount;
 
-  const [draftAmt,   setDraftAmt]   = useState(cat.amount.toString());
-  const [draftPct,   setDraftPct]   = useState(cat.percentage.toString());
-  const [draftSpent, setDraftSpent] = useState(cat.spent.toString());
-
-  const amtRef   = useRef<HTMLInputElement>(null);
-  const pctRef   = useRef<HTMLInputElement>(null);
-  const spentRef = useRef<HTMLInputElement>(null);
-
-  // Keep drafts in sync when parent updates (e.g. after a different field commits)
-  useEffect(() => {
-    if (!editingAmt)   setDraftAmt(cat.amount.toString()); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [cat.amount, editingAmt]);
-
-  useEffect(() => {
-    if (!editingPct)   setDraftPct(cat.percentage.toString()); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [cat.percentage, editingPct]);
-
-  useEffect(() => {
-    if (!editingSpent) setDraftSpent(cat.spent.toString()); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [cat.spent, editingSpent]);
-
-  useEffect(() => { if (editingAmt)   amtRef.current?.select(); },   [editingAmt]);
-  useEffect(() => { if (editingPct)   pctRef.current?.select(); },   [editingPct]);
-  useEffect(() => { if (editingSpent) spentRef.current?.select(); }, [editingSpent]);
-
-  function commitAmt() {
-    const raw = parseFloat(draftAmt.replace(/[$,]/g, ""));
-    if (!isNaN(raw) && raw >= 0) {
-      onUpdate(cat.id, Math.round(raw), cat.spent);
-    } else {
-      setDraftAmt(cat.amount.toString());
-    }
-    setEditingAmt(false);
+  function commitAmount(next: number | undefined) {
+    const amount = next === undefined ? 0 : Math.max(0, Math.round(next));
+    onUpdate(cat.id, amount, cat.spent);
   }
 
-  function commitPct() {
-    const raw = parseFloat(draftPct.replace(/%/g, ""));
-    if (!isNaN(raw) && raw >= 0) {
-      const amount = Math.round((raw / 100) * startingBudget);
-      onUpdate(cat.id, amount, cat.spent);
-    } else {
-      setDraftPct(cat.percentage.toString());
-    }
-    setEditingPct(false);
+  function commitPct(next: number | undefined) {
+    if (next === undefined) return;
+    const amount = Math.max(0, Math.round((next / 100) * startingBudget));
+    onUpdate(cat.id, amount, cat.spent);
   }
 
-  function commitSpent() {
-    const raw = parseFloat(draftSpent.replace(/[$,]/g, ""));
-    if (!isNaN(raw) && raw >= 0) {
-      onUpdate(cat.id, cat.amount, raw);
-    } else {
-      setDraftSpent(cat.spent.toString());
-    }
-    setEditingSpent(false);
+  function commitSpent(next: number | undefined) {
+    const spent = next === undefined ? 0 : Math.max(0, Math.round(next));
+    onUpdate(cat.id, cat.amount, spent);
   }
-
-  const spentPct = cat.amount > 0 ? Math.min((cat.spent / cat.amount) * 100, 100) : 0;
-  const isOver   = cat.spent > cat.amount;
-
-  const hasAdjustments = cat.adjustments && cat.adjustments.length > 0;
-  const adjustedBaseline = cat.baselinePercentage + (cat.adjustments ?? []).reduce((s, a) => s + a.delta, 0);
 
   return (
-    <div className="space-y-2">
-      {/* Line 1: category name + why? */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-800 flex-1 min-w-0 truncate">{cat.name}</span>
-        <button
-          onClick={() => setShowWhy((v) => !v)}
-          className="text-[10px] text-gray-400 hover:text-[var(--accent)] transition-colors leading-none border border-gray-200 hover:border-[var(--accent)] rounded px-1.5 py-0.5 shrink-0"
-          title="Show how this allocation was calculated"
-        >
-          {showWhy ? "hide" : "how?"}
-        </button>
-      </div>
-
-      {/* Always-visible description — what this category covers */}
-      {cat.description && (
-        <p className="text-xs text-gray-500 leading-relaxed -mt-0.5">{cat.description}</p>
-      )}
-
-      {/* Line 2: dollar | % | spent (pushed right) */}
-      <div className="flex items-center gap-4">
-        {/* Dollar amount */}
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-400">$</span>
-          {editingAmt ? (
-            <input
-              ref={amtRef}
-              value={draftAmt}
-              onChange={(e) => setDraftAmt(e.target.value)}
-              onBlur={commitAmt}
-              onKeyDown={(e) => { if (e.key === "Enter") commitAmt(); if (e.key === "Escape") { setEditingAmt(false); setDraftAmt(cat.amount.toString()); } }}
-              className="w-20 text-sm text-gray-900 border-b border-[var(--accent)] outline-none bg-transparent"
-            />
-          ) : (
-            <button
-              onClick={() => setEditingAmt(true)}
-              className="text-sm font-medium text-gray-900 hover:text-[var(--accent)] transition-colors tabular-nums"
-              title="Click to edit dollar amount"
-            >
-              {cat.amount.toLocaleString()}
-            </button>
-          )}
-        </div>
-
-        {/* Percentage */}
-        <div className="flex items-center gap-1">
-          {editingPct ? (
-            <input
-              ref={pctRef}
-              value={draftPct}
-              onChange={(e) => setDraftPct(e.target.value)}
-              onBlur={commitPct}
-              onKeyDown={(e) => { if (e.key === "Enter") commitPct(); if (e.key === "Escape") { setEditingPct(false); setDraftPct(cat.percentage.toString()); } }}
-              className="w-10 text-sm text-gray-500 border-b border-[var(--accent)] outline-none bg-transparent"
-            />
-          ) : (
-            <button
-              onClick={() => setEditingPct(true)}
-              className="text-sm text-gray-400 hover:text-[var(--accent)] transition-colors tabular-nums"
-              title="Click to edit percentage"
-            >
-              {cat.percentage}%
-            </button>
-          )}
-        </div>
-
-        {/* Spent — pushed right */}
-        <div className="flex items-center gap-1 ml-auto">
-          <span className="text-xs text-gray-400">spent $</span>
-          {editingSpent ? (
-            <input
-              ref={spentRef}
-              value={draftSpent}
-              onChange={(e) => setDraftSpent(e.target.value)}
-              onBlur={commitSpent}
-              onKeyDown={(e) => { if (e.key === "Enter") commitSpent(); if (e.key === "Escape") { setEditingSpent(false); setDraftSpent(cat.spent.toString()); } }}
-              className="w-16 text-xs text-gray-700 border-b border-[var(--accent)] outline-none bg-transparent"
-            />
-          ) : (
-            <button
-              onClick={() => setEditingSpent(true)}
-              className={`text-xs tabular-nums transition-colors hover:text-[var(--accent)] ${isOver ? "text-red-500 font-semibold" : "text-gray-700"}`}
-              title="Click to update amount spent"
-            >
-              {cat.spent.toLocaleString()}
-            </button>
-          )}
-          {isOver && <span className="text-xs text-red-500 font-medium ml-1">over!</span>}
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${isOver ? "bg-red-400" : "bg-[var(--accent)]"}`}
-          style={{ width: `${spentPct}%` }}
+    <tr className="border-t border-gray-100 align-top">
+      <td className="px-3 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">{cat.name}</td>
+      <td className="px-3 py-3 text-right text-sm text-gray-500 tabular-nums whitespace-nowrap">
+        ${estimate.toLocaleString()}
+      </td>
+      <td className="px-3 py-2 text-right">
+        <EditableMoneyCell
+          value={cat.amount}
+          onCommit={commitAmount}
+          ariaLabel={`${cat.name} revised estimate`}
+          className="text-sm"
         />
-      </div>
-
-      {cat.tip && <p className="text-xs text-[var(--accent)]">{cat.tip}</p>}
-
-      {showWhy && (
-        <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5 text-xs text-gray-600 space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-gray-500">Industry default</span>
-            <span className="tabular-nums font-medium">{cat.baselinePercentage}%</span>
-          </div>
-          {(cat.adjustments ?? []).map((adj, i) => (
-            <div key={i} className="flex items-center justify-between">
-              <span className="text-gray-500">{adj.reason}</span>
-              {adj.delta !== 0 && (
-                <span className={`tabular-nums font-medium ${adj.delta > 0 ? "text-[var(--accent)]" : "text-blue-500"}`}>
-                  {adj.delta > 0 ? "+" : ""}{adj.delta}%
-                </span>
-              )}
-            </div>
-          ))}
-          {hasAdjustments && (
-            <div className="flex items-center justify-between border-t border-gray-200 pt-1 mt-1">
-              <span className="text-gray-500">Pre-scaling total</span>
-              <span className="tabular-nums font-medium">{adjustedBaseline}%</span>
-            </div>
-          )}
-          <div className="flex items-center justify-between border-t border-gray-200 pt-1 mt-1">
-            <span className="text-gray-500">Current allocation</span>
-            <span className="tabular-nums font-semibold text-gray-800">
-              ${cat.amount.toLocaleString()} ({cat.percentage}% of starting)
-            </span>
-          </div>
+      </td>
+      <td className="px-3 py-2 text-right">
+        <EditableNumberCell
+          value={cat.percentage}
+          onCommit={commitPct}
+          ariaLabel={`${cat.name} revised percentage`}
+          suffix="%"
+          className="text-sm"
+        />
+      </td>
+      <td className="px-3 py-2 text-right">
+        <div className="flex flex-col items-end gap-1">
+          <EditableMoneyCell
+            value={cat.spent}
+            onCommit={commitSpent}
+            ariaLabel={`${cat.name} spent`}
+            className={`text-sm ${isOver ? "text-red-600 font-semibold" : ""}`}
+            fadeEmpty
+          />
+          {isOver && <span className="text-[10px] text-red-500 font-medium">over budget</span>}
         </div>
-      )}
-    </div>
+      </td>
+      <td className="px-3 py-3 text-xs text-gray-500 leading-relaxed">
+        {cat.description ?? ""}
+        {cat.tip && <span className="block text-[var(--accent)] mt-1">{cat.tip}</span>}
+      </td>
+    </tr>
   );
 }
 
-// ── Budget page ───────────────────────────────────────────────────────────────
-
 export function Budget() {
-  const { answers, budgetCategories } = usePlan();
+  const { answers, budgetCategories, baseBudgetCategories } = usePlan();
   const { setBudgetOverride, resetBudgetOverrides, budgetOverrides } = usePlanStore();
 
   if (!answers) return null;
@@ -236,6 +95,10 @@ export function Budget() {
   const spentPct       = allocated > 0 ? Math.round((totalSpent / allocated) * 100) : 0;
   const hasOverrides   = Object.keys(budgetOverrides).length > 0;
 
+  // Map original (pre-override) amounts by id so the Estimate column can show
+  // them next to the Revised Estimate.
+  const estimateById = new Map(baseBudgetCategories.map((c) => [c.id, c.amount]));
+
   function handleUpdate(id: string, amount: number, spent: number) {
     setBudgetOverride(id, { amount, spent });
   }
@@ -246,7 +109,7 @@ export function Budget() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Budget</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            ${startingBudget.toLocaleString()} starting &middot; click any value to edit
+            ${startingBudget.toLocaleString()} starting &middot; click any cell to edit
           </p>
         </div>
         {hasOverrides && (
@@ -296,18 +159,48 @@ export function Budget() {
       )}
 
       <Panel title="Budget breakdown">
-        <p className="text-xs text-gray-400 mb-4">
-          Percentages set the initial split of your starting budget. After that, edit dollar amounts directly — they don&rsquo;t need to add up to your starting total.
-        </p>
-        <div className="space-y-5">
-          {budgetCategories.map((cat) => (
-            <BudgetRow
-              key={cat.id}
-              cat={cat}
-              startingBudget={startingBudget}
-              onUpdate={handleUpdate}
-            />
-          ))}
+        <div className="overflow-x-auto -mx-5 px-5">
+          <table className="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
+            <thead>
+              <tr className="bg-gray-50 text-left">
+                <th className="px-3 py-2 font-medium text-gray-500 whitespace-nowrap">Type</th>
+                <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Estimate</th>
+                <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Revised Estimate</th>
+                <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Revised %</th>
+                <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Spent</th>
+                <th className="px-3 py-2 font-medium text-gray-500 whitespace-nowrap">Explanation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {budgetCategories.map((cat) => (
+                <BudgetTableRow
+                  key={cat.id}
+                  cat={cat}
+                  estimate={estimateById.get(cat.id) ?? cat.amount}
+                  startingBudget={startingBudget}
+                  onUpdate={handleUpdate}
+                />
+              ))}
+              <tr className="border-t-2 border-gray-300 bg-[var(--accent)]/5">
+                <td className="px-3 py-2.5 font-semibold text-gray-900">Total</td>
+                <td className="px-3 py-2.5 text-right font-semibold text-gray-900 tabular-nums">
+                  ${baseBudgetCategories.reduce((s, c) => s + c.amount, 0).toLocaleString()}
+                </td>
+                <td className="px-3 py-2.5 text-right font-semibold text-gray-900 tabular-nums">
+                  ${allocated.toLocaleString()}
+                </td>
+                <td className="px-3 py-2.5 text-right text-gray-500 tabular-nums">
+                  {startingBudget > 0
+                    ? `${Math.round((allocated / startingBudget) * 1000) / 10}%`
+                    : "—"}
+                </td>
+                <td className="px-3 py-2.5 text-right font-semibold text-gray-900 tabular-nums">
+                  ${totalSpent.toLocaleString()}
+                </td>
+                <td />
+              </tr>
+            </tbody>
+          </table>
         </div>
       </Panel>
     </div>
