@@ -244,6 +244,38 @@ export function migratePlanStore(persisted: unknown, version: number): PlanState
       }
     }
   }
+  if (version < 7) {
+    // The v6 migration set up the shared library, but server-merged vendors
+    // (or stale local data) could still carry "orphan" miscLineItems whose
+    // id doesn't match any library entry while their label does. Those orphans
+    // were invisible in the editor but still summed in compute, causing
+    // double counts on Compare. Re-map any orphan whose label matches a
+    // library entry onto the library id, then dedupe each vendor's items.
+    if (Array.isArray(state.vendors) && Array.isArray(state.miscLineItemLabels)) {
+      const labelToId = new Map<string, string>();
+      for (const l of state.miscLineItemLabels) {
+        labelToId.set(l.label.trim().toLowerCase(), l.id);
+      }
+      state.vendors = state.vendors.map((v) => {
+        const items = v.miscLineItems ?? [];
+        if (items.length === 0) return v;
+        const seenIds = new Set<string>();
+        const seenLabels = new Set<string>();
+        const cleaned = [] as typeof items;
+        for (const m of items) {
+          const labelKey = (m.label ?? "").trim().toLowerCase();
+          const mappedId = labelKey ? labelToId.get(labelKey) : undefined;
+          const id = mappedId ?? m.id;
+          if (seenIds.has(id)) continue;
+          if (labelKey && seenLabels.has(labelKey)) continue;
+          seenIds.add(id);
+          if (labelKey) seenLabels.add(labelKey);
+          cleaned.push({ ...m, id });
+        }
+        return { ...v, miscLineItems: cleaned };
+      });
+    }
+  }
   return state as PlanState;
 }
 
@@ -659,7 +691,7 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
-      version: 6,
+      version: 7,
       migrate: (persisted, version) => migratePlanStore(persisted, version),
     }
   )
