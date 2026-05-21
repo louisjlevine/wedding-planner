@@ -230,6 +230,56 @@ describe("migratePlanStore — v5 → v6 shared misc library + bar fields on ven
   });
 });
 
+describe("migratePlanStore — v6 → v7 orphan misc cleanup", () => {
+  it("remaps orphan items whose label matches a library entry, and dedupes by label", () => {
+    const persisted = {
+      miscLineItemLabels: [
+        { id: "lib-doc",       label: "DOC" },
+        { id: "lib-transport", label: "Transport" },
+      ],
+      vendors: [
+        {
+          id: "v1",
+          category: "Venue",
+          name: "Loft",
+          status: "considering",
+          miscLineItems: [
+            { id: "lib-doc",       label: "DOC",       cost: 2750 },
+            { id: "orphan-doc",    label: "DOC",       cost: 2750 }, // orphan id, same label
+            { id: "lib-transport", label: "Transport", cost: 2000 },
+            { id: "orphan-trans",  label: "transport", cost: 2000 }, // orphan + case diff
+          ],
+        },
+      ],
+    };
+    const migrated = migratePlanStore(persisted, 6);
+    const items = migrated.vendors[0].miscLineItems!;
+    // Two distinct labels survive, each once.
+    expect(items).toHaveLength(2);
+    const ids = items.map((m) => m.id).sort();
+    // All orphans got remapped onto the library ids.
+    expect(ids).toEqual(["lib-doc", "lib-transport"]);
+  });
+
+  it("leaves a clean vendor untouched", () => {
+    const persisted = {
+      miscLineItemLabels: [{ id: "lib-doc", label: "DOC" }],
+      vendors: [
+        {
+          id: "v1",
+          category: "Venue",
+          name: "Loft",
+          status: "considering",
+          miscLineItems: [{ id: "lib-doc", label: "DOC", cost: 2750 }],
+        },
+      ],
+    };
+    const migrated = migratePlanStore(persisted, 6);
+    expect(migrated.vendors[0].miscLineItems).toHaveLength(1);
+    expect(migrated.vendors[0].miscLineItems![0].cost).toBe(2750);
+  });
+});
+
 describe("migratePlanStore — v4 → v5 guest priority backfill", () => {
   const guest = (over: Partial<Guest> = {}): Guest => ({
     id:          over.id ?? "g",

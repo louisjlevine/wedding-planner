@@ -201,6 +201,16 @@ function VenueConfigCard({
 
 type Scenario = ReturnType<typeof computeScenario>;
 
+// Shared styling tokens for the compare table. Centralising these keeps every
+// section visually consistent — line items live one indent step inside their
+// group, group headers stand out, and subtotal rows feel like a closing band.
+const LINE_LABEL_CLS = "pl-8 pr-3 py-2 text-gray-600 text-xs";
+const SUBTOTAL_ROW_CLS = "border-t border-gray-200 bg-gray-50/70";
+const SUBTOTAL_LABEL_CLS = "px-3 py-2.5 text-xs font-semibold text-gray-800";
+const SUBTOTAL_VALUE_CLS = "px-3 py-2.5 text-right tabular-nums font-semibold text-gray-900 whitespace-nowrap";
+const GROUP_HEADER_ROW_CLS = "bg-gray-100/80 border-t-2 border-gray-200";
+const GROUP_HEADER_CELL_CLS = "px-3 py-2 text-[11px] uppercase tracking-wider text-gray-700 font-bold";
+
 // Read-only money cell, used for derived subtotals that shouldn't be edited.
 function MoneyCell({ value, faded }: { value: number; faded?: boolean }) {
   return (
@@ -448,13 +458,13 @@ export function Compare() {
               </thead>
               <tbody>
                 {/* VENUE GROUP */}
-                <tr className="bg-gray-50/60">
-                  <td colSpan={columns.length + 1} className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                <tr className={GROUP_HEADER_ROW_CLS}>
+                  <td colSpan={columns.length + 1} className={GROUP_HEADER_CELL_CLS}>
                     Venue
                   </td>
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Base cost</td>
+                  <td className={LINE_LABEL_CLS}>Base cost</td>
                   {columns.map((col) => (
                     <td key={col.key} className="px-3 py-1 text-right">
                       <EditableMoneyCell
@@ -466,7 +476,7 @@ export function Compare() {
                   ))}
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Hours included</td>
+                  <td className={LINE_LABEL_CLS}>Hours included</td>
                   {columns.map((col) => (
                     <td key={col.key} className="px-3 py-1 text-right">
                       <EditableNumberCell
@@ -479,7 +489,7 @@ export function Compare() {
                   ))}
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Overtime $ / hour</td>
+                  <td className={LINE_LABEL_CLS}>Overtime $ / hour</td>
                   {columns.map((col) => (
                     <td key={col.key} className="px-3 py-1 text-right">
                       <EditableMoneyCell
@@ -492,20 +502,26 @@ export function Compare() {
                   ))}
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Overtime ({hours}h event)</td>
+                  <td className={LINE_LABEL_CLS}>Overtime ({hours}h event)</td>
                   {columns.map((col) => (
                     <MoneyCell key={col.key} value={col.scenario.venue.overtime} faded={col.scenario.venue.overtime === 0} />
                   ))}
                 </tr>
+                <tr className={SUBTOTAL_ROW_CLS}>
+                  <td className={SUBTOTAL_LABEL_CLS}>Venue subtotal</td>
+                  {columns.map((col) => (
+                    <td key={col.key} className={SUBTOTAL_VALUE_CLS}>{fmtMoney(col.scenario.venue.total)}</td>
+                  ))}
+                </tr>
 
                 {/* CATERING GROUP */}
-                <tr className="bg-gray-50/60 border-t border-gray-100">
-                  <td colSpan={columns.length + 1} className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                <tr className={GROUP_HEADER_ROW_CLS}>
+                  <td colSpan={columns.length + 1} className={GROUP_HEADER_CELL_CLS}>
                     Catering
                   </td>
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Caterer</td>
+                  <td className={LINE_LABEL_CLS}>Caterer</td>
                   {columns.map((col) => (
                     <td key={col.key} className="px-3 py-1 text-right text-gray-700 whitespace-nowrap">
                       <select
@@ -525,7 +541,7 @@ export function Compare() {
                   ))}
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Package</td>
+                  <td className={LINE_LABEL_CLS}>Package</td>
                   {columns.map((col) => {
                     const pkgs = col.caterer?.packages ?? [];
                     if (pkgs.length === 0) {
@@ -550,7 +566,7 @@ export function Compare() {
                   })}
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">$ / person</td>
+                  <td className={LINE_LABEL_CLS}>$ / person</td>
                   {columns.map((col) => {
                     const pkg = resolvePackage(col.caterer, col.config.packageId);
                     if (col.caterer && pkg) {
@@ -579,7 +595,7 @@ export function Compare() {
                   })}
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Catering base</td>
+                  <td className={LINE_LABEL_CLS}>Catering base</td>
                   {columns.map((col) => {
                     const pkg = resolvePackage(col.caterer, col.config.packageId);
                     if (col.caterer && pkg) {
@@ -609,23 +625,23 @@ export function Compare() {
                     return <td key={col.key} className="px-3 py-2 text-right text-gray-300">—</td>;
                   })}
                 </tr>
-                <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Subtotal ({guestCount} ppl)</td>
+                <tr className={SUBTOTAL_ROW_CLS}>
+                  <td className={SUBTOTAL_LABEL_CLS}>Catering subtotal <span className="text-gray-400 font-normal">({guestCount} ppl)</span></td>
                   {columns.map((col) => (
-                    <MoneyCell key={col.key} value={col.scenario.catering.total} />
+                    <td key={col.key} className={SUBTOTAL_VALUE_CLS}>{fmtMoney(col.scenario.catering.total)}</td>
                   ))}
                 </tr>
 
                 {/* BAR GROUP */}
-                <tr className="bg-gray-50/60 border-t border-gray-100">
-                  <td colSpan={columns.length + 1} className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                <tr className={GROUP_HEADER_ROW_CLS}>
+                  <td colSpan={columns.length + 1} className={GROUP_HEADER_CELL_CLS}>
                     Bar
                   </td>
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Mode</td>
+                  <td className={LINE_LABEL_CLS}>Mode</td>
                   {columns.map((col) => (
-                    <td key={col.key} className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">
+                    <td key={col.key} className="px-3 py-2 text-right text-gray-700 whitespace-nowrap text-xs">
                       {col.venue.barMode ? BAR_MODE_LABEL[col.venue.barMode] : (
                         <button
                           type="button"
@@ -639,9 +655,9 @@ export function Compare() {
                   ))}
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Bar vendor</td>
+                  <td className={LINE_LABEL_CLS}>Bar vendor</td>
                   {columns.map((col) => (
-                    <td key={col.key} className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">
+                    <td key={col.key} className="px-3 py-2 text-right text-gray-700 whitespace-nowrap text-xs">
                       {col.venue.barMode === "via_caterer" && col.barVendor ? (
                         <span className="inline-flex items-center gap-1.5 justify-end">
                           <span>{col.barVendor.name}</span>
@@ -663,7 +679,7 @@ export function Compare() {
                 </tr>
                 {/* Self-host total budget — editable when applicable */}
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Self-host budget</td>
+                  <td className={LINE_LABEL_CLS}>Self-host budget</td>
                   {columns.map((col) => {
                     if (col.venue.barMode !== "self_host") {
                       return <td key={col.key} className="px-3 py-2 text-right text-gray-300">—</td>;
@@ -680,7 +696,7 @@ export function Compare() {
                   })}
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Base / setup</td>
+                  <td className={LINE_LABEL_CLS}>Base / setup</td>
                   {columns.map((col) => {
                     if (col.venue.barMode !== "via_caterer" || !col.barVendor) {
                       return <MoneyCell key={col.key} value={col.scenario.bar.base} faded={col.scenario.bar.base === 0} />;
@@ -704,7 +720,7 @@ export function Compare() {
                   })}
                 </tr>
                 <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Bar $ / person</td>
+                  <td className={LINE_LABEL_CLS}>Bar $ / person</td>
                   {columns.map((col) => {
                     if (col.venue.barMode !== "via_caterer" || !col.barVendor) {
                       return <td key={col.key} className="px-3 py-2 text-right text-gray-300">—</td>;
@@ -726,24 +742,24 @@ export function Compare() {
                     );
                   })}
                 </tr>
-                <tr className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">Subtotal</td>
+                <tr className={SUBTOTAL_ROW_CLS}>
+                  <td className={SUBTOTAL_LABEL_CLS}>Bar subtotal</td>
                   {columns.map((col) => (
-                    <MoneyCell key={col.key} value={col.scenario.bar.total} />
+                    <td key={col.key} className={SUBTOTAL_VALUE_CLS}>{fmtMoney(col.scenario.bar.total)}</td>
                   ))}
                 </tr>
 
                 {/* MISC GROUP — shared library, editable inline */}
                 {miscLabelRows.length > 0 && (
                   <>
-                    <tr className="bg-gray-50/60 border-t border-gray-100">
-                      <td colSpan={columns.length + 1} className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                    <tr className={GROUP_HEADER_ROW_CLS}>
+                      <td colSpan={columns.length + 1} className={GROUP_HEADER_CELL_CLS}>
                         Misc
                       </td>
                     </tr>
                     {miscLabelRows.map((lbl) => (
                       <tr key={lbl.id} className="border-t border-gray-100">
-                        <td className="px-3 py-2 text-gray-500">
+                        <td className={LINE_LABEL_CLS}>
                           <span className="inline-flex items-center gap-1.5">
                             <span>{lbl.label}</span>
                             <button
@@ -778,20 +794,20 @@ export function Compare() {
                         })}
                       </tr>
                     ))}
-                    <tr className="border-t border-gray-100">
-                      <td className="px-3 py-2 text-gray-500">Subtotal</td>
+                    <tr className={SUBTOTAL_ROW_CLS}>
+                      <td className={SUBTOTAL_LABEL_CLS}>Misc subtotal</td>
                       {columns.map((col) => (
-                        <MoneyCell key={col.key} value={col.scenario.misc.total} />
+                        <td key={col.key} className={SUBTOTAL_VALUE_CLS}>{fmtMoney(col.scenario.misc.total)}</td>
                       ))}
                     </tr>
                   </>
                 )}
 
                 {/* TOTALS */}
-                <tr className="border-t-2 border-gray-300 bg-[var(--accent)]/5">
-                  <td className="px-3 py-2.5 font-semibold text-gray-900">Total</td>
+                <tr className="border-t-2 border-[var(--accent)]/40 bg-[var(--accent)]/10">
+                  <td className="px-3 py-3 text-sm font-bold text-gray-900">Total</td>
                   {columns.map((col) => (
-                    <td key={col.key} className="px-3 py-2.5 text-right font-semibold text-gray-900 tabular-nums whitespace-nowrap">
+                    <td key={col.key} className="px-3 py-3 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap text-sm">
                       {fmtMoney(col.scenario.total)}
                     </td>
                   ))}

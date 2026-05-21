@@ -233,6 +233,21 @@ describe("computeMiscCost", () => {
     expect(r.items).toHaveLength(1);
   });
 
+  it("dedupes orphan entries that share a label but have a different id", () => {
+    // Pre-shared-library data could leave behind entries with one-off ids
+    // that match a properly-mapped row by label. These used to double the
+    // misc subtotal on Compare; now we drop the second occurrence.
+    const venue = withMisc("Venue", [
+      { id: "lib-doc",      label: "DOC",       cost: 2750 },
+      { id: "orphan-doc",   label: "DOC",       cost: 2750 },
+      { id: "lib-transport", label: "Transport", cost: 2000 },
+      { id: "orphan-trans", label: "transport", cost: 2000 }, // case-insensitive too
+    ]);
+    const r = computeMiscCost(venue, undefined);
+    expect(r.total).toBe(2750 + 2000);
+    expect(r.items).toHaveLength(2);
+  });
+
   it("returns zero total when no misc items are set", () => {
     const r = computeMiscCost(undefined, undefined);
     expect(r.total).toBe(0);

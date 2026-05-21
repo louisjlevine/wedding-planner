@@ -153,19 +153,26 @@ export interface MiscBreakdown {
 // shared-library migration (the same library id can appear on both vendors).
 // Caterer-side misc data is preserved on the vendor record but no longer
 // folded into the per-venue scenario total.
+//
+// Defensive: dedupes by both id AND lowercase trimmed label. The id dedupe
+// catches well-formed duplicates; the label dedupe catches "orphan" rows
+// that pre-date the shared-library migration and still have a one-off id
+// while sharing a label with a properly-mapped row.
 export function computeMiscCost(
   venue: Vendor | undefined,
   _catering?: Vendor | undefined,
 ): MiscBreakdown {
   void _catering;
   const items: MiscEntry[] = [];
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenLabels = new Set<string>();
   for (const m of venue?.miscLineItems ?? []) {
     if (!Number.isFinite(m.cost)) continue;
-    // Dedupe by library id so a vendor that somehow ended up with two rows
-    // for the same id (legacy + migrated) doesn't get counted twice.
-    if (seen.has(m.id)) continue;
-    seen.add(m.id);
+    if (seenIds.has(m.id)) continue;
+    const labelKey = (m.label ?? "").trim().toLowerCase();
+    if (labelKey && seenLabels.has(labelKey)) continue;
+    seenIds.add(m.id);
+    if (labelKey) seenLabels.add(labelKey);
     items.push({ label: m.label, cost: m.cost });
   }
   const total = items.reduce((sum, m) => sum + m.cost, 0);
