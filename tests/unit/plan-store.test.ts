@@ -194,6 +194,14 @@ describe("migratePlanStore — v5 → v6 shared misc library + bar fields on ven
     const v1Cleanup = migrated.vendors.find((v) => v.id === "v1")?.miscLineItems?.find((m) => m.label === "Cleanup");
     const v2Cleanup = migrated.vendors.find((v) => v.id === "v2")?.miscLineItems?.find((m) => m.label === "Cleanup");
     expect(v1Cleanup?.id).toBe(v2Cleanup?.id);
+    // Every existing cost is preserved — no data is dropped during migration.
+    expect(v1Cleanup?.cost).toBe(500);
+    expect(v2Cleanup?.cost).toBe(600);
+    const v1Chairs = migrated.vendors.find((v) => v.id === "v1")?.miscLineItems?.find((m) => m.label === "Chairs");
+    expect(v1Chairs?.cost).toBe(300);
+    // Vendor counts stay the same — nothing got merged or removed.
+    expect(migrated.vendors.find((v) => v.id === "v1")?.miscLineItems).toHaveLength(2);
+    expect(migrated.vendors.find((v) => v.id === "v2")?.miscLineItems).toHaveLength(1);
   });
 
   it("moves bar comparison config onto the venue itself", () => {
