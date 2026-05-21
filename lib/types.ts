@@ -79,9 +79,17 @@ export interface CatererPackage {
 }
 
 export interface MiscLineItem {
+  id: string;     // matches MiscLineItemLabel.id when sourced from the shared library
+  label: string;  // denormalized for back-compat; library label is the source of truth
+  cost: number;
+}
+
+// Shared registry of misc line item labels. Adding a label to one vendor makes
+// it available to all vendors; deleting removes it from all vendors that had a
+// cost recorded for it.
+export interface MiscLineItemLabel {
   id: string;
   label: string;
-  cost: number;
 }
 
 export interface Vendor {
@@ -100,8 +108,17 @@ export interface Vendor {
   rentalPeriod?: string;  // e.g. "8 hours", "full day"
   overtimeRate?: string;  // e.g. "$250/hour"
   barMode?: BarMode;      // venue: which bar setup this venue uses
+  barSelfHostAmount?: number; // venue + self_host: total alcohol budget
+  barVendorId?: string;       // venue + via_caterer: id of selected caterer or bar vendor
   // Catering-specific
   packages?: CatererPackage[];
+  // Catering-specific: optional bar / alcohol pricing when this caterer also
+  // handles drinks. Treated separately from food packages so Compare can
+  // surface food and bar lines independently.
+  barCostModel?: {
+    base?: number;
+    perPerson?: number;
+  };
   // Extra cost lines surfaced as "Misc" in the Compare table
   miscLineItems?: MiscLineItem[];
   // Structured cost model used by the Compare dashboard
@@ -217,10 +234,11 @@ export type BarMode = "self_host" | "via_caterer";
 export interface VenueComparisonConfig {
   catererId?: string;        // single caterer per venue
   packageId?: string;        // selected package from that caterer
-  // Bar mode itself is set on the venue (Vendor.barMode); only the
-  // amount/rate input lives on the compare config.
-  barFlatBudget?: number;    // self_host: total alcohol budget
-  barPerPerson?: number;     // via_caterer: $ added per guest
+  // Bar mode + amount/vendor now live on the venue itself (Vendor.barMode,
+  // barSelfHostAmount, barVendorId). These legacy fields stay for migration
+  // and are ignored at read time.
+  barFlatBudget?: number;
+  barPerPerson?: number;
 }
 
 export interface ComparisonSelection {

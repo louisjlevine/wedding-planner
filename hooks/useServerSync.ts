@@ -21,6 +21,7 @@ function extractPayload(store: ReturnType<typeof usePlanStore.getState>) {
     timelineDoneIds,
     intakeComplete,
     deletedVendorIds,
+    miscLineItemLabels,
   } = store;
   return {
     answers,
@@ -35,6 +36,7 @@ function extractPayload(store: ReturnType<typeof usePlanStore.getState>) {
     timelineDoneIds,
     intakeComplete,
     deletedVendorIds,
+    miscLineItemLabels,
   };
 }
 

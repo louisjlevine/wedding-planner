@@ -153,7 +153,7 @@ describe("computeBarCost", () => {
     expect(r.hasData).toBe(true);
   });
 
-  it("via-caterer multiplies per-person by guest count", () => {
+  it("via-caterer multiplies per-person by guest count (legacy direct entry)", () => {
     const r = computeBarCost({ mode: "via_caterer", perPerson: 25 }, 120);
     expect(r.total).toBe(3000);
     expect(r.hasData).toBe(true);
@@ -166,6 +166,35 @@ describe("computeBarCost", () => {
     expect(b.total).toBe(0);
     expect(a.hasData).toBe(false);
     expect(b.hasData).toBe(false);
+  });
+
+  it("via-caterer pulls pricing from a caterer's barCostModel", () => {
+    const caterer: Vendor = {
+      id: "c1",
+      name: "Forage",
+      category: "Catering",
+      status: "considering",
+      barCostModel: { base: 500, perPerson: 25 },
+    };
+    const r = computeBarCost({ mode: "via_caterer" }, 100, caterer);
+    expect(r.base).toBe(500);
+    expect(r.perPerson).toBe(2500);
+    expect(r.total).toBe(3000);
+    expect(r.vendorId).toBe("c1");
+  });
+
+  it("via-caterer pulls pricing from a Bar vendor's costModel", () => {
+    const bar: Vendor = {
+      id: "b1",
+      name: "PourHouse",
+      category: "Bar",
+      status: "considering",
+      costModel: { base: 300, perPerson: 55 },
+    };
+    const r = computeBarCost({ mode: "via_caterer" }, 100, bar);
+    expect(r.base).toBe(300);
+    expect(r.perPerson).toBe(5500);
+    expect(r.total).toBe(5800);
   });
 });
 

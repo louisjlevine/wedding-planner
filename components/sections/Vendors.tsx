@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { usePlanStore } from "@/lib/plan-store";
 import type { Vendor, VendorAttachment, VendorNote, CatererPackage, BarMode, MiscLineItem } from "@/lib/types";
+import { MiscLineItemsEditor } from "@/components/ui/MiscLineItemsEditor";
 import type { ResearchType } from "@/lib/research-prompts";
 
 // ── Attachment helpers ───────────────────────────────────────────────────────
@@ -347,11 +348,13 @@ function StatusSelector({
 
 function EditVendorForm({
   vendor,
+  vendors,
   onSave,
   onCancel,
   onAutoSave,
 }: {
   vendor: Vendor;
+  vendors: Vendor[];
   onSave: (updates: Partial<Vendor>) => void;
   onCancel: () => void;
   onAutoSave: (updates: Partial<Vendor>) => void;
@@ -386,6 +389,16 @@ function EditVendorForm({
   });
   const [packages, setPackages] = useState<CatererPackage[]>(vendor.packages ?? []);
   const [barMode, setBarMode] = useState<BarMode | "">(vendor.barMode ?? "");
+  const [barSelfHostAmount, setBarSelfHostAmount] = useState<string>(
+    vendor.barSelfHostAmount !== undefined ? String(vendor.barSelfHostAmount) : "",
+  );
+  const [barVendorId, setBarVendorId] = useState<string>(vendor.barVendorId ?? "");
+  const [barCateringBase, setBarCateringBase] = useState<string>(
+    vendor.barCostModel?.base !== undefined ? String(vendor.barCostModel.base) : "",
+  );
+  const [barCateringPerPerson, setBarCateringPerPerson] = useState<string>(
+    vendor.barCostModel?.perPerson !== undefined ? String(vendor.barCostModel.perPerson) : "",
+  );
   const [miscLineItems, setMiscLineItems] = useState<MiscLineItem[]>(vendor.miscLineItems ?? []);
   // Seed notesList from structured list, falling back to legacy notes string
   const [notesList, setNotesList] = useState<VendorNote[]>(() => {
@@ -420,7 +433,15 @@ function EditVendorForm({
       perPerson:      useLegacyPerPerson ? num(draft.costPerPerson) : undefined,
     };
     const cmHasAny = Object.values(cm).some((v) => v !== undefined);
-    const cleanMisc = miscLineItems.filter((m) => m.label.trim() || Number.isFinite(m.cost));
+    const cleanMisc = miscLineItems.filter((m) => Number.isFinite(m.cost));
+    // Bar self-host amount only relevant when venue + self_host.
+    const barSelfHostNum = isVenue && barMode === "self_host" ? num(barSelfHostAmount) : undefined;
+    const barVendorIdToSave = isVenue && barMode === "via_caterer" && barVendorId ? barVendorId : undefined;
+    // Caterer-only bar pricing.
+    const barCm = isCatering
+      ? { base: num(barCateringBase), perPerson: num(barCateringPerPerson) }
+      : undefined;
+    const barCmHasAny = barCm && Object.values(barCm).some((v) => v !== undefined);
     return {
       name:         draft.name.trim() || vendor.name,
       category:     draft.category,
@@ -438,9 +459,16 @@ function EditVendorForm({
       attachments:  attachments.length ? attachments : undefined,
       packages:     isCatering && cleanPackages.length ? cleanPackages : undefined,
       barMode:      isVenue && barMode ? barMode : undefined,
+      barSelfHostAmount: barSelfHostNum,
+      barVendorId:  barVendorIdToSave,
+      barCostModel: barCmHasAny ? barCm : undefined,
       miscLineItems: cleanMisc.length ? cleanMisc : undefined,
     };
-  }, [draft, notesList, attachments, isVenue, isCatering, isPerPerson, packages, barMode, miscLineItems, vendor.name]);
+  }, [
+    draft, notesList, attachments, isVenue, isCatering, isPerPerson, packages,
+    barMode, barSelfHostAmount, barVendorId, barCateringBase, barCateringPerPerson,
+    miscLineItems, vendor.name,
+  ]);
 
   // Flush the draft to the store when the tab is hidden or closed — safety
   // net for mobile, where clicking "Save" may not be possible before the
@@ -703,11 +731,11 @@ function EditVendorForm({
         </div>
       )}
 
-      {/* Venue: bar-handling — single mode that drives the Compare table */}
+      {/* Venue: bar-handling — mode + the amount/vendor that drives Compare */}
       {isVenue && (
         <div className="border-t border-gray-200/70 pt-3 space-y-2">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bar handling</p>
-          <p className="text-[11px] text-gray-400">Sets the bar mode used in Compare for this venue.</p>
+          <p className="text-[11px] text-gray-400">Set how this venue handles the bar. Flows through to the Compare table.</p>
           <select
             value={barMode}
             onChange={(e) => setBarMode((e.target.value as BarMode) || "")}
@@ -715,64 +743,92 @@ function EditVendorForm({
           >
             <option value="">— Not set —</option>
             <option value="self_host">Self-host</option>
-            <option value="via_caterer">Through caterer</option>
+            <option value="via_caterer">Through vendor</option>
           </select>
+
+          {barMode === "self_host" && (
+            <div className="max-w-xs">
+              <label className="text-xs text-gray-500 mb-1 block">Total alcohol budget ($)</label>
+              <input
+                type="number"
+                value={barSelfHostAmount}
+                onChange={(e) => setBarSelfHostAmount(e.target.value)}
+                placeholder="e.g. 2500"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+          )}
+
+          {barMode === "via_caterer" && (() => {
+            const barVendorOptions = vendors.filter(
+              (v) =>
+                v.id !== vendor.id &&
+                v.status !== "rejected" &&
+                (v.category === "Catering" || v.category === "Bar"),
+            );
+            return (
+              <div className="max-w-xs">
+                <label className="text-xs text-gray-500 mb-1 block">Bar vendor</label>
+                <select
+                  value={barVendorId}
+                  onChange={(e) => setBarVendorId(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+                >
+                  <option value="">— Select caterer or bar vendor —</option>
+                  {barVendorOptions.length === 0 ? (
+                    <option value="" disabled>No eligible vendors yet</option>
+                  ) : (
+                    barVendorOptions.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name?.trim() || "Untitled"} ({v.category})
+                      </option>
+                    ))
+                  )}
+                </select>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Pricing pulls from the selected vendor&apos;s bar costs.
+                </p>
+              </div>
+            );
+          })()}
         </div>
       )}
 
-      {/* Misc line items — folded into the Compare table */}
-      <div className="border-t border-gray-200/70 pt-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Misc line items</p>
-          <button
-            type="button"
-            onClick={() => setMiscLineItems((items) => [
-              ...items,
-              { id: `misc-${Date.now()}-${items.length}`, label: "", cost: 0 },
-            ])}
-            className="text-xs text-[var(--accent)] hover:opacity-80"
-          >
-            + Add item
-          </button>
-        </div>
-        {miscLineItems.length === 0 ? (
-          <p className="text-[11px] text-gray-400 italic">
-            One-off costs (chairs, cleanup, vendor meals…) — they show up under Misc on the Compare page.
+      {/* Caterer: optional alcohol pricing so food and bar can be compared separately */}
+      {isCatering && (
+        <div className="border-t border-gray-200/70 pt-3 space-y-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Alcohol / bar pricing</p>
+          <p className="text-[11px] text-gray-400">
+            Fill this in if this caterer also handles alcohol. Venues that pick this caterer for bar service will use these rates.
           </p>
-        ) : (
-          <div className="space-y-1.5">
-            {miscLineItems.map((item, idx) => (
-              <div key={item.id} className="flex items-center gap-2">
-                <input
-                  value={item.label}
-                  onChange={(e) => setMiscLineItems((arr) => arr.map((m, i) => i === idx ? { ...m, label: e.target.value } : m))}
-                  placeholder="Label (e.g. cleanup, chairs)"
-                  className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)]"
-                />
-                <input
-                  type="number"
-                  value={Number.isFinite(item.cost) ? item.cost : ""}
-                  onChange={(e) => {
-                    const n = parseFloat(e.target.value);
-                    setMiscLineItems((arr) => arr.map((m, i) => i === idx ? { ...m, cost: Number.isFinite(n) ? n : 0 } : m));
-                  }}
-                  placeholder="Cost"
-                  className="w-28 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)]"
-                />
-                <button
-                  type="button"
-                  onClick={() => setMiscLineItems((arr) => arr.filter((_, i) => i !== idx))}
-                  className="text-gray-300 hover:text-red-400 transition-colors shrink-0"
-                  aria-label="Remove line item"
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <path d="M1 1l10 10M11 1L1 11" />
-                  </svg>
-                </button>
-              </div>
-            ))}
+          <div className="grid grid-cols-2 gap-3 max-w-md">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">$ per person</label>
+              <input
+                type="number"
+                value={barCateringPerPerson}
+                onChange={(e) => setBarCateringPerPerson(e.target.value)}
+                placeholder="e.g. 25"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Base ($)</label>
+              <input
+                type="number"
+                value={barCateringBase}
+                onChange={(e) => setBarCateringBase(e.target.value)}
+                placeholder="e.g. 500"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              />
+            </div>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Misc line items — shared library across all vendors */}
+      <div className="border-t border-gray-200/70 pt-3">
+        <MiscLineItemsEditor items={miscLineItems} onChange={setMiscLineItems} />
       </div>
       <div className="space-y-2">
         <label className="text-xs text-gray-500 block">Notes</label>
@@ -1452,6 +1508,7 @@ export function Vendors() {
                   <EditVendorForm
                     key={vendor.id}
                     vendor={vendor}
+                    vendors={vendors}
                     onSave={(updates) => { updateVendor(vendor.id, updates); setEditingId(null); }}
                     onCancel={() => setEditingId(null)}
                     onAutoSave={(updates) => updateVendor(vendor.id, updates)}
