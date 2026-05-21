@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { usePlanStore } from "@/lib/plan-store";
 import { Panel } from "@/components/ui/Panel";
 import type { Vendor, BarMode, VenueComparisonConfig } from "@/lib/types";
@@ -15,7 +15,7 @@ const STATUS_DOT: Record<Vendor["status"], string> = {
 
 const BAR_MODE_LABEL: Record<BarMode, string> = {
   self_host:   "Self-host",
-  via_caterer: "Through caterer",
+  via_caterer: "Through vendor",
 };
 
 function fmtMoney(n: number): string {
@@ -90,19 +90,24 @@ function VenueConfigCard({
   venue,
   config,
   caterers,
-  guestCount,
+  bars,
   onChange,
   onEditVenue,
 }: {
   venue: Vendor;
   config: VenueComparisonConfig;
   caterers: Vendor[];
-  guestCount: number;
+  bars: Vendor[];
   onChange: (partial: Partial<VenueComparisonConfig>) => void;
   onEditVenue: () => void;
 }) {
   const caterer = caterers.find((c) => c.id === config.catererId);
   const barMode = venue.barMode;
+  const barVendor =
+    venue.barVendorId
+      ? caterers.find((c) => c.id === venue.barVendorId) ??
+        bars.find((b) => b.id === venue.barVendorId)
+      : undefined;
 
   return (
     <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-white">
@@ -163,12 +168,26 @@ function VenueConfigCard({
         </div>
       )}
 
-      {/* Bar input — mode is set on the venue, only the amount lives here */}
+      {/* Bar summary — fully set on the venue page */}
       <div>
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-[11px] text-gray-500">
-            Bar — {barMode ? BAR_MODE_LABEL[barMode] : "not set"}
-          </p>
+        <p className="text-[11px] text-gray-500 mb-1">
+          Bar — {barMode ? BAR_MODE_LABEL[barMode] : "not set"}
+        </p>
+        <div className="text-[12px] text-gray-700">
+          {barMode === "self_host" && (
+            <span>
+              {venue.barSelfHostAmount !== undefined
+                ? `$${venue.barSelfHostAmount.toLocaleString()} budget`
+                : "No amount set"}
+            </span>
+          )}
+          {barMode === "via_caterer" && (
+            <span>
+              {barVendor
+                ? `${barVendor.name?.trim() || "Untitled"} (${barVendor.category})`
+                : "No vendor selected"}
+            </span>
+          )}
           {!barMode && (
             <button
               type="button"
@@ -179,36 +198,6 @@ function VenueConfigCard({
             </button>
           )}
         </div>
-        {barMode === "self_host" && (
-          <div>
-            <label className="text-[11px] text-gray-500 mb-1 block">Total alcohol budget ($)</label>
-            <input
-              type="number"
-              value={config.barFlatBudget ?? ""}
-              placeholder="e.g. 2500"
-              onChange={(e) => {
-                const n = parseFloat(e.target.value);
-                onChange({ barFlatBudget: Number.isFinite(n) ? n : undefined });
-              }}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
-            />
-          </div>
-        )}
-        {barMode === "via_caterer" && (
-          <div>
-            <label className="text-[11px] text-gray-500 mb-1 block">$ / person × {guestCount}</label>
-            <input
-              type="number"
-              value={config.barPerPerson ?? ""}
-              placeholder="e.g. 25"
-              onChange={(e) => {
-                const n = parseFloat(e.target.value);
-                onChange({ barPerPerson: Number.isFinite(n) ? n : undefined });
-              }}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
-            />
-          </div>
-        )}
       </div>
     </div>
   );
@@ -224,6 +213,59 @@ function MoneyCell({ value, faded }: { value: number; faded?: boolean }) {
   );
 }
 
+// Inline-edit input for a misc line item cost on the Compare page. Uses a
+// local string so a freshly-cleared field doesn't immediately snap back to 0.
+function MiscCostInput({
+  vendorId,
+  labelId,
+  existing,
+  onCommit,
+}: {
+  vendorId: string;
+  labelId: string;
+  label: string;
+  existing: number | undefined;
+  onCommit: (raw: string) => void;
+}) {
+  const initial = existing !== undefined && Number.isFinite(existing) && existing !== 0
+    ? String(existing)
+    : "";
+  // Remount when initial changes — e.g. a different vendor in the same column,
+  // or external write — so our local string mirrors the freshly-loaded value.
+  return (
+    <MiscCostInputInner
+      key={`${vendorId}:${labelId}:${initial}`}
+      initial={initial}
+      onCommit={onCommit}
+    />
+  );
+}
+
+function MiscCostInputInner({
+  initial,
+  onCommit,
+}: {
+  initial: string;
+  onCommit: (raw: string) => void;
+}) {
+  const [raw, setRaw] = useState(initial);
+  return (
+    <input
+      type="number"
+      value={raw}
+      onChange={(e) => setRaw(e.target.value)}
+      onBlur={() => {
+        if (raw !== initial) onCommit(raw);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      placeholder="—"
+      className="w-20 text-right tabular-nums border border-transparent rounded px-2 py-1 text-xs hover:border-gray-200 focus:border-[var(--accent)] focus:outline-none"
+    />
+  );
+}
+
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export function Compare() {
@@ -231,6 +273,7 @@ export function Compare() {
     vendors, answers, comparison,
     updateComparison, updateVenueConfig,
     setActiveTab, setEditingVendorId,
+    updateVendor, miscLineItemLabels, removeMiscLineItemLabel,
   } = usePlanStore();
 
   function openVendorEditor(vendorId: string) {
@@ -241,6 +284,7 @@ export function Compare() {
   // Rejected vendors don't belong in cost comparison.
   const venueOptions    = vendors.filter((v) => v.category === "Venue"    && v.status !== "rejected");
   const cateringOptions = vendors.filter((v) => v.category === "Catering" && v.status !== "rejected");
+  const barOptions      = vendors.filter((v) => v.category === "Bar"      && v.status !== "rejected");
 
   function toggleVenue(id: string) {
     const current = comparison.venueIds;
@@ -259,6 +303,7 @@ export function Compare() {
     key: string;
     venue: Vendor;
     caterer?: Vendor;
+    barVendor?: Vendor;
     config: VenueComparisonConfig;
     scenario: Scenario;
   };
@@ -267,35 +312,57 @@ export function Compare() {
     return venueSel.slice(0, 8).map((venue) => {
       const config = comparison.venueConfigs[venue.id] ?? {};
       const caterer = cateringOptions.find((c) => c.id === config.catererId);
-      // Bar mode is set on the venue; default to self_host so the addon is
-      // still computable (with a zero total) when no mode is chosen yet.
+      // Bar pricing is fully on the venue page now.
+      const barVendor =
+        venue.barMode === "via_caterer" && venue.barVendorId
+          ? cateringOptions.find((c) => c.id === venue.barVendorId) ??
+            barOptions.find((b) => b.id === venue.barVendorId)
+          : undefined;
       const barAddon: BarAddon = {
         mode: venue.barMode ?? "self_host",
-        flatBudget: config.barFlatBudget,
-        perPerson: config.barPerPerson,
+        flatBudget: venue.barSelfHostAmount,
       };
       return {
         key: venue.id,
         venue,
         caterer,
+        barVendor,
         config,
-        scenario: computeScenario(venue, caterer, config.packageId, barAddon, guestCount, hours),
+        scenario: computeScenario(venue, caterer, config.packageId, barAddon, guestCount, hours, barVendor),
       };
     });
-  }, [venueSel, cateringOptions, comparison.venueConfigs, guestCount, hours]);
+  }, [venueSel, cateringOptions, barOptions, comparison.venueConfigs, guestCount, hours]);
 
   const budget = answers?.budget ?? 0;
   const anySelected = venueSel.length > 0;
 
-  // Build a sorted union of misc labels that appear in any column so each
-  // label gets its own row, with "—" in columns that don't include it.
-  const miscLabels = useMemo(() => {
-    const set = new Set<string>();
-    for (const col of columns) {
-      for (const m of col.scenario.misc.items) set.add(m.label);
+  // Show every shared library label as a row. Each cell maps to the venue's
+  // miscLineItems entry for that label (caterer-side misc is folded into the
+  // caterer column by source).
+  const miscLabelRows = useMemo(
+    () => [...miscLineItemLabels].sort((a, b) => a.label.localeCompare(b.label)),
+    [miscLineItemLabels],
+  );
+
+  // Inline-edit a cost cell on Compare. Writes through to the underlying
+  // vendor so the change is also reflected on the Vendors tab.
+  function updateLineItemCost(vendorId: string, labelId: string, label: string, raw: string) {
+    const vendor = vendors.find((v) => v.id === vendorId);
+    if (!vendor) return;
+    const existing = vendor.miscLineItems ?? [];
+    const trimmed = raw.trim();
+    const n = parseFloat(raw);
+    if (trimmed === "" || !Number.isFinite(n)) {
+      const next = existing.filter((m) => m.id !== labelId);
+      updateVendor(vendorId, { miscLineItems: next.length ? next : undefined });
+      return;
     }
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [columns]);
+    const idx = existing.findIndex((m) => m.id === labelId);
+    const next = idx === -1
+      ? [...existing, { id: labelId, label, cost: n }]
+      : existing.map((m, i) => (i === idx ? { ...m, label, cost: n } : m));
+    updateVendor(vendorId, { miscLineItems: next });
+  }
 
   return (
     <div className="space-y-6">
@@ -358,7 +425,7 @@ export function Compare() {
                 venue={venue}
                 config={comparison.venueConfigs[venue.id] ?? {}}
                 caterers={cateringOptions}
-                guestCount={guestCount}
+                bars={barOptions}
                 onChange={(partial) => updateVenueConfig(venue.id, partial)}
                 onEditVenue={() => openVendorEditor(venue.id)}
               />
@@ -493,27 +560,88 @@ export function Compare() {
                   ))}
                 </tr>
                 <tr className="border-t border-gray-100">
+                  <td className="px-3 py-2 text-gray-500">Bar vendor</td>
+                  {columns.map((col) => (
+                    <td key={col.key} className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">
+                      {col.venue.barMode === "via_caterer" && col.barVendor ? (
+                        <span className="inline-flex items-center gap-1.5 justify-end">
+                          <span>{col.barVendor.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => openVendorEditor(col.barVendor!.id)}
+                            className="text-gray-300 hover:text-[var(--accent)] transition-colors"
+                            title="Edit bar vendor costs"
+                            aria-label={`Edit ${col.barVendor.name} costs`}
+                          >
+                            <EditPencil />
+                          </button>
+                        </span>
+                      ) : col.venue.barMode === "self_host" ? (
+                        <span className="text-gray-400 italic">self-host</span>
+                      ) : "—"}
+                    </td>
+                  ))}
+                </tr>
+                <tr className="border-t border-gray-100">
+                  <td className="px-3 py-2 text-gray-500">Base / setup</td>
+                  {columns.map((col) => (
+                    <MoneyCell key={col.key} value={col.scenario.bar.base} faded={col.scenario.bar.base === 0} />
+                  ))}
+                </tr>
+                <tr className="border-t border-gray-100">
+                  <td className="px-3 py-2 text-gray-500">$ / person × {guestCount}</td>
+                  {columns.map((col) => (
+                    <MoneyCell key={col.key} value={col.scenario.bar.perPerson} faded={col.scenario.bar.perPerson === 0} />
+                  ))}
+                </tr>
+                <tr className="border-t border-gray-100">
                   <td className="px-3 py-2 text-gray-500">Subtotal</td>
                   {columns.map((col) => (
                     <MoneyCell key={col.key} value={col.scenario.bar.total} />
                   ))}
                 </tr>
 
-                {/* MISC GROUP — render only if any column has misc items */}
-                {miscLabels.length > 0 && (
+                {/* MISC GROUP — shared library, editable inline */}
+                {miscLabelRows.length > 0 && (
                   <>
                     <tr className="bg-gray-50/60 border-t border-gray-100">
                       <td colSpan={columns.length + 1} className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
                         Misc
                       </td>
                     </tr>
-                    {miscLabels.map((label) => (
-                      <tr key={label} className="border-t border-gray-100">
-                        <td className="px-3 py-2 text-gray-500">{label}</td>
-                        {columns.map((col) => {
-                          const match = col.scenario.misc.items.find((m) => m.label === label);
-                          return <MoneyCell key={col.key} value={match?.cost ?? 0} faded={!match} />;
-                        })}
+                    {miscLabelRows.map((lbl) => (
+                      <tr key={lbl.id} className="border-t border-gray-100">
+                        <td className="px-3 py-2 text-gray-500">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span>{lbl.label}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`Delete "${lbl.label}" from every vendor?`)) {
+                                  removeMiscLineItemLabel(lbl.id);
+                                }
+                              }}
+                              className="text-gray-300 hover:text-red-400 transition-colors"
+                              title="Remove from all vendors"
+                              aria-label={`Remove ${lbl.label}`}
+                            >
+                              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                <path d="M1 1l10 10M11 1L1 11" />
+                              </svg>
+                            </button>
+                          </span>
+                        </td>
+                        {columns.map((col) => (
+                          <td key={col.key} className="px-3 py-1 text-right">
+                            <MiscCostInput
+                              vendorId={col.venue.id}
+                              labelId={lbl.id}
+                              label={lbl.label}
+                              existing={col.venue.miscLineItems?.find((m) => m.id === lbl.id)?.cost}
+                              onCommit={(raw) => updateLineItemCost(col.venue.id, lbl.id, lbl.label, raw)}
+                            />
+                          </td>
+                        ))}
                       </tr>
                     ))}
                     <tr className="border-t border-gray-100">

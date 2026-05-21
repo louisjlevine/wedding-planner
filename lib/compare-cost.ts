@@ -86,23 +86,55 @@ export function computeCateringCost(
 export interface BarAddon {
   mode: BarMode;
   flatBudget?: number;   // self_host
-  perPerson?: number;    // via_caterer
+  perPerson?: number;    // via_caterer (legacy direct entry)
+  base?: number;         // via_caterer (legacy direct entry)
 }
 
 export interface BarBreakdown {
   mode: BarMode;
+  base: number;
+  perPerson: number;     // per-person subtotal (perPerson × guests)
   total: number;
   hasData: boolean;
+  vendorId?: string;
+  vendorName?: string;
 }
 
-export function computeBarCost(addon: BarAddon, guestCount: number): BarBreakdown {
+// Pull the bar pricing for the selected bar vendor. Bar-category vendors carry
+// the pricing on their costModel; caterers use the separate barCostModel.
+function readBarVendorPricing(vendor: Vendor | undefined): { base: number; perPerson: number } {
+  if (!vendor) return { base: 0, perPerson: 0 };
+  if (vendor.category === "Catering") {
+    const cm = vendor.barCostModel ?? {};
+    return { base: cm.base ?? 0, perPerson: cm.perPerson ?? 0 };
+  }
+  // Bar category (or anything else) — fall back to costModel.
+  const cm = vendor.costModel ?? {};
+  return { base: cm.base ?? 0, perPerson: cm.perPerson ?? 0 };
+}
+
+export function computeBarCost(addon: BarAddon, guestCount: number, barVendor?: Vendor): BarBreakdown {
+  const guests = Math.max(0, guestCount);
   if (addon.mode === "self_host") {
     const total = addon.flatBudget ?? 0;
-    return { mode: "self_host", total, hasData: total > 0 };
+    return { mode: "self_host", base: 0, perPerson: 0, total, hasData: total > 0 };
   }
-  const perPerson = addon.perPerson ?? 0;
-  const total = perPerson * Math.max(0, guestCount);
-  return { mode: "via_caterer", total, hasData: perPerson > 0 };
+  // via_caterer — pricing comes from the chosen bar vendor; legacy direct
+  // entry on the addon still works as a fallback.
+  const fromVendor = readBarVendorPricing(barVendor);
+  const base = fromVendor.base || (addon.base ?? 0);
+  const perPersonRate = fromVendor.perPerson || (addon.perPerson ?? 0);
+  const personSubtotal = perPersonRate * guests;
+  const total = base + personSubtotal;
+  return {
+    mode: "via_caterer",
+    base,
+    perPerson: personSubtotal,
+    total,
+    hasData: total > 0,
+    vendorId: barVendor?.id,
+    vendorName: barVendor?.name,
+  };
 }
 
 export interface MiscEntry {
@@ -149,11 +181,12 @@ export function computeScenario(
   packageId: string | undefined,
   bar: BarAddon,
   guestCount: number,
-  hours: number
+  hours: number,
+  barVendor?: Vendor
 ): ScenarioTotal {
   const v = computeVenueCost(venue, hours);
   const c = computeCateringCost(catering, packageId, guestCount);
-  const b = computeBarCost(bar, guestCount);
+  const b = computeBarCost(bar, guestCount, barVendor);
   const m = computeMiscCost(venue, catering);
   return {
     venue: v,

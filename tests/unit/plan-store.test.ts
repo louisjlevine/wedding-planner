@@ -126,6 +126,110 @@ describe("mergeVendors", () => {
   });
 });
 
+describe("shared misc line item library", () => {
+  beforeEach(() => {
+    usePlanStore.setState({ vendors: [], miscLineItemLabels: [] });
+  });
+
+  it("adds a label to the shared library", () => {
+    const entry = usePlanStore.getState().addMiscLineItemLabel("Cleanup");
+    expect(entry.label).toBe("Cleanup");
+    expect(usePlanStore.getState().miscLineItemLabels).toHaveLength(1);
+  });
+
+  it("dedupes labels case-insensitively", () => {
+    usePlanStore.getState().addMiscLineItemLabel("Cleanup");
+    usePlanStore.getState().addMiscLineItemLabel("cleanup");
+    expect(usePlanStore.getState().miscLineItemLabels).toHaveLength(1);
+  });
+
+  it("removes a label from the library AND from every vendor that had a cost for it", () => {
+    const entry = usePlanStore.getState().addMiscLineItemLabel("Cleanup");
+    usePlanStore.setState({
+      vendors: [
+        baseVendor({ id: "v1", miscLineItems: [{ id: entry.id, label: "Cleanup", cost: 500 }] }),
+        baseVendor({ id: "v2", miscLineItems: [{ id: entry.id, label: "Cleanup", cost: 700 }] }),
+        baseVendor({ id: "v3", miscLineItems: [{ id: "other", label: "Other", cost: 100 }] }),
+      ],
+    });
+    usePlanStore.getState().removeMiscLineItemLabel(entry.id);
+    expect(usePlanStore.getState().miscLineItemLabels).toHaveLength(0);
+    const vendors = usePlanStore.getState().vendors;
+    expect(vendors[0].miscLineItems).toBeUndefined();
+    expect(vendors[1].miscLineItems).toBeUndefined();
+    // Unrelated line items on other vendors are untouched.
+    expect(vendors[2].miscLineItems).toHaveLength(1);
+  });
+
+  it("renaming a label updates both the registry and any denormalised labels on vendors", () => {
+    const entry = usePlanStore.getState().addMiscLineItemLabel("Cleanup");
+    usePlanStore.setState({
+      vendors: [
+        baseVendor({ id: "v1", miscLineItems: [{ id: entry.id, label: "Cleanup", cost: 500 }] }),
+      ],
+    });
+    usePlanStore.getState().renameMiscLineItemLabel(entry.id, "Cleanup fee");
+    expect(usePlanStore.getState().miscLineItemLabels[0].label).toBe("Cleanup fee");
+    expect(usePlanStore.getState().vendors[0].miscLineItems?.[0].label).toBe("Cleanup fee");
+  });
+});
+
+describe("migratePlanStore — v5 → v6 shared misc library + bar fields on venue", () => {
+  it("builds the shared misc library from existing vendor line items", () => {
+    const persisted = {
+      vendors: [
+        { id: "v1", category: "Venue", name: "Barn", status: "considering", miscLineItems: [
+          { id: "m1", label: "Cleanup", cost: 500 },
+          { id: "m2", label: "Chairs",  cost: 300 },
+        ] },
+        { id: "v2", category: "Catering", name: "Forage", status: "considering", miscLineItems: [
+          { id: "m3", label: "Cleanup", cost: 600 }, // same label, different id
+        ] },
+      ],
+    };
+    const migrated = migratePlanStore(persisted, 5);
+    const labels = (migrated.miscLineItemLabels ?? []).map((l) => l.label).sort();
+    expect(labels).toEqual(["Chairs", "Cleanup"]);
+    // Both vendors should reference the same library id for "Cleanup".
+    const v1Cleanup = migrated.vendors.find((v) => v.id === "v1")?.miscLineItems?.find((m) => m.label === "Cleanup");
+    const v2Cleanup = migrated.vendors.find((v) => v.id === "v2")?.miscLineItems?.find((m) => m.label === "Cleanup");
+    expect(v1Cleanup?.id).toBe(v2Cleanup?.id);
+    // Every existing cost is preserved — no data is dropped during migration.
+    expect(v1Cleanup?.cost).toBe(500);
+    expect(v2Cleanup?.cost).toBe(600);
+    const v1Chairs = migrated.vendors.find((v) => v.id === "v1")?.miscLineItems?.find((m) => m.label === "Chairs");
+    expect(v1Chairs?.cost).toBe(300);
+    // Vendor counts stay the same — nothing got merged or removed.
+    expect(migrated.vendors.find((v) => v.id === "v1")?.miscLineItems).toHaveLength(2);
+    expect(migrated.vendors.find((v) => v.id === "v2")?.miscLineItems).toHaveLength(1);
+  });
+
+  it("moves bar comparison config onto the venue itself", () => {
+    const persisted = {
+      vendors: [
+        { id: "venue-1", category: "Venue", name: "Barn", status: "considering", barMode: "self_host" },
+        { id: "venue-2", category: "Venue", name: "Loft", status: "considering", barMode: "via_caterer" },
+        { id: "cat-1",   category: "Catering", name: "Forage", status: "considering" },
+      ],
+      comparison: {
+        venueIds: [],
+        notes: "",
+        venueConfigs: {
+          "venue-1": { barFlatBudget: 2500 },
+          "venue-2": { catererId: "cat-1", barPerPerson: 25 },
+        },
+      },
+    };
+    const migrated = migratePlanStore(persisted, 5);
+    const v1 = migrated.vendors.find((v) => v.id === "venue-1");
+    const v2 = migrated.vendors.find((v) => v.id === "venue-2");
+    const cat = migrated.vendors.find((v) => v.id === "cat-1");
+    expect(v1?.barSelfHostAmount).toBe(2500);
+    expect(v2?.barVendorId).toBe("cat-1");
+    expect(cat?.barCostModel?.perPerson).toBe(25);
+  });
+});
+
 describe("migratePlanStore — v4 → v5 guest priority backfill", () => {
   const guest = (over: Partial<Guest> = {}): Guest => ({
     id:          over.id ?? "g",

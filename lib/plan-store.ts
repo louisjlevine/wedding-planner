@@ -17,6 +17,8 @@ import type {
   ComparisonSelection,
   VenueComparisonConfig,
   BarMode,
+  MiscLineItem,
+  MiscLineItemLabel,
 } from "./types";
 import { priorityFromRelationship } from "./guest-priority";
 
@@ -48,6 +50,9 @@ interface PlanState {
   vendorFilterHideRejected: boolean;
   deletedVendorIds: string[]; // track locally-deleted vendors to prevent re-import
   deletedVendorDomains: string[]; // track domains of deleted vendors to prevent re-import
+  // Shared registry of misc line item labels — adding a label to one vendor
+  // makes it available to all vendors; removing it removes from all.
+  miscLineItemLabels: MiscLineItemLabel[];
 
   setAnswers: (answers: WeddingAnswers) => void;
   updateAnswers: (partial: Partial<WeddingAnswers>) => void;
@@ -57,6 +62,12 @@ interface PlanState {
   updateVendor: (id: string, updates: Partial<Vendor>) => void;
   removeVendor: (id: string) => void;
   mergeVendors: (incoming: Vendor[]) => void;
+
+  // Shared misc line item label library
+  addMiscLineItemLabel: (label: string) => MiscLineItemLabel;
+  renameMiscLineItemLabel: (id: string, label: string) => void;
+  removeMiscLineItemLabel: (id: string) => void; // also strips from every vendor
+  setVendorMiscLineItem: (vendorId: string, item: MiscLineItem) => void;
 
   addTask: (task: Task) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
@@ -181,6 +192,58 @@ export function migratePlanStore(persisted: unknown, version: number): PlanState
       );
     }
   }
+  if (version < 6) {
+    // Build the shared misc-label library from any labels already in use, and
+    // normalise each vendor's miscLineItems to reference library ids. Vendors
+    // with the same label keep a consistent id afterwards.
+    if (Array.isArray(state.vendors)) {
+      const labelMap = new Map<string, MiscLineItemLabel>();
+      state.vendors = state.vendors.map((v) => {
+        const items = v.miscLineItems ?? [];
+        if (items.length === 0) return v;
+        const remapped = items.map((m) => {
+          const key = (m.label ?? "").trim();
+          if (!key) return m;
+          const existing = labelMap.get(key.toLowerCase());
+          if (existing) {
+            return { ...m, id: existing.id, label: existing.label };
+          }
+          const entry: MiscLineItemLabel = { id: m.id || `lbl-${labelMap.size}-${Date.now()}`, label: key };
+          labelMap.set(key.toLowerCase(), entry);
+          return { ...m, id: entry.id, label: entry.label };
+        });
+        return { ...v, miscLineItems: remapped };
+      });
+      state.miscLineItemLabels = Array.from(labelMap.values());
+    } else {
+      state.miscLineItemLabels = [];
+    }
+
+    // Migrate bar config off VenueComparisonConfig onto the venue itself.
+    const cmp = state.comparison;
+    if (cmp && cmp.venueConfigs && Array.isArray(state.vendors)) {
+      const venuesById = new Map(state.vendors.map((v) => [v.id, v]));
+      for (const [venueId, cfg] of Object.entries(cmp.venueConfigs)) {
+        const venue = venuesById.get(venueId);
+        if (!venue) continue;
+        if (venue.barMode === "self_host" && typeof cfg.barFlatBudget === "number" && venue.barSelfHostAmount === undefined) {
+          venue.barSelfHostAmount = cfg.barFlatBudget;
+        }
+        if (venue.barMode === "via_caterer" && typeof cfg.barPerPerson === "number") {
+          // Point at the caterer chosen for this venue if available; copy the
+          // per-person rate onto that caterer's bar pricing so the legacy
+          // amount carries over.
+          if (cfg.catererId) {
+            venue.barVendorId = venue.barVendorId ?? cfg.catererId;
+            const caterer = venuesById.get(cfg.catererId);
+            if (caterer && !caterer.barCostModel) {
+              caterer.barCostModel = { perPerson: cfg.barPerPerson };
+            }
+          }
+        }
+      }
+    }
+  }
   return state as PlanState;
 }
 
@@ -206,6 +269,7 @@ export const usePlanStore = create<PlanState>()(
       deletedVendorDomains: [],
       comparison: EMPTY_COMPARISON,
       editingVendorId: null,
+      miscLineItemLabels: [],
 
       setAnswers: (answers) =>
         set({ answers, intakeComplete: true, activeTab: "advisor" }),
@@ -267,6 +331,74 @@ export const usePlanStore = create<PlanState>()(
           vendors: state.vendors.map((v) =>
             v.id === id ? { ...v, ...updates } : v
           ),
+        })),
+
+      addMiscLineItemLabel: (label) => {
+        const trimmed = label.trim();
+        if (!trimmed) {
+          return { id: "", label: "" };
+        }
+        // Reuse an existing entry if one matches (case-insensitive); otherwise
+        // create a new one.
+        let entry: MiscLineItemLabel | undefined;
+        set((state) => {
+          const found = state.miscLineItemLabels.find(
+            (l) => l.label.toLowerCase() === trimmed.toLowerCase(),
+          );
+          if (found) {
+            entry = found;
+            return state;
+          }
+          entry = { id: `lbl-${Date.now()}-${state.miscLineItemLabels.length}`, label: trimmed };
+          return { miscLineItemLabels: [...state.miscLineItemLabels, entry] };
+        });
+        return entry ?? { id: "", label: "" };
+      },
+
+      renameMiscLineItemLabel: (id, label) =>
+        set((state) => {
+          const trimmed = label.trim();
+          if (!trimmed) return state;
+          return {
+            miscLineItemLabels: state.miscLineItemLabels.map((l) =>
+              l.id === id ? { ...l, label: trimmed } : l,
+            ),
+            vendors: state.vendors.map((v) => {
+              if (!v.miscLineItems) return v;
+              const next = v.miscLineItems.map((m) =>
+                m.id === id ? { ...m, label: trimmed } : m,
+              );
+              return { ...v, miscLineItems: next };
+            }),
+          };
+        }),
+
+      removeMiscLineItemLabel: (id) =>
+        set((state) => ({
+          miscLineItemLabels: state.miscLineItemLabels.filter((l) => l.id !== id),
+          vendors: state.vendors.map((v) => {
+            if (!v.miscLineItems) return v;
+            const next = v.miscLineItems.filter((m) => m.id !== id);
+            return next.length === v.miscLineItems.length
+              ? v
+              : { ...v, miscLineItems: next.length ? next : undefined };
+          }),
+        })),
+
+      setVendorMiscLineItem: (vendorId, item) =>
+        set((state) => ({
+          vendors: state.vendors.map((v) => {
+            if (v.id !== vendorId) return v;
+            const existing = v.miscLineItems ?? [];
+            const idx = existing.findIndex((m) => m.id === item.id);
+            let next: MiscLineItem[];
+            if (idx === -1) {
+              next = [...existing, item];
+            } else {
+              next = existing.map((m, i) => (i === idx ? item : m));
+            }
+            return { ...v, miscLineItems: next };
+          }),
         })),
 
       removeVendor: (id) =>
@@ -527,7 +659,7 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
-      version: 5,
+      version: 6,
       migrate: (persisted, version) => migratePlanStore(persisted, version),
     }
   )
