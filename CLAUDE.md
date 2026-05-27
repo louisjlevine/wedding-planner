@@ -230,3 +230,28 @@ Next.js 16 ships `eslint-plugin-react-hooks` v7 which includes `react-hooks/puri
 (flags `Date.now()` in render) and `react-hooks/set-state-in-effect`. Legitimate uses in
 `Topbar.tsx`, `Overview.tsx`, `Budget.tsx`, and `Research.tsx` are suppressed with
 `// eslint-disable-line` inline comments rather than disabling the rule globally.
+<!-- CLAUDE-EXTENSIONS-MERGE:START -->
+## Deploy & infra (managed block — session-analysis additions, safe to edit)
+
+Railway is the production host. See the `railway-deploy` skill for DNS, TXT records, Postgres wiring, and debug workflow. Before proposing any Railway fix, read the logs tail — do not guess.
+
+### Skills to invoke automatically
+- `railway-deploy` for any deploy or DNS work
+- `nextjs-full-stack-bootstrap` patterns for new feature scaffolds
+- `website-design` for any component styling
+- `linear-ticket` for converting feedback to tickets
+
+### Agents available
+- `deployment-verifier` after every deploy
+- `ui-polish-reviewer` before any prod push
+- `feedback-to-linear` for inbound feedback
+
+### Recurring bugs (do not re-introduce)
+- Vendor card hover overlay misaligns when the status message opens — keep overlay positioned absolute to the card, not viewport.
+- Vendors must auto-sort by name within each category.
+- `class="empty"` is only valid on full-page empty state divs, never on inline field elements.
+- Inbound vendor emails (Resend webhook at `/api/webhooks/resend`) must be excluded from Basic Auth middleware.
+
+### Linear triage scheduled job
+Runs every 30 min. Guard: only kickoff if an open ticket exists in a non-Review, non-Done state. This guard was added after the double-consulting-email incident.
+<!-- CLAUDE-EXTENSIONS-MERGE:END -->
