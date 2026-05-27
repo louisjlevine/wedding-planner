@@ -43,6 +43,50 @@ funding (single), stress (multi)
 - under 50 guests → mark venue booking as "easier, more flexibility"
 - 100k+ budget → unlock luxury vendor tier notes in research prompts
 
+## Agent Roster — when to invoke whom
+
+Canonical agent definitions live in `docs/agents/` (committed). Claude Code reads them from `~/.claude/agents/` — see `docs/agent-setup.md` for the symlink one-liner. Be conservative — token cost compounds. A one-line bugfix should run no agents.
+
+### Plan phase (before any code)
+
+| Agent | Invoke when | Skip when |
+|---|---|---|
+| `system-analyst` | New feature or non-trivial behavior change | Typo, one-liner, dep bump, pure refactor |
+| `ux-designer` | Diff will touch `components/**/*.tsx`, `app/**/*.tsx`, or `app/globals.css` | Backend-only change, `lib/` or `app/api/` only |
+| `cto` | New dependency, store schema change, new `lib/` module, new API route, cross-cutting refactor | Anything fully scoped to one existing module |
+
+### Build phase
+
+Main Claude writes the code. No agents run during the build.
+
+### Post-build (run in parallel, gated by what the diff touched)
+
+| Agent | Gate |
+|---|---|
+| `security-reviewer` | Diff touches `app/api/**`, `middleware.ts`, `next.config.ts`, env var handling, or new deps |
+| `backend-qa` | Diff touches `app/api/**/*.ts` or `lib/**/*.ts` (outside components) |
+| `frontend-qa` | Diff touches `components/**/*.tsx`, `app/**/*.tsx`, or `app/globals.css` |
+| `spaghetti` | Diff > ~50 lines OR new file created |
+
+### How to invoke
+
+Use the `Agent` tool with `subagent_type` set to the agent's name. Pass the user's request, the relevant `git diff`, and the spec path if one exists — agents should not re-explore the repo from scratch. Post-build agents are independent: invoke them in a single message with parallel `Agent` calls.
+
+### Escalation knob
+
+User can say `full team` (run everything) or `skip QA` / `skip security` (drop specific agents this turn). Default is the conservative routing above.
+
+### Known pitfalls (frontend agents must respect these)
+
+- **Intake question order is fixed** — `Intake.tsx` must keep questions in the order defined in CLAUDE.md; `plan-adapters.ts` depends on it.
+- **`ResearchCard` is the only AI prose renderer** — keep the `<pre className="whitespace-pre-wrap">` wrapper.
+- **`BudgetBar` and `MetricCard`** are shared across Overview, Budget, and Compare — changes propagate to all three.
+- **ESLint `// eslint-disable-line` comments** in `Topbar.tsx`, `Overview.tsx`, `Budget.tsx`, and `Research.tsx` are intentional — don't remove them.
+- **No Anthropic SDK in client components** — all AI calls go through `/api/*` routes.
+- **Zustand store version** — any new persisted field requires a migration case in `migratePlanStore()` with a bumped version number.
+
+---
+
 ## Security
 
 ### Post-deployment security scan (required after every major deployment)
