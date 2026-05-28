@@ -36,7 +36,8 @@ function MilestoneRow({
         <button
           onClick={() => onToggle(item.id)}
           title={item.done ? "Mark incomplete" : "Mark complete"}
-          className={`w-4 h-4 rounded-full border-2 transition-colors hover:opacity-70 ${
+          aria-label={item.done ? `Mark "${item.title}" incomplete` : `Mark "${item.title}" complete`}
+          className={`relative w-4 h-4 rounded-full border-2 transition-colors hover:opacity-70 after:content-[''] after:absolute after:-inset-2.5 ${
             item.done
               ? "bg-[var(--accent)] border-[var(--accent)]"
               : isToday
@@ -122,10 +123,10 @@ export function Timeline() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Timeline & Tasks</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Timeline & Tasks</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           {doneTimeline} of {timeline.length} milestones done &middot;{" "}
           {doneTasks.length} of {merged.length} tasks done
@@ -223,7 +224,8 @@ export function Timeline() {
               >
                 <button
                   onClick={() => toggleTask(task.id)}
-                  className="mt-0.5 w-4 h-4 rounded border-2 border-gray-300 hover:border-[var(--accent)] shrink-0 transition-colors"
+                  aria-label={`Mark "${task.title}" done`}
+                  className="relative mt-0.5 w-4 h-4 rounded border-2 border-gray-300 hover:border-[var(--accent)] shrink-0 transition-colors after:content-[''] after:absolute after:-inset-2.5"
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900">{task.title}</p>
@@ -268,7 +270,8 @@ export function Timeline() {
                   >
                     <button
                       onClick={() => toggleTask(task.id)}
-                      className="w-4 h-4 rounded bg-[var(--accent)] border-2 border-[var(--accent)] shrink-0"
+                      aria-label={`Mark "${task.title}" not done`}
+                      className="relative w-4 h-4 rounded bg-[var(--accent)] border-2 border-[var(--accent)] shrink-0 after:content-[''] after:absolute after:-inset-2.5"
                     />
                     <p className="text-sm text-gray-400 line-through">{task.title}</p>
                   </div>

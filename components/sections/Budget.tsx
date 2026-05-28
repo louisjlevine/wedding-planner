@@ -40,7 +40,7 @@ function BudgetTableRow({
 
   return (
     <tr className="border-t border-gray-100 align-top">
-      <td className="px-3 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">{cat.name}</td>
+      <td className="sticky left-0 z-10 bg-white px-3 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">{cat.name}</td>
       <td className="px-3 py-3 text-right text-sm text-gray-500 tabular-nums whitespace-nowrap">
         ${estimate.toLocaleString()}
       </td>
@@ -107,7 +107,7 @@ export function Budget() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Budget</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Budget</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             ${startingBudget.toLocaleString()} starting &middot; click any cell to edit
           </p>
@@ -163,7 +163,7 @@ export function Budget() {
           <table className="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
             <thead>
               <tr className="bg-gray-50 text-left">
-                <th className="px-3 py-2 font-medium text-gray-500 whitespace-nowrap">Type</th>
+                <th className="sticky left-0 z-20 bg-gray-50 px-3 py-2 font-medium text-gray-500 whitespace-nowrap">Type</th>
                 <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Estimate</th>
                 <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Revised Estimate</th>
                 <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Revised %</th>
@@ -182,7 +182,7 @@ export function Budget() {
                 />
               ))}
               <tr className="border-t-2 border-gray-300 bg-[var(--accent)]/5">
-                <td className="px-3 py-2.5 font-semibold text-gray-900">Total</td>
+                <td className="sticky left-0 z-10 bg-[var(--accent-wash)] px-3 py-2.5 font-semibold text-gray-900">Total</td>
                 <td className="px-3 py-2.5 text-right font-semibold text-gray-900 tabular-nums">
                   ${baseBudgetCategories.reduce((s, c) => s + c.amount, 0).toLocaleString()}
                 </td>

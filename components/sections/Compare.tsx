@@ -6,13 +6,7 @@ import { Panel } from "@/components/ui/Panel";
 import type { Vendor, BarMode, VenueComparisonConfig, CatererPackage } from "@/lib/types";
 import { computeScenario, resolvePackage, type BarAddon } from "@/lib/compare-cost";
 import { EditableMoneyCell, EditableNumberCell, fmtMoney } from "@/components/ui/EditableMoneyCell";
-
-const STATUS_DOT: Record<Vendor["status"], string> = {
-  considering: "bg-gray-400",
-  contacted:   "bg-yellow-400",
-  booked:      "bg-green-500",
-  rejected:    "bg-red-400",
-};
+import { STATUS_DOT } from "@/lib/vendor-status";
 
 const BAR_MODE_LABEL: Record<BarMode, string> = {
   self_host:   "Self-host",
@@ -204,9 +198,12 @@ type Scenario = ReturnType<typeof computeScenario>;
 // Shared styling tokens for the compare table. Centralising these keeps every
 // section visually consistent — line items live one indent step inside their
 // group, group headers stand out, and subtotal rows feel like a closing band.
-const LINE_LABEL_CLS = "pl-8 pr-3 py-2 text-gray-600 text-xs";
+// First column is sticky so the line-item label stays visible while the venue
+// columns scroll horizontally on narrow screens. Each sticky cell carries an
+// opaque background matching its row so scrolled content doesn't bleed through.
+const LINE_LABEL_CLS = "sticky left-0 z-10 bg-white pl-8 pr-3 py-2 text-gray-600 text-xs";
 const SUBTOTAL_ROW_CLS = "border-t border-gray-200 bg-gray-50/70";
-const SUBTOTAL_LABEL_CLS = "px-3 py-2.5 text-xs font-semibold text-gray-800";
+const SUBTOTAL_LABEL_CLS = "sticky left-0 z-10 bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-800";
 const SUBTOTAL_VALUE_CLS = "px-3 py-2.5 text-right tabular-nums font-semibold text-gray-900 whitespace-nowrap";
 const GROUP_HEADER_ROW_CLS = "bg-gray-100/80 border-t-2 border-gray-200";
 const GROUP_HEADER_CELL_CLS = "px-3 py-2 text-[11px] uppercase tracking-wider text-gray-700 font-bold";
@@ -353,7 +350,7 @@ export function Compare() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Compare</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Compare</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Side-by-side cost per venue. Pick a caterer and package per venue. Bar mode and misc items come from each vendor.
         </p>
@@ -370,7 +367,7 @@ export function Compare() {
 
       {/* 2 — Event assumptions */}
       <Panel title="Event assumptions">
-        <div className="grid grid-cols-2 gap-4 max-w-md">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Guest count</label>
             <input
@@ -437,7 +434,7 @@ export function Compare() {
             <table className="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
               <thead>
                 <tr className="bg-gray-50 text-left">
-                  <th className="px-3 py-2 font-medium text-gray-500 w-44">Line item</th>
+                  <th className="sticky left-0 z-20 bg-gray-50 px-3 py-2 font-medium text-gray-500 w-44">Line item</th>
                   {columns.map((col) => (
                     <th key={col.key} className="px-3 py-2 font-medium text-gray-700 text-right whitespace-nowrap">
                       <div className="inline-flex items-center gap-1.5 justify-end">
@@ -805,7 +802,7 @@ export function Compare() {
 
                 {/* TOTALS */}
                 <tr className="border-t-2 border-[var(--accent)]/40 bg-[var(--accent)]/10">
-                  <td className="px-3 py-3 text-sm font-bold text-gray-900">Total</td>
+                  <td className="sticky left-0 z-10 bg-[var(--accent-wash)] px-3 py-3 text-sm font-bold text-gray-900">Total</td>
                   {columns.map((col) => (
                     <td key={col.key} className="px-3 py-3 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap text-sm">
                       {fmtMoney(col.scenario.total)}
@@ -814,7 +811,7 @@ export function Compare() {
                 </tr>
                 {budget > 0 && (
                   <tr className="border-t border-gray-100">
-                    <td className="px-3 py-2 text-gray-500">vs. total budget</td>
+                    <td className="sticky left-0 z-10 bg-white px-3 py-2 text-gray-500">vs. total budget</td>
                     {columns.map((col) => {
                       const delta = budget - col.scenario.total;
                       const over = delta < 0;

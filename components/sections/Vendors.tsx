@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { usePlanStore } from "@/lib/plan-store";
 import type { Vendor, VendorAttachment, VendorNote, CatererPackage, BarMode, MiscLineItem } from "@/lib/types";
 import { MiscLineItemsEditor } from "@/components/ui/MiscLineItemsEditor";
+import { STATUS_DOT } from "@/lib/vendor-status";
 import type { ResearchType } from "@/lib/research-prompts";
 
 // ── Attachment helpers ───────────────────────────────────────────────────────
@@ -190,9 +191,12 @@ function AttachmentList({
                 <button
                   type="button"
                   onClick={() => onRemove(att.id)}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label={`Remove ${att.fileName}`}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 transition-opacity"
                 >
-                  x
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M1 1l10 10M11 1L1 11" />
+                  </svg>
                 </button>
               )}
             </div>
@@ -259,13 +263,6 @@ function AttachmentUpload({
   );
 }
 
-const STATUS_DOT: Record<Vendor["status"], string> = {
-  considering: "bg-gray-400",
-  contacted:   "bg-yellow-400",
-  booked:      "bg-green-500",
-  rejected:    "bg-red-400",
-};
-
 const TAGS = ["Toured", "Has Quote", "Priority", "Referred", "Waitlisted"] as const;
 
 const CATEGORIES = [
@@ -309,7 +306,8 @@ function StatusSelector({
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className={`w-2.5 h-2.5 rounded-full shrink-0 transition-all duration-150 hover:scale-125 hover:shadow-sm ${STATUS_DOT[vendor.status]}`}
+        aria-label={`Status: ${vendor.status}. Click to change.`}
+        className={`relative w-2.5 h-2.5 rounded-full shrink-0 transition-all duration-150 hover:scale-125 hover:shadow-sm after:content-[''] after:absolute after:-inset-2.5 ${STATUS_DOT[vendor.status]}`}
         title={`Current status: ${vendor.status}. Click to change.`}
       />
 
@@ -579,7 +577,7 @@ function EditVendorForm({
           })}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Name</label>
           <input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
@@ -607,7 +605,7 @@ function EditVendorForm({
       </div>
       <div className="border-t border-gray-200/70 pt-3 space-y-2">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cost</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Base cost ($)</label>
             <input type="text" inputMode="decimal" value={draft.costBase} onChange={(e) => setDraft((d) => ({ ...d, costBase: e.target.value }))}
@@ -801,7 +799,7 @@ function EditVendorForm({
           <p className="text-[11px] text-gray-400">
             Fill this in if this caterer also handles alcohol. Venues that pick this caterer for bar service will use these rates.
           </p>
-          <div className="grid grid-cols-2 gap-3 max-w-md">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
             <div>
               <label className="text-xs text-gray-500 mb-1 block">$ per person</label>
               <input
@@ -840,7 +838,7 @@ function EditVendorForm({
                 <button
                   type="button"
                   onClick={() => setNotesList((prev) => prev.filter((n) => n.id !== note.id))}
-                  className="text-gray-300 hover:text-red-400 transition-colors shrink-0 mt-0.5 opacity-0 group-hover:opacity-100"
+                  className="text-gray-400 hover:text-red-500 transition-colors shrink-0 mt-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                   aria-label="Remove note"
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -1226,7 +1224,7 @@ export function Vendors() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Vendors</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Vendors</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {vendors.filter((v) => v.status === "booked").length} booked &middot;{" "}
             {vendors.length} total
@@ -1279,7 +1277,7 @@ export function Vendors() {
       {adding && (
         <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
           <h3 className="text-sm font-semibold text-gray-700">New vendor</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Category</label>
               <select

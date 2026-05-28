@@ -373,7 +373,7 @@ function EditGuestForm({
 
   return (
     <div className="bg-[var(--accent)]/5 border border-[var(--accent)] rounded-xl px-5 py-4 space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Name</label>
           <input value={d.name} onChange={(e) => setD((x) => ({ ...x, name: e.target.value }))}
@@ -670,14 +670,14 @@ export function Guests() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Guests</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Guests</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {guests.reduce((s, g) => s + g.totalGuests, 0)} invited &middot; {counts.yes} confirmed &middot; {counts.pending} pending
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <button onClick={() => downloadXLSXTemplate()}
-            className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
+            className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors">
             Download template
           </button>
           <button onClick={() => csvInputRef.current?.click()}
@@ -686,7 +686,7 @@ export function Guests() {
           </button>
           {guests.length > 0 && (
             <button onClick={() => exportGuestsXLSX(guests)}
-              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[#D4537E] hover:text-[#D4537E] transition-colors">
+              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors">
               Export
             </button>
           )}
@@ -829,22 +829,28 @@ export function Guests() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {(["yes","no","maybe","pending"] as Guest["rsvp"][]).map((status) => (
           <div key={status} className="relative group">
-            <div className="bg-white border border-gray-200 rounded-xl p-4 text-center cursor-default select-none">
+            <div
+              tabIndex={0}
+              aria-label={`${counts[status]} ${status}`}
+              className="bg-white border border-gray-200 rounded-xl p-4 text-center select-none">
               <p className="text-2xl font-bold text-gray-900">{counts[status]}</p>
-              <p className="text-xs text-gray-400 capitalize mt-0.5">{status}</p>
+              <p className="text-xs text-gray-500 capitalize mt-0.5">{status}</p>
             </div>
-            <div className="hidden group-hover:block">
+            <div className="hidden group-hover:block group-focus-within:block">
               <SideTooltip split={splits[status]} />
             </div>
           </div>
         ))}
         {guests.length > 0 && (
           <div className="relative group">
-            <div className="bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-xl p-4 text-center cursor-default select-none">
+            <div
+              tabIndex={0}
+              aria-label={`${estimated} estimated attending`}
+              className="bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-xl p-4 text-center select-none">
               <p className="text-2xl font-bold text-[var(--accent)]">{estimated}</p>
               <p className="text-xs text-[var(--accent)]/70 mt-0.5">Est. attending</p>
             </div>
-            <div className="hidden group-hover:block">
+            <div className="hidden group-hover:block group-focus-within:block">
               <SideTooltip split={splits.estimated} />
             </div>
           </div>
@@ -894,7 +900,7 @@ export function Guests() {
           </div>
           <div className="flex gap-2">
             <button onClick={confirmCsvImport}
-              className="px-4 py-2 bg-[#D4537E] text-white text-sm font-medium rounded-lg hover:bg-[#bf4a70] transition-colors">
+              className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity">
               Confirm import
             </button>
             <button onClick={cancelCsvImport} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
@@ -909,10 +915,12 @@ export function Guests() {
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-gray-400">Attendance likelihood</span>
           <div className="relative group inline-flex">
-            <button className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold flex items-center justify-center hover:bg-gray-300 transition-colors leading-none">
+            <button
+              aria-label="How attendance likelihood is estimated"
+              className="w-5 h-5 rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold flex items-center justify-center hover:bg-gray-300 transition-colors leading-none">
               i
             </button>
-            <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 bg-gray-900 text-white text-xs rounded-lg px-3 py-2.5 shadow-xl whitespace-nowrap pointer-events-none">
+            <div className="hidden group-hover:block group-focus-within:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 bg-gray-900 text-white text-xs rounded-lg px-3 py-2.5 shadow-xl whitespace-nowrap pointer-events-none">
               <p className="font-semibold text-gray-300 mb-2">Estimated attendance by relationship &amp; location</p>
               <table className="border-separate border-spacing-x-3 border-spacing-y-0.5">
                 <thead>
@@ -946,7 +954,7 @@ export function Guests() {
       {adding && (
         <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
           <h3 className="text-sm font-semibold text-gray-700">New guest</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Name *</label>
               <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}

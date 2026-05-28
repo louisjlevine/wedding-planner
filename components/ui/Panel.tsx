@@ -13,7 +13,7 @@ export function Panel({ title, children, className = "", action }: PanelProps) {
       {(title || action) && (
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           {title && (
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">{title}</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-500">{title}</h2>
           )}
           {action && <div>{action}</div>}
         </div>

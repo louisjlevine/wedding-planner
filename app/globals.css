@@ -2,6 +2,9 @@
 
 :root {
   --accent: #D4537E;
+  /* Opaque equivalent of accent @ 10% over white. Used where a translucent
+     tint can't be (e.g. sticky table cells that overlap scrolled content). */
+  --accent-wash: #fbeef3;
 }
 
 html, body {
@@ -14,6 +17,23 @@ body {
   color: #111827;
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Consistent keyboard-focus ring across every interactive element.
+   :focus-visible only triggers for keyboard / assistive-tech users, so mouse
+   clicks stay clean. This is the single source of focus styling for buttons,
+   links and selects — they no longer need their own focus rules. Inputs and
+   textareas keep their own accent border+ring (set via Tailwind) so they're
+   intentionally left out here. */
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 @keyframes fade-in {
