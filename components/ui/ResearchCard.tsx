@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Markdown, TypingDots } from "@/components/ui/Markdown";
 import { usePlanStore } from "@/lib/plan-store";
 import type { ResearchType } from "@/lib/research-prompts";
 import type { WeddingAnswers } from "@/lib/types";
@@ -38,38 +37,6 @@ const CHAT_STARTERS: Partial<Record<ResearchType, string[]>> = {
   honeymoon: ["What destinations suit our vibe?", "When should we book?"],
   timeline: ["How long should cocktail hour be?", "When should speeches happen?"],
   budget: ["Where can we cut costs?", "What hidden fees should we watch for?"],
-};
-
-const mdComponents: React.ComponentProps<typeof ReactMarkdown>["components"] = {
-  h1: ({ children }) => <p className="font-bold text-gray-900 text-sm mb-1 mt-3 first:mt-0">{children}</p>,
-  h2: ({ children }) => <p className="font-bold text-gray-900 text-sm mb-1 mt-3 first:mt-0">{children}</p>,
-  h3: ({ children }) => <p className="font-semibold text-gray-800 text-sm mb-0.5 mt-2">{children}</p>,
-  p: ({ children }) => <p className="mb-2 last:mb-0 text-sm text-gray-700">{children}</p>,
-  strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-  em: ({ children }) => <em className="italic">{children}</em>,
-  ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5 text-sm text-gray-700">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5 text-sm text-gray-700">{children}</ol>,
-  li: ({ children }) => <li>{children}</li>,
-  hr: () => <hr className="my-3 border-gray-100" />,
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer"
-      className="text-[var(--accent)] underline underline-offset-2 hover:text-[var(--accent)] transition-colors">
-      {children}
-    </a>
-  ),
-  table: ({ children }) => (
-    <div className="overflow-x-auto my-3">
-      <table className="w-full text-xs border-collapse">{children}</table>
-    </div>
-  ),
-  thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
-  th: ({ children }) => (
-    <th className="px-3 py-2 text-left font-semibold text-gray-700 border border-gray-200 whitespace-nowrap">{children}</th>
-  ),
-  td: ({ children }) => (
-    <td className="px-3 py-2 text-gray-700 border border-gray-200 align-top">{children}</td>
-  ),
-  tr: ({ children }) => <tr className="even:bg-gray-50">{children}</tr>,
 };
 
 export function ResearchCard({ type, title, description, answers }: ResearchCardProps) {
@@ -203,10 +170,8 @@ export function ResearchCard({ type, title, description, answers }: ResearchCard
       {/* Result */}
       {result && (
         <>
-          <div className="px-5 py-4 overflow-y-auto max-h-96">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-              {result}
-            </ReactMarkdown>
+          <div className="px-5 py-4 overflow-y-auto max-h-96 text-sm text-gray-700">
+            <Markdown>{result}</Markdown>
           </div>
 
           {/* Actions bar */}
@@ -291,15 +256,9 @@ export function ResearchCard({ type, title, description, answers }: ResearchCard
                       >
                         {msg.role === "assistant" ? (
                           msg.content ? (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-                              {msg.content}
-                            </ReactMarkdown>
+                            <Markdown>{msg.content}</Markdown>
                           ) : (
-                            <span className="inline-flex gap-1 items-center">
-                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" />
-                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0.1s" }} />
-                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0.2s" }} />
-                            </span>
+                            <TypingDots />
                           )
                         ) : (
                           msg.content

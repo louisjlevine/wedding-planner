@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/lib/plan-store";
+import { IconButton } from "@/components/ui/Button";
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -95,35 +96,23 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             <span className="sm:hidden">AI</span>
           </button>
         )}
-        <div className="hidden md:flex items-center gap-1">
+        <div className="hidden md:flex items-center gap-0.5">
           <div className="w-px h-4 bg-gray-200 mx-1" />
-          <button
-            onClick={handleExport}
-            title="Export backup"
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-          >
+          <IconButton onClick={handleExport} label="Export backup">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-          </button>
-          <button
-            onClick={() => importRef.current?.click()}
-            title="Import backup"
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-          >
+          </IconButton>
+          <IconButton onClick={() => importRef.current?.click()} label="Import backup">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12" />
             </svg>
-          </button>
-          <button
-            onClick={handleLogout}
-            title="Sign out"
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-          >
+          </IconButton>
+          <IconButton onClick={handleLogout} label="Sign out">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-          </button>
+          </IconButton>
         </div>
         <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
       </div>

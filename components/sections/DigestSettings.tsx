@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePlanStore } from "@/lib/plan-store";
 import { usePlan } from "@/hooks/usePlan";
+import { Button } from "@/components/ui/Button";
 import type { EmailDigestPrefs } from "@/lib/types";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -114,7 +115,7 @@ export function DigestSettings() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Email Digest</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Email Digest</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Weekly summary of overdue tasks, upcoming deadlines, and planning milestones.
         </p>
@@ -198,12 +199,9 @@ export function DigestSettings() {
         </div>
 
         <div className="flex gap-3 pt-1">
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
-          >
+          <Button onClick={handleSave}>
             {saved ? "Saved" : "Save preferences"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -224,13 +222,12 @@ export function DigestSettings() {
             {loadingPreview ? "Generating..." : "Preview digest"}
           </button>
 
-          <button
+          <Button
             onClick={handleSendNow}
             disabled={sending || !canSend}
-            className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
           >
             {sending ? "Sending..." : "Send now"}
-          </button>
+          </Button>
         </div>
 
         {!canSend && (

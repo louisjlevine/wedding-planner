@@ -221,7 +221,6 @@ export type Tab =
   | "overview"
   | "timeline"
   | "budget"
-  | "tasks"
   | "vendors"
   | "compare"
   | "guests"

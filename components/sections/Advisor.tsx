@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Markdown, TypingDots } from "@/components/ui/Markdown";
 import { usePlan } from "@/hooks/usePlan";
 import { usePlanStore } from "@/lib/plan-store";
 
@@ -15,38 +14,6 @@ const FOLLOW_UPS = [
 
 const KICKOFF_PROMPT =
   "I just finished setting up my wedding planning details. Please give me a warm, personalised briefing: start with the 2–3 most urgent actions I should take first given my timeline and setting, call out any flags specific to my situation (location, setting, guest count, budget), and tell me what you can help me with as we plan together. Keep it encouraging and practical.";
-
-const mdComponents: React.ComponentProps<typeof ReactMarkdown>["components"] = {
-  h1: ({ children }) => <p className="font-bold text-gray-900 text-base mb-1">{children}</p>,
-  h2: ({ children }) => <p className="font-bold text-gray-900 mt-3 mb-1 first:mt-0">{children}</p>,
-  h3: ({ children }) => <p className="font-semibold text-gray-800 mt-2 mb-0.5">{children}</p>,
-  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-  strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-  em: ({ children }) => <em className="italic">{children}</em>,
-  ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
-  li: ({ children }) => <li>{children}</li>,
-  hr: () => <hr className="my-3 border-gray-200" />,
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer"
-      className="text-[var(--accent)] underline underline-offset-2 hover:text-[var(--accent)] transition-colors">
-      {children}
-    </a>
-  ),
-  table: ({ children }) => (
-    <div className="overflow-x-auto my-3">
-      <table className="w-full text-xs border-collapse">{children}</table>
-    </div>
-  ),
-  thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
-  th: ({ children }) => <th className="px-3 py-2 text-left font-semibold text-gray-700 border border-gray-200 whitespace-nowrap">{children}</th>,
-  td: ({ children }) => <td className="px-3 py-2 text-gray-700 border border-gray-200 align-top">{children}</td>,
-  tr: ({ children }) => <tr className="even:bg-gray-50">{children}</tr>,
-};
-
-function MarkdownMessage({ content }: { content: string }) {
-  return <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{content}</ReactMarkdown>;
-}
 
 export function Advisor() {
   const { answers } = usePlan();
@@ -135,11 +102,11 @@ export function Advisor() {
   const visibleMessages = advisorMessages.filter((m) => !m.hidden);
 
   return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-120px)]">
+    <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="mb-4 shrink-0 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Your Advisor</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Your Advisor</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Guides you through every decision — conversation history is saved automatically
           </p>
@@ -171,14 +138,14 @@ export function Advisor() {
             {notes.map((note) => (
               <div key={note.id} className="px-4 py-3 flex items-start gap-3 group">
                 <div className="flex-1 min-w-0 text-xs text-gray-700 leading-relaxed">
-                  <MarkdownMessage content={note.content} />
+                  <Markdown>{note.content}</Markdown>
                 </div>
                 <div className="shrink-0 flex flex-col items-end gap-1">
                   <span className="text-xs text-gray-400">
                     {new Date(note.savedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </span>
                   <button onClick={() => removeNote(note.id)}
-                    className="text-xs text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+                    className="text-xs text-gray-400 hover:text-red-500 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100">
                     remove
                   </button>
                 </div>
@@ -194,11 +161,7 @@ export function Advisor() {
         {loading && visibleMessages.length === 0 && (
           <div className="flex justify-start">
             <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-3">
-              <span className="inline-flex gap-1 items-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" />
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0.1s" }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0.2s" }} />
-              </span>
+              <TypingDots />
             </div>
           </div>
         )}
@@ -214,13 +177,9 @@ export function Advisor() {
                     : "bg-white border border-gray-200 text-gray-800 rounded-bl-sm"
                 }`}>
                   {msg.content ? (
-                    msg.role === "assistant" ? <MarkdownMessage content={msg.content} /> : msg.content
+                    msg.role === "assistant" ? <Markdown>{msg.content}</Markdown> : msg.content
                   ) : (
-                    <span className="inline-flex gap-1 items-center">
-                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0.1s" }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0.2s" }} />
-                    </span>
+                    <TypingDots />
                   )}
                 </div>
                 {msg.role === "assistant" && msg.content && !loading && (

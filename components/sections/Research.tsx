@@ -1,60 +1,71 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Markdown, TypingDots } from "@/components/ui/Markdown";
 import { usePlan } from "@/hooks/usePlan";
 import { usePlanStore } from "@/lib/plan-store";
 import type { ResearchRecommendation, ResearchChatMessage } from "@/lib/types";
 import type { ResearchType as RT } from "@/lib/research-prompts";
 import type { ResearchType } from "@/lib/research-prompts";
 
-// ── Markdown renderer shared across sections ──────────────────────────────────
-
-const mdComponents: React.ComponentProps<typeof ReactMarkdown>["components"] = {
-  h1: ({ children }) => <p className="font-bold text-gray-900 mt-3 mb-1 first:mt-0">{children}</p>,
-  h2: ({ children }) => <p className="font-bold text-gray-900 mt-3 mb-1 first:mt-0">{children}</p>,
-  h3: ({ children }) => <p className="font-semibold text-gray-800 mt-2 mb-0.5">{children}</p>,
-  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-  strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-  em: ({ children }) => <em className="italic">{children}</em>,
-  ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
-  li: ({ children }) => <li>{children}</li>,
-  hr: () => <hr className="my-3 border-gray-100" />,
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer"
-      className="text-[var(--accent)] underline underline-offset-2 hover:text-[var(--accent)] transition-colors break-all">
-      {children}
-    </a>
-  ),
-  table: ({ children }) => (
-    <div className="overflow-x-auto my-3">
-      <table className="w-full text-xs border-collapse">{children}</table>
-    </div>
-  ),
-  thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
-  th: ({ children }) => <th className="px-3 py-2 text-left font-semibold text-gray-700 border border-gray-200 whitespace-nowrap">{children}</th>,
-  td: ({ children }) => <td className="px-3 py-2 text-gray-700 border border-gray-200 align-top">{children}</td>,
-  tr: ({ children }) => <tr className="even:bg-gray-50">{children}</tr>,
-};
-
-function Md({ children }: { children: string }) {
-  return <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{children}</ReactMarkdown>;
-}
-
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const TYPES: { type: ResearchType; label: string; icon: string; vendorCategory?: string }[] = [
-  { type: "venue",        label: "Venue",          icon: "🏛",  vendorCategory: "Venue" },
-  { type: "photographer", label: "Photography",    icon: "📷",  vendorCategory: "Photography" },
-  { type: "caterer",      label: "Catering",       icon: "🍽",  vendorCategory: "Catering" },
-  { type: "florist",      label: "Flowers",        icon: "💐",  vendorCategory: "Florist" },
-  { type: "music",        label: "Music",          icon: "🎵",  vendorCategory: "Music" },
-  { type: "dress",        label: "Attire",         icon: "👗",  vendorCategory: "Attire" },
-  { type: "honeymoon",    label: "Honeymoon",      icon: "✈️" },
-  { type: "timeline",     label: "Day Timeline",   icon: "🗓" },
-  { type: "budget",       label: "Budget",         icon: "💰" },
+// Inline SVGs (no emoji — the design system forbids emoji in the UI). Each icon
+// is a thin-stroke line glyph matching the sidebar's visual language.
+const ICONS: Record<ResearchType, React.ReactNode> = {
+  venue: (
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V8l7-4 7 4v13M9 21v-5a1 1 0 011-1h4a1 1 0 011 1v5" />
+  ),
+  photographer: (
+    <>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h2.5l1.5-2h8l1.5 2H20a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V8a1 1 0 011-1z" />
+      <circle cx="12" cy="13" r="3.2" />
+    </>
+  ),
+  caterer: (
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v7a2 2 0 002 2h0a2 2 0 002-2V3M7 12v9M16 3c-1.5 0-2.5 2-2.5 4.5S14.5 12 16 12s2.5-2 2.5-4.5S17.5 3 16 3zm0 9v9" />
+  ),
+  florist: (
+    <>
+      <circle cx="12" cy="8" r="3" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 11v10M9 15c-2 0-3-1.5-3-3M15 15c2 0 3-1.5 3-3" />
+    </>
+  ),
+  music: (
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 18V5l11-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm11-2a3 3 0 11-6 0 3 3 0 016 0z" />
+  ),
+  dress: (
+    <path strokeLinecap="round" strokeLinejoin="round" d="M10 3h4l-1 4 4 5-2 9H7l-2-9 4-5-1-4zM12 7v14" />
+  ),
+  honeymoon: (
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z" />
+  ),
+  timeline: (
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" />
+  ),
+  budget: (
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  ),
+};
+
+function CategoryIcon({ type }: { type: ResearchType }) {
+  return (
+    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+      {ICONS[type]}
+    </svg>
+  );
+}
+
+const TYPES: { type: ResearchType; label: string; vendorCategory?: string }[] = [
+  { type: "venue",        label: "Venue",          vendorCategory: "Venue" },
+  { type: "photographer", label: "Photography",    vendorCategory: "Photography" },
+  { type: "caterer",      label: "Catering",       vendorCategory: "Catering" },
+  { type: "florist",      label: "Flowers",        vendorCategory: "Florist" },
+  { type: "music",        label: "Music",          vendorCategory: "Music" },
+  { type: "dress",        label: "Attire",         vendorCategory: "Attire" },
+  { type: "honeymoon",    label: "Honeymoon" },
+  { type: "timeline",     label: "Day Timeline" },
+  { type: "budget",       label: "Budget" },
 ];
 
 const CHAT_STARTERS: Partial<Record<ResearchType, string[]>> = {
@@ -110,7 +121,7 @@ function RecommendationCard({
   if (editing) {
     return (
       <div className="border border-[var(--accent)] rounded-xl p-4 space-y-3 bg-[var(--accent)]/5">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-gray-500 mb-1 block font-medium">Name</label>
             <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })}
@@ -186,13 +197,13 @@ function RecommendationCard({
             </a>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-2 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
           <button onClick={() => setEditing(true)}
-            className="text-xs text-gray-400 hover:text-gray-700 transition-colors">
+            className="text-xs text-gray-500 hover:text-gray-800 transition-colors">
             Edit
           </button>
           <button onClick={() => onDismiss(rec.id, rec.title)}
-            className="text-xs text-gray-300 hover:text-red-400 transition-colors">
+            className="text-xs text-gray-400 hover:text-red-500 transition-colors">
             Dismiss
           </button>
         </div>
@@ -415,13 +426,7 @@ function ResearchPanel({ type, label, vendorCategory, answers }: {
                     : "bg-gray-50 border border-gray-200 text-gray-800"
                 }`}>
                   {msg.role === "assistant" ? (
-                    msg.content
-                      ? <Md>{msg.content}</Md>
-                      : <span className="inline-flex gap-1 items-center">
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" />
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0.1s" }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0.2s" }} />
-                        </span>
+                    msg.content ? <Markdown>{msg.content}</Markdown> : <TypingDots />
                   ) : msg.content}
                 </div>
               </div>
@@ -482,12 +487,12 @@ export function Research() {
   const active = TYPES.find((t) => t.type === activeType)!;
 
   return (
-    <div className="flex gap-6 h-full">
-      {/* Sidebar */}
-      <aside className="w-44 shrink-0">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 px-2">Category</p>
-        <nav className="space-y-0.5">
-          {TYPES.map(({ type, label, icon }) => {
+    <div className="flex flex-col md:flex-row gap-4 md:gap-6 h-full">
+      {/* Category nav — horizontal scroll on mobile, sidebar on md+ */}
+      <aside className="w-full md:w-44 shrink-0">
+        <p className="hidden md:block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 px-2">Category</p>
+        <nav className="flex md:block gap-1.5 md:gap-0 md:space-y-0.5 overflow-x-auto pb-1 md:pb-0 -mx-1 px-1 md:mx-0 md:px-0">
+          {TYPES.map(({ type, label }) => {
             const session = researchSessions[type];
             const hasRecs = (session?.recommendations?.length ?? 0) > 0;
             const hasNotes = !!session?.notes?.trim();
@@ -498,13 +503,13 @@ export function Research() {
               <button
                 key={type}
                 onClick={() => setActiveType(type)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                className={`shrink-0 md:w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
                   activeType === type
                     ? "bg-[var(--accent)]/10 text-[var(--accent)] font-medium"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
-                <span className="text-base leading-none">{icon}</span>
+                <CategoryIcon type={type} />
                 <span className="flex-1 truncate">{label}</span>
                 {hasActivity && (
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
@@ -520,7 +525,7 @@ export function Research() {
       {/* Main panel */}
       <div className="flex-1 min-w-0 overflow-y-auto">
         <div className="mb-5">
-          <h1 className="text-xl font-bold text-gray-900">{active.label} Research</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{active.label} Research</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Add your notes, get personalised recommendations, then refine with follow-up questions
           </p>
