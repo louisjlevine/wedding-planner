@@ -1,0 +1,69 @@
+name: QA Review
+
+# Runs the project's post-build QA agents (per the CLAUDE.md routing table) on
+# every pull request and posts a consolidated review. This is the enforced
+# backstop for the *judgment* reviews (frontend-qa design pass, spaghetti
+# structure) that the deterministic CI in main.yml can't perform.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# Only the latest commit on a PR needs review — cancel superseded runs.
+concurrency:
+  group: qa-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qa-review:
+    # Skip drafts to avoid spending credits on work-in-progress.
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: anthropics/claude-code-action@beta
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          mode: agent
+          allowed_tools: "Bash,Read,Glob,Grep"
+          direct_prompt: |
+            You are the automated post-build QA reviewer for the Wedding Planner
+            project. Review THIS pull request's diff and report findings only —
+            do NOT modify code, commit, or push.
+
+            STEP 1 — Compute the diff:
+              git fetch origin ${{ github.base_ref }}
+              git diff --stat origin/${{ github.base_ref }}...HEAD
+              git diff origin/${{ github.base_ref }}...HEAD
+
+            STEP 2 — Apply the post-build agent routing from CLAUDE.md. The agent
+            charters live in docs/agents/. Run ONLY the gated reviews:
+              - frontend-qa       → diff touches components/**/*.tsx, app/**/*.tsx,
+                                     or app/globals.css
+              - backend-qa        → diff touches app/api/**/*.ts or lib/**/*.ts
+              - security-reviewer → diff touches app/api/**, middleware.ts,
+                                     next.config.ts, env-var handling, or adds a dep
+              - spaghetti         → diff is >~50 lines OR adds a new file
+            Read each gated agent's charter in docs/agents/ and perform its checks
+            against the diff. Back verdicts with real results by running, as needed:
+              npm ci && npx tsc --noEmit && npx eslint && npm test
+
+            STEP 3 — Post ONE consolidated review as your final message: a short
+            table of which agents ran and their verdict (Pass / Needs fixes),
+            then concrete findings formatted as `file:line — issue → fix`. For any
+            gate that didn't trigger, say "skipped (gate not met)". Keep it concise.
