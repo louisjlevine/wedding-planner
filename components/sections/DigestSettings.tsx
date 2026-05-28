@@ -214,13 +214,13 @@ export function DigestSettings() {
         </p>
 
         <div className="flex flex-wrap gap-3">
-          <button
+          <Button
+            variant="secondary"
             onClick={handlePreview}
             disabled={loadingPreview}
-            className="px-4 py-2 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             {loadingPreview ? "Generating..." : "Preview digest"}
-          </button>
+          </Button>
 
           <Button
             onClick={handleSendNow}
