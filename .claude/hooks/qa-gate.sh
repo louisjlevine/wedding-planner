@@ -16,15 +16,21 @@ fi
 
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 
-# Changed files = this branch vs main (committed) + staged + unstaged.
-# Refresh origin/main first so the fork point is accurate even when the local
-# ref lags (best-effort, never blocks on failure). Fall back through a local
-# main ref, then the previous commit, then HEAD (which yields an empty diff).
-git fetch --quiet --no-tags origin main 2>/dev/null || true
-base="$(git merge-base HEAD origin/main 2>/dev/null \
-        || git merge-base HEAD main 2>/dev/null \
-        || git rev-parse HEAD~1 2>/dev/null \
-        || echo HEAD)"
+# Changed files = un-pushed commits + staged + unstaged. The base is the
+# branch's upstream (@{upstream}), so once a branch is pushed or merged the
+# committed delta is empty and the gate stays quiet — it only fires on work
+# that hasn't left this machine yet.
+#
+# If the branch has no upstream (never pushed), the whole branch is un-pushed:
+# fall back to the fork point off main (refresh it best-effort first).
+base="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)"
+if [ -z "$base" ]; then
+  git fetch --quiet --no-tags origin main 2>/dev/null || true
+  base="$(git merge-base HEAD origin/main 2>/dev/null \
+          || git merge-base HEAD main 2>/dev/null \
+          || git rev-parse HEAD~1 2>/dev/null \
+          || echo HEAD)"
+fi
 changed="$(
   {
     git diff --name-only "$base" HEAD 2>/dev/null
