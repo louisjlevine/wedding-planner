@@ -17,7 +17,14 @@ fi
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 
 # Changed files = this branch vs main (committed) + staged + unstaged.
-base="$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD)"
+# Refresh origin/main first so the fork point is accurate even when the local
+# ref lags (best-effort, never blocks on failure). Fall back through a local
+# main ref, then the previous commit, then HEAD (which yields an empty diff).
+git fetch --quiet --no-tags origin main 2>/dev/null || true
+base="$(git merge-base HEAD origin/main 2>/dev/null \
+        || git merge-base HEAD main 2>/dev/null \
+        || git rev-parse HEAD~1 2>/dev/null \
+        || echo HEAD)"
 changed="$(
   {
     git diff --name-only "$base" HEAD 2>/dev/null
