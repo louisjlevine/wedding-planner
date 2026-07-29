@@ -38,7 +38,10 @@ export function Layout() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+    // 100dvh, not 100vh: on mobile the dynamic URL bar makes 100vh taller than
+    // the visible viewport, pushing the bottom of the shell off-screen where
+    // zooming out can't reach it.
+    <div className="flex flex-col h-dvh bg-gray-50 overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
         {/* Mobile overlay */}
         {sidebarOpen && (

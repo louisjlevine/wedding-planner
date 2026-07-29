@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { usePlan } from "@/hooks/usePlan";
 import { usePlanStore } from "@/lib/plan-store";
 import { Panel } from "@/components/ui/Panel";
@@ -14,11 +15,13 @@ function BudgetTableRow({
   estimate,
   startingBudget,
   onUpdate,
+  onRemove,
 }: {
   cat: BudgetCategory;
-  estimate: number;
+  estimate: number | null;
   startingBudget: number;
   onUpdate: (id: string, amount: number, spent: number) => void;
+  onRemove?: (id: string, name: string) => void;
 }) {
   const isOver = cat.spent > cat.amount;
 
@@ -40,9 +43,14 @@ function BudgetTableRow({
 
   return (
     <tr className="border-t border-gray-100 align-top">
-      <td className="sticky left-0 z-10 bg-white px-3 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">{cat.name}</td>
+      <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-3 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">
+        {cat.name}
+        {cat.isCustom && (
+          <span className="ml-2 text-[10px] font-normal uppercase tracking-wide text-gray-400">added</span>
+        )}
+      </td>
       <td className="px-3 py-3 text-right text-sm text-gray-500 tabular-nums whitespace-nowrap">
-        ${estimate.toLocaleString()}
+        {estimate === null ? "—" : `$${estimate.toLocaleString()}`}
       </td>
       <td className="px-3 py-2 text-right">
         <EditableMoneyCell
@@ -73,9 +81,26 @@ function BudgetTableRow({
           {isOver && <span className="text-[10px] text-red-500 font-medium">over budget</span>}
         </div>
       </td>
-      <td className="px-3 py-3 text-xs text-gray-500 leading-relaxed">
-        {cat.description ?? ""}
-        {cat.tip && <span className="block text-[var(--accent)] mt-1">{cat.tip}</span>}
+      <td className="px-3 py-3 text-xs text-gray-500 leading-relaxed min-w-[260px]">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            {cat.description ?? ""}
+            {cat.tip && <span className="block text-[var(--accent)] mt-1">{cat.tip}</span>}
+          </div>
+          {cat.isCustom && onRemove && (
+            <button
+              type="button"
+              onClick={() => onRemove(cat.id, cat.name)}
+              className="shrink-0 text-gray-300 hover:text-red-400 transition-colors p-1 -m-1"
+              aria-label={`Remove ${cat.name} line item`}
+              title="Remove line item"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M1 1l10 10M11 1L1 11" />
+              </svg>
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -83,7 +108,18 @@ function BudgetTableRow({
 
 export function Budget() {
   const { answers, budgetCategories, baseBudgetCategories } = usePlan();
-  const { setBudgetOverride, resetBudgetOverrides, budgetOverrides } = usePlanStore();
+  const {
+    setBudgetOverride,
+    resetBudgetOverrides,
+    budgetOverrides,
+    customBudgetCategories,
+    addCustomBudgetCategory,
+    updateCustomBudgetCategory,
+    removeCustomBudgetCategory,
+  } = usePlanStore();
+  const [draftName, setDraftName] = useState("");
+
+  const customIds = new Set(customBudgetCategories.map((c) => c.id));
 
   if (!answers) return null;
 
@@ -100,7 +136,28 @@ export function Budget() {
   const estimateById = new Map(baseBudgetCategories.map((c) => [c.id, c.amount]));
 
   function handleUpdate(id: string, amount: number, spent: number) {
+    // Custom lines own their numbers directly — routing them through
+    // budgetOverrides would let "Reset to defaults" silently zero them out.
+    if (customIds.has(id)) {
+      updateCustomBudgetCategory(id, { amount, spent });
+      return;
+    }
     setBudgetOverride(id, { amount, spent });
+  }
+
+  function handleAddLineItem() {
+    const trimmed = draftName.trim();
+    if (!trimmed) return;
+    addCustomBudgetCategory(trimmed);
+    setDraftName("");
+  }
+
+  function handleRemoveLineItem(id: string, name: string) {
+    const confirmed = window.confirm(
+      `Remove "${name}" from the budget?\n\nIts allocation and spend will be deleted. There's no undo.`,
+    );
+    if (!confirmed) return;
+    removeCustomBudgetCategory(id);
   }
 
   return (
@@ -159,16 +216,21 @@ export function Budget() {
       )}
 
       <Panel title="Budget breakdown">
-        <div className="overflow-x-auto -mx-5 px-5">
-          <table className="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
+        {/* The border + rounding live on the scroll container, not the table.
+            `overflow-hidden` on the <table> would make the table itself the
+            sticky scrollport, which silently kills the frozen first column. */}
+        <div className="overflow-x-auto border border-gray-200 rounded-xl">
+          <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 text-left">
-                <th className="sticky left-0 z-20 bg-gray-50 px-3 py-2 font-medium text-gray-500 whitespace-nowrap">Type</th>
+                <th className="sticky left-0 z-20 bg-gray-50 border-r border-gray-200 px-3 py-2 font-medium text-gray-500 whitespace-nowrap">Type</th>
                 <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Estimate</th>
                 <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Revised Estimate</th>
                 <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Revised %</th>
                 <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Spent</th>
-                <th className="px-3 py-2 font-medium text-gray-500 whitespace-nowrap">Explanation</th>
+                {/* Floor the width so the prose column can't be squeezed to a
+                    sliver on narrow screens — it scrolls into view instead. */}
+                <th className="px-3 py-2 font-medium text-gray-500 whitespace-nowrap min-w-[260px]">Explanation</th>
               </tr>
             </thead>
             <tbody>
@@ -176,13 +238,14 @@ export function Budget() {
                 <BudgetTableRow
                   key={cat.id}
                   cat={cat}
-                  estimate={estimateById.get(cat.id) ?? cat.amount}
+                  estimate={cat.isCustom ? null : estimateById.get(cat.id) ?? cat.amount}
                   startingBudget={startingBudget}
                   onUpdate={handleUpdate}
+                  onRemove={handleRemoveLineItem}
                 />
               ))}
               <tr className="border-t-2 border-gray-300 bg-[var(--accent)]/5">
-                <td className="sticky left-0 z-10 bg-[var(--accent-wash)] px-3 py-2.5 font-semibold text-gray-900">Total</td>
+                <td className="sticky left-0 z-10 bg-[var(--accent-wash)] border-r border-gray-200 px-3 py-2.5 font-semibold text-gray-900">Total</td>
                 <td className="px-3 py-2.5 text-right font-semibold text-gray-900 tabular-nums">
                   ${baseBudgetCategories.reduce((s, c) => s + c.amount, 0).toLocaleString()}
                 </td>
@@ -201,6 +264,36 @@ export function Budget() {
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && draftName.trim()) {
+                  e.preventDefault();
+                  handleAddLineItem();
+                }
+              }}
+              placeholder="New line item (e.g. rehearsal dinner, welcome bags)"
+              aria-label="New budget line item name"
+              className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+            />
+            <button
+              type="button"
+              onClick={handleAddLineItem}
+              disabled={!draftName.trim()}
+              className="shrink-0 px-4 py-2 text-xs font-medium rounded-lg bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-40 disabled:hover:opacity-40 transition-opacity"
+            >
+              Add line item
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-2">
+            Added lines have no industry estimate — set the amount yourself. They count toward your
+            allocation and spend totals.
+          </p>
         </div>
       </Panel>
     </div>

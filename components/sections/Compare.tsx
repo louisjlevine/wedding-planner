@@ -201,9 +201,9 @@ type Scenario = ReturnType<typeof computeScenario>;
 // First column is sticky so the line-item label stays visible while the venue
 // columns scroll horizontally on narrow screens. Each sticky cell carries an
 // opaque background matching its row so scrolled content doesn't bleed through.
-const LINE_LABEL_CLS = "sticky left-0 z-10 bg-white pl-8 pr-3 py-2 text-gray-600 text-xs";
+const LINE_LABEL_CLS = "sticky left-0 z-10 bg-white border-r border-gray-200 pl-8 pr-3 py-2 text-gray-600 text-xs";
 const SUBTOTAL_ROW_CLS = "border-t border-gray-200 bg-gray-50/70";
-const SUBTOTAL_LABEL_CLS = "sticky left-0 z-10 bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-800";
+const SUBTOTAL_LABEL_CLS = "sticky left-0 z-10 bg-gray-50 border-r border-gray-200 px-3 py-2.5 text-xs font-semibold text-gray-800";
 const SUBTOTAL_VALUE_CLS = "px-3 py-2.5 text-right tabular-nums font-semibold text-gray-900 whitespace-nowrap";
 const GROUP_HEADER_ROW_CLS = "bg-gray-100/80 border-t-2 border-gray-200";
 const GROUP_HEADER_CELL_CLS = "px-3 py-2 text-[11px] uppercase tracking-wider text-gray-700 font-bold";
@@ -430,11 +430,14 @@ export function Compare() {
             Pick at least one venue above to see the cost breakdown.
           </p>
         ) : (
-          <div className="overflow-x-auto -mx-5 px-5">
-            <table className="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
+          // The border + rounding live on the scroll container, not the table.
+          // `overflow-hidden` on the <table> would make the table itself the
+          // sticky scrollport, which silently kills the frozen first column.
+          <div className="overflow-x-auto border border-gray-200 rounded-xl">
+            <table className="w-full text-xs">
               <thead>
                 <tr className="bg-gray-50 text-left">
-                  <th className="sticky left-0 z-20 bg-gray-50 px-3 py-2 font-medium text-gray-500 w-44">Line item</th>
+                  <th className="sticky left-0 z-20 bg-gray-50 border-r border-gray-200 px-3 py-2 font-medium text-gray-500 w-44">Line item</th>
                   {columns.map((col) => (
                     <th key={col.key} className="px-3 py-2 font-medium text-gray-700 text-right whitespace-nowrap">
                       <div className="inline-flex items-center gap-1.5 justify-end">
@@ -802,7 +805,7 @@ export function Compare() {
 
                 {/* TOTALS */}
                 <tr className="border-t-2 border-[var(--accent)]/40 bg-[var(--accent)]/10">
-                  <td className="sticky left-0 z-10 bg-[var(--accent-wash)] px-3 py-3 text-sm font-bold text-gray-900">Total</td>
+                  <td className="sticky left-0 z-10 bg-[var(--accent-wash)] border-r border-gray-200 px-3 py-3 text-sm font-bold text-gray-900">Total</td>
                   {columns.map((col) => (
                     <td key={col.key} className="px-3 py-3 text-right font-bold text-gray-900 tabular-nums whitespace-nowrap text-sm">
                       {fmtMoney(col.scenario.total)}
@@ -811,7 +814,7 @@ export function Compare() {
                 </tr>
                 {budget > 0 && (
                   <tr className="border-t border-gray-100">
-                    <td className="sticky left-0 z-10 bg-white px-3 py-2 text-gray-500">vs. total budget</td>
+                    <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-3 py-2 text-gray-500">vs. total budget</td>
                     {columns.map((col) => {
                       const delta = budget - col.scenario.total;
                       const over = delta < 0;

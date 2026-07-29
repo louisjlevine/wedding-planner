@@ -2,6 +2,7 @@
 
 import { usePlanStore } from "@/lib/plan-store";
 import { buildTimeline, buildBudgetCategories, buildInitialTasks } from "@/lib/plan-adapters";
+import type { BudgetCategory } from "@/lib/types";
 
 export function usePlan() {
   const store = usePlanStore();
@@ -20,7 +21,24 @@ export function usePlan() {
   const baseBudgetCategories = store.answers
     ? buildBudgetCategories(store.answers)
     : [];
-  const budgetCategories = baseBudgetCategories.map((cat) => {
+  // User-added lines have no adapter estimate, so they're appended to the
+  // revised view only — the Estimate column and its total stay adapter-derived.
+  const customCategories: BudgetCategory[] = store.customBudgetCategories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    amount: Math.max(0, Math.round(c.amount)),
+    spent: Math.max(0, Math.round(c.spent)),
+    percentage:
+      startingBudget > 0
+        ? Math.round((Math.max(0, c.amount) / startingBudget) * 1000) / 10
+        : 0,
+    description: c.description,
+    baselinePercentage: 0,
+    adjustments: [],
+    isCustom: true,
+  }));
+
+  const adaptedCategories = baseBudgetCategories.map((cat) => {
     const override = store.budgetOverrides[cat.id];
     if (!override) return cat;
     const amount = Math.max(0, Math.round(override.amount));
@@ -35,6 +53,8 @@ export function usePlan() {
       spent: override.spent,
     };
   });
+
+  const budgetCategories = [...adaptedCategories, ...customCategories];
 
   const defaultTasks = store.answers ? buildInitialTasks(store.answers) : [];
 

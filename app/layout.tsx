@@ -11,6 +11,13 @@ const inter = Inter({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Without an explicit minimumScale, mobile browsers clamp pinch-zoom-out at
+  // the initial scale for a document that has no overflow to reveal — so the
+  // wide Budget/Compare tables can't be zoomed out to fit. maximumScale and
+  // userScalable stay permissive so zooming *in* still works for accessibility.
+  minimumScale: 0.25,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export const metadata: Metadata = {

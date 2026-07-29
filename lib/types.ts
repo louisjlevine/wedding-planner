@@ -180,6 +180,18 @@ export interface BudgetCategory {
   description?: string; // what this category covers, context-aware
   baselinePercentage: number; // industry default % before any adaptive adjustments
   adjustments: AdaptiveAdjustment[]; // list of rules that changed the baseline
+  isCustom?: boolean; // user-added line item, not produced by plan-adapters
+}
+
+// A budget line the user added by hand. Unlike adapter-derived categories these
+// have no industry estimate to revise, so they own their amount/spent directly
+// rather than going through budgetOverrides (which "Reset to defaults" clears).
+export interface CustomBudgetCategory {
+  id: string;
+  name: string;
+  amount: number;
+  spent: number;
+  description?: string;
 }
 
 export interface Note {

@@ -331,3 +331,83 @@ describe("migratePlanStore — v4 → v5 guest priority backfill", () => {
     expect(migrated.guests).toBeUndefined();
   });
 });
+
+describe("custom budget line items", () => {
+  beforeEach(() => {
+    usePlanStore.setState({ customBudgetCategories: [], budgetOverrides: {} });
+  });
+
+  it("adds a line item with zeroed amount and spend", () => {
+    const created = usePlanStore.getState().addCustomBudgetCategory("Rehearsal dinner");
+    expect(created.name).toBe("Rehearsal dinner");
+    expect(created.amount).toBe(0);
+    expect(created.spent).toBe(0);
+    expect(usePlanStore.getState().customBudgetCategories).toHaveLength(1);
+  });
+
+  it("trims whitespace and ignores an empty name", () => {
+    usePlanStore.getState().addCustomBudgetCategory("  Welcome bags  ");
+    usePlanStore.getState().addCustomBudgetCategory("   ");
+    const cats = usePlanStore.getState().customBudgetCategories;
+    expect(cats).toHaveLength(1);
+    expect(cats[0].name).toBe("Welcome bags");
+  });
+
+  it("reuses an existing line item instead of creating a duplicate row", () => {
+    const first = usePlanStore.getState().addCustomBudgetCategory("Favors");
+    const second = usePlanStore.getState().addCustomBudgetCategory("favors");
+    expect(second.id).toBe(first.id);
+    expect(usePlanStore.getState().customBudgetCategories).toHaveLength(1);
+  });
+
+  it("updates amount and spent on an existing line item", () => {
+    const created = usePlanStore.getState().addCustomBudgetCategory("Rehearsal dinner");
+    usePlanStore.getState().updateCustomBudgetCategory(created.id, { amount: 4000, spent: 1500 });
+    const cat = usePlanStore.getState().customBudgetCategories[0];
+    expect(cat.amount).toBe(4000);
+    expect(cat.spent).toBe(1500);
+  });
+
+  it("keeps custom amounts when adapter overrides are reset", () => {
+    const created = usePlanStore.getState().addCustomBudgetCategory("Rehearsal dinner");
+    usePlanStore.getState().updateCustomBudgetCategory(created.id, { amount: 4000, spent: 1500 });
+    usePlanStore.getState().setBudgetOverride("venue", { amount: 20000, spent: 0 });
+
+    usePlanStore.getState().resetBudgetOverrides();
+
+    expect(usePlanStore.getState().budgetOverrides).toEqual({});
+    expect(usePlanStore.getState().customBudgetCategories[0].amount).toBe(4000);
+    expect(usePlanStore.getState().customBudgetCategories[0].spent).toBe(1500);
+  });
+
+  it("removes a line item and drops any override keyed to its id", () => {
+    const created = usePlanStore.getState().addCustomBudgetCategory("Rehearsal dinner");
+    usePlanStore.setState({
+      budgetOverrides: { [created.id]: { amount: 999, spent: 1 }, venue: { amount: 20000, spent: 0 } },
+    });
+
+    usePlanStore.getState().removeCustomBudgetCategory(created.id);
+
+    expect(usePlanStore.getState().customBudgetCategories).toHaveLength(0);
+    expect(usePlanStore.getState().budgetOverrides).toEqual({ venue: { amount: 20000, spent: 0 } });
+  });
+});
+
+describe("migratePlanStore — v7 → v8 custom budget categories", () => {
+  it("seeds an empty customBudgetCategories array", () => {
+    const migrated = migratePlanStore({ answers: null }, 7);
+    expect(migrated.customBudgetCategories).toEqual([]);
+  });
+
+  it("preserves custom categories already present on the payload", () => {
+    const existing = [{ id: "custom-1", name: "Rehearsal dinner", amount: 4000, spent: 0 }];
+    const migrated = migratePlanStore({ customBudgetCategories: existing }, 7);
+    expect(migrated.customBudgetCategories).toEqual(existing);
+  });
+
+  it("leaves v8+ payloads untouched", () => {
+    const existing = [{ id: "custom-1", name: "Favors", amount: 500, spent: 100 }];
+    const migrated = migratePlanStore({ customBudgetCategories: existing }, 8);
+    expect(migrated.customBudgetCategories).toEqual(existing);
+  });
+});
