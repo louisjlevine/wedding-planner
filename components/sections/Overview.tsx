@@ -7,29 +7,19 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import type { WeddingPriority } from "@/lib/types";
+import {
+  SEASONS,
+  seasonToDate,
+  dateToSeason,
+  describeWeddingDate,
+  formatDate,
+  formatMonthYear,
+  daysUntil as daysUntilDate,
+  todayISO,
+  type Season,
+} from "@/lib/date-utils";
 
-// ── Season helpers (mirrors Intake.tsx) ───────────────────────────────────────
-
-type Season = "Spring" | "Summer" | "Autumn" | "Winter";
-const SEASONS: { value: Season; desc: string }[] = [
-  { value: "Spring", desc: "Mar–May" },
-  { value: "Summer", desc: "Jun–Aug" },
-  { value: "Autumn", desc: "Sep–Nov" },
-  { value: "Winter", desc: "Dec–Feb" },
-];
-
-function seasonToDate(season: Season, year: number): string {
-  const month = { Spring: "05", Summer: "07", Autumn: "10", Winter: "12" }[season];
-  return `${year}-${month}-15`;
-}
-
-function dateToSeason(iso: string): { season: Season; year: number } {
-  const d = new Date(iso);
-  const m = d.getMonth() + 1;
-  const year = d.getFullYear();
-  const season: Season = m <= 2 || m === 12 ? "Winter" : m <= 5 ? "Spring" : m <= 8 ? "Summer" : "Autumn";
-  return { season, year };
-}
+type DateMode = "season" | "exact";
 
 const PRIORITIES: { value: WeddingPriority; label: string }[] = [
   { value: "photography",     label: "Photography" },
@@ -49,8 +39,10 @@ function EditDetailsPanel({ onClose }: { onClose: () => void }) {
 
   // Derive initial values before hooks — falls back to safe defaults when answers is null
   const { season: initSeason, year: initYear } = dateToSeason(answers?.date ?? "");
+  const [dateMode, setDateMode]   = useState<DateMode>(answers?.dateIsExact ? "exact" : "season");
   const [season, setSeason]       = useState<Season>(initSeason);
   const [year, setYear]           = useState(initYear);
+  const [exactDate, setExactDate] = useState(answers?.dateIsExact ? answers.date : "");
   const [guestCount, setGuestCount] = useState((answers?.guestCount ?? 100).toString());
   const [priorities, setPriorities] = useState<WeddingPriority[]>([...(answers?.priorities ?? [])]);
 
@@ -67,12 +59,15 @@ function EditDetailsPanel({ onClose }: { onClose: () => void }) {
     );
   }
 
+  const useExact = dateMode === "exact" && !!exactDate;
+
   function save() {
     const count = parseInt(guestCount) || answers!.guestCount;
     updateAnswers({
-      date:       seasonToDate(season, year),
-      guestCount: count,
-      priorities: priorities.length === 3 ? priorities : answers!.priorities,
+      date:        useExact ? exactDate : seasonToDate(season, year),
+      dateIsExact: useExact,
+      guestCount:  count,
+      priorities:  priorities.length === 3 ? priorities : answers!.priorities,
     });
     onClose();
   }
@@ -81,25 +76,60 @@ function EditDetailsPanel({ onClose }: { onClose: () => void }) {
     <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-5">
       <h3 className="text-sm font-semibold text-gray-700">Edit wedding details</h3>
 
-      {/* Season + year */}
+      {/* Wedding date — exact day, or season + year while it's still undecided */}
       <div>
         <label className="text-xs text-gray-500 mb-2 block font-medium">Wedding date</label>
-        <div className="flex gap-2 flex-wrap">
-          {SEASONS.map(({ value, desc }) => (
-            <button key={value} onClick={() => setSeason(value)}
-              className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
-                season === value
-                  ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] font-medium"
-                  : "border-gray-200 text-gray-600 hover:border-gray-300"
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit mb-3">
+          {([
+            { value: "exact", label: "Exact date" },
+            { value: "season", label: "Season & year" },
+          ] as { value: DateMode; label: string }[]).map(({ value, label }) => (
+            <button key={value} onClick={() => setDateMode(value)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                dateMode === value
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
               }`}>
-              {value} <span className="text-xs opacity-60 ml-1">{desc}</span>
+              {label}
             </button>
           ))}
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
-            {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
         </div>
+
+        {dateMode === "exact" ? (
+          <>
+            <input
+              type="date"
+              value={exactDate}
+              min={todayISO()}
+              onChange={(e) => setExactDate(e.target.value)}
+              aria-label="Exact wedding date"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              {exactDate
+                ? "Milestones and due dates recalculate from this day."
+                : "Pick a day, or switch back to season & year."}
+            </p>
+          </>
+        ) : (
+          <div className="flex gap-2 flex-wrap">
+            {SEASONS.map(({ value, desc }) => (
+              <button key={value} onClick={() => setSeason(value)}
+                className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
+                  season === value
+                    ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] font-medium"
+                    : "border-gray-200 text-gray-600 hover:border-gray-300"
+                }`}>
+                {value} <span className="text-xs opacity-60 ml-1">{desc}</span>
+              </button>
+            ))}
+            <select value={year} onChange={(e) => setYear(Number(e.target.value))}
+              aria-label="Wedding year"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
+              {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Guest count */}
@@ -160,7 +190,8 @@ function EditDetailsPanel({ onClose }: { onClose: () => void }) {
 // ── Overview page ─────────────────────────────────────────────────────────────
 
 export function Overview() {
-  const { answers, tasks, guests, vendors, timeline, budgetCategories, setActiveTab } = usePlan();
+  const { answers, tasks, defaultTasks, guests, vendors, timeline, budgetCategories, setActiveTab } =
+    usePlan();
   const [editingDetails, setEditingDetails] = useState(false);
 
   if (!answers) return null;
@@ -168,24 +199,28 @@ export function Overview() {
   const totalBudget  = answers.budget;
   const totalSpent   = budgetCategories.reduce((sum, c) => sum + c.spent, 0);
   const remaining    = totalBudget - totalSpent;
-  const doneTasks    = tasks.filter((t) => t.done).length;
-  const totalTasks   = tasks.length;
+  // Same merge the Timeline & Tasks page uses — adapter-derived tasks only land
+  // in the store once touched, so counting `tasks` alone undercounts the plan.
+  const storeTaskIds = new Set(tasks.map((t) => t.id));
+  const allTasks     = [...tasks, ...defaultTasks.filter((t) => !storeTaskIds.has(t.id))];
+  const doneTasks    = allTasks.filter((t) => t.done).length;
+  const totalTasks   = allTasks.length;
   const confirmedGuests = guests.filter((g) => g.rsvp === "yes").length;
   const bookedVendors   = vendors.filter((v) => v.status === "booked").length;
-  const daysUntil = Math.ceil(
-    (new Date(answers.date).getTime() - Date.now()) / (1000 * 60 * 60 * 24) // eslint-disable-line react-hooks/purity
-  );
+  const daysUntil = daysUntilDate(
+    answers.date,
+    Date.now() // eslint-disable-line react-hooks/purity
+  ) ?? 0;
   const nextItems = timeline
-    .filter((t) => !t.done && t.targetDate >= new Date().toISOString().split("T")[0])
+    .filter((t) => !t.done && t.targetDate >= todayISO())
     .slice(0, 4);
   const flags = [
     ...timeline.filter((t) => t.flag),
-    ...tasks.filter((t) => t.flag),
+    ...allTasks.filter((t) => t.flag),
   ].slice(0, 4);
 
-  const weddingDate = new Date(answers.date).toLocaleDateString("en-US", {
-    month: "long", day: "numeric", year: "numeric",
-  });
+  const weddingDate = describeWeddingDate(answers);
+  const dateIsApproximate = !answers.dateIsExact;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -197,7 +232,9 @@ export function Overview() {
             Louis &amp; {answers.partnerName}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            {answers.location} &middot; {weddingDate} &middot; {answers.guestCount} guests
+            {answers.location} &middot; {weddingDate}
+            {dateIsApproximate && <span className="text-gray-400"> (date TBC)</span>} &middot;{" "}
+            {answers.guestCount} guests
           </p>
         </div>
         <button
@@ -217,9 +254,9 @@ export function Overview() {
       {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          label="Days to go"
-          value={daysUntil > 0 ? daysUntil.toLocaleString() : "Today!"}
-          sub={new Date(answers.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          label={dateIsApproximate ? "Days to go (est.)" : "Days to go"}
+          value={daysUntil > 0 ? daysUntil.toLocaleString() : daysUntil === 0 ? "Today!" : "—"}
+          sub={dateIsApproximate ? `${weddingDate} — set an exact date` : formatDate(answers.date)}
         />
         <MetricCard
           label="Budget remaining"
@@ -257,9 +294,7 @@ export function Overview() {
                     {item.flag && <p className="text-xs text-[var(--accent)] mt-0.5">{item.flag}</p>}
                   </div>
                   <span className="text-xs text-gray-400 shrink-0 mt-0.5">
-                    {item.targetDate
-                      ? new Date(item.targetDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })
-                      : ""}
+                    {formatMonthYear(item.targetDate)}
                   </span>
                 </li>
               ))}

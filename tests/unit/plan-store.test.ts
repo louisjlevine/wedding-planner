@@ -411,3 +411,39 @@ describe("migratePlanStore — v7 → v8 custom budget categories", () => {
     expect(migrated.customBudgetCategories).toEqual(existing);
   });
 });
+
+describe("migratePlanStore — v8 → v9 exact wedding date flag", () => {
+  const answers = {
+    partnerName: "Alex",
+    date: "2027-07-15",
+    location: "Nashville, TN",
+    guestCount: 100,
+    budget: 50_000,
+    vibe: ["romantic"],
+    priorities: ["venue", "food", "photography"],
+    setting: "indoor",
+    funding: "self",
+    stress: ["budget"],
+  } as unknown as import("@/lib/types").WeddingAnswers;
+
+  it("marks pre-v9 dates as approximate — they all came from the season picker", () => {
+    const migrated = migratePlanStore({ answers }, 8);
+    expect(migrated.answers?.dateIsExact).toBe(false);
+    expect(migrated.answers?.date).toBe("2027-07-15");
+  });
+
+  it("leaves an already-set flag alone", () => {
+    const migrated = migratePlanStore({ answers: { ...answers, dateIsExact: true } }, 8);
+    expect(migrated.answers?.dateIsExact).toBe(true);
+  });
+
+  it("is a no-op when there are no answers yet", () => {
+    const migrated = migratePlanStore({ answers: null }, 8);
+    expect(migrated.answers).toBeNull();
+  });
+
+  it("leaves v9+ payloads untouched", () => {
+    const migrated = migratePlanStore({ answers }, 9);
+    expect(migrated.answers?.dateIsExact).toBeUndefined();
+  });
+});

@@ -31,9 +31,15 @@ with App Router. All AI calls go through Next.js API routes (never client-side).
 - All AI responses render in <pre className="whitespace-pre-wrap"> inside ResearchCard
 
 ## Intake questions (in order)
-partner name (free text), date (single), location (single), guests (single), 
+partner name (free text), date (exact date OR season+year), location (single), guests (single), 
 budget (single), vibe (multi), priorities (multi, pick 3), setting (single), 
 funding (single), stress (multi)
+
+The date step offers an exact `<input type="date">` or a season + year fallback.
+`WeddingAnswers.dateIsExact` records which one; when false the UI shows "Summer 2027
+(date TBC)" rather than a specific day. All date parsing/formatting goes through
+`lib/date-utils.ts` — never `new Date(iso).toLocaleDateString()` directly, which
+renders the previous day west of UTC.
 
 ## Adaptive rules (plan-adapters.ts must implement these)
 - outdoor setting → add tent/weather contingency tasks + flag in timeline
@@ -81,6 +87,8 @@ User can say `full team` (run everything) or `skip QA` / `skip security` (drop s
 - **Intake question order is fixed** — `Intake.tsx` must keep questions in the order defined in CLAUDE.md; `plan-adapters.ts` depends on it.
 - **`ResearchCard` is the only AI prose renderer** — keep the `<pre className="whitespace-pre-wrap">` wrapper.
 - **`BudgetBar` and `MetricCard`** are shared across Overview, Budget, and Compare — changes propagate to all three.
+- **Milestones and tasks render on one page** — `Timeline.tsx` is a single combined list (Overdue / Upcoming / No date yet / Done) with a filter, not sub-tabs. Don't split it back apart.
+- **Adapter-derived tasks aren't in the store until touched** — toggling one must materialise it via `addTask`; `toggleTask` alone is a no-op. Anything counting tasks must merge `tasks` with `defaultTasks`.
 - **ESLint `// eslint-disable-line` comments** in `Topbar.tsx`, `Overview.tsx`, `Budget.tsx`, and `Research.tsx` are intentional — don't remove them.
 - **No Anthropic SDK in client components** — all AI calls go through `/api/*` routes.
 - **Zustand store version** — any new persisted field requires a migration case in `migratePlanStore()` with a bumped version number.
@@ -150,8 +158,12 @@ tests/
 ├── setup.ts                        # global setup (suppress console.error noise)
 ├── unit/
 │   ├── adapters.test.ts            # buildTimeline, buildBudgetCategories, buildInitialTasks
+│   ├── date-utils.test.ts          # local-time parsing, season mapping, exact vs approximate
 │   ├── guest-probability.test.ts   # getBaseProbability, guestExpectedCount, estimatedAttendance
 │   └── research-prompts.test.ts    # buildResearchPrompt — all types + context flags
+├── components/
+│   ├── ResearchCard.test.tsx       # sole AI-prose renderer
+│   └── Timeline.test.tsx           # combined milestones + tasks page
 ├── api/
 │   ├── research.test.ts            # input validation, type allowlist, error safety
 │   ├── recommendations.test.ts     # JSON parsing, URL filtering, status normalisation

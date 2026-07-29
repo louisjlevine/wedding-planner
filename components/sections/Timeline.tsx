@@ -4,28 +4,62 @@ import { useState } from "react";
 import { usePlan } from "@/hooks/usePlan";
 import { usePlanStore } from "@/lib/plan-store";
 import { Badge } from "@/components/ui/Badge";
+import { describeWeddingDate, formatDate, todayISO } from "@/lib/date-utils";
 import type { Task } from "@/lib/types";
 
 function priorityVariant(p: Task["priority"]) {
   return p === "high" ? "pink" : p === "medium" ? "yellow" : "gray";
 }
 
-function MilestoneRow({
+// Milestones and tasks live in different store slices (derived timeline vs.
+// user-editable tasks) but read as one plan on screen, so both are normalised
+// into this shape before rendering.
+interface PlanItem {
+  key: string;
+  id: string;
+  kind: "milestone" | "task";
+  title: string;
+  date?: string;
+  category: string;
+  priority?: Task["priority"];
+  flag?: string;
+  done: boolean;
+  monthsBefore?: number;
+  removable?: boolean;
+}
+
+const PRIORITY_RANK: Record<Task["priority"], number> = { high: 0, medium: 1, low: 2 };
+
+/** Undated items sort last; otherwise chronological, milestones ahead of tasks on a tie. */
+function byDate(a: PlanItem, b: PlanItem): number {
+  if (a.date && b.date && a.date !== b.date) return a.date < b.date ? -1 : 1;
+  if (a.date && !b.date) return -1;
+  if (!a.date && b.date) return 1;
+  if (a.kind !== b.kind) return a.kind === "milestone" ? -1 : 1;
+  return PRIORITY_RANK[a.priority ?? "medium"] - PRIORITY_RANK[b.priority ?? "medium"];
+}
+
+function PlanItemRow({
   item,
   today,
   onToggle,
+  onRemove,
 }: {
-  item: ReturnType<typeof usePlan>["timeline"][number];
+  item: PlanItem;
   today: string;
-  onToggle: (id: string) => void;
+  onToggle: (item: PlanItem) => void;
+  onRemove: (item: PlanItem) => void;
 }) {
-  const isToday = item.targetDate === today;
-  const isOverdue = !item.done && item.targetDate < today;
+  const isMilestone = item.kind === "milestone";
+  const isToday = !!item.date && item.date === today;
+  const isOverdue = !item.done && !!item.date && item.date < today;
 
   return (
     <div
       className={`bg-white border rounded-xl px-5 py-4 flex items-start gap-4 ${
-        isToday
+        item.done
+          ? "border-gray-100 bg-gray-50"
+          : isToday
           ? "border-[var(--accent)] ring-1 ring-[var(--accent)]/20"
           : isOverdue
           ? "border-red-200 bg-red-50/30"
@@ -34,10 +68,16 @@ function MilestoneRow({
     >
       <div className="shrink-0 mt-0.5">
         <button
-          onClick={() => onToggle(item.id)}
+          onClick={() => onToggle(item)}
           title={item.done ? "Mark incomplete" : "Mark complete"}
-          aria-label={item.done ? `Mark "${item.title}" incomplete` : `Mark "${item.title}" complete`}
-          className={`relative w-4 h-4 rounded-full border-2 transition-colors hover:opacity-70 after:content-[''] after:absolute after:-inset-2.5 ${
+          aria-label={
+            item.done ? `Mark "${item.title}" incomplete` : `Mark "${item.title}" complete`
+          }
+          className={`relative w-4 h-4 border-2 transition-colors hover:opacity-70 after:content-[''] after:absolute after:-inset-2.5 ${
+            // Round for milestones, square for tasks — the shape is the fastest
+            // way to tell the two apart in a combined list.
+            isMilestone ? "rounded-full" : "rounded"
+          } ${
             item.done
               ? "bg-[var(--accent)] border-[var(--accent)]"
               : isToday
@@ -48,67 +88,175 @@ function MilestoneRow({
           }`}
         />
       </div>
+
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className={`text-sm font-medium ${item.done ? "line-through text-gray-400" : "text-gray-900"}`}>
+          <p
+            className={`text-sm font-medium ${
+              item.done ? "line-through text-gray-400" : "text-gray-900"
+            }`}
+          >
             {item.title}
           </p>
+          <Badge variant={isMilestone ? "pink" : "gray"}>
+            {isMilestone ? "Milestone" : "Task"}
+          </Badge>
+          {!isMilestone && item.priority && (
+            <Badge variant={priorityVariant(item.priority)}>{item.priority}</Badge>
+          )}
           <Badge variant="gray">{item.category}</Badge>
-          {item.flag && <Badge variant="pink">Note</Badge>}
         </div>
-        {item.flag && (
-          <p className="text-xs text-[var(--accent)] mt-1">{item.flag}</p>
-        )}
+        {item.flag && <p className="text-xs text-[var(--accent)] mt-1">{item.flag}</p>}
       </div>
-      <div className="shrink-0 text-right">
-        <p className={`text-xs font-medium ${isOverdue ? "text-red-500" : "text-gray-500"}`}>
-          {item.targetDate
-            ? new Date(item.targetDate).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })
-            : ""}
-        </p>
-        {item.monthsBefore > 0 && (
-          <p className="text-xs text-gray-400 mt-0.5">{item.monthsBefore}mo before</p>
+
+      <div className="shrink-0 text-right flex items-start gap-3">
+        <div>
+          <p className={`text-xs font-medium ${isOverdue ? "text-red-500" : "text-gray-500"}`}>
+            {item.date ? formatDate(item.date) : "No date"}
+          </p>
+          {isMilestone && item.monthsBefore != null && item.monthsBefore > 0 && (
+            <p className="text-xs text-gray-400 mt-0.5">{item.monthsBefore}mo before</p>
+          )}
+        </div>
+        {item.removable && (
+          <button
+            onClick={() => onRemove(item)}
+            className="text-gray-300 hover:text-red-400 text-xs transition-colors mt-0.5"
+          >
+            remove
+          </button>
         )}
       </div>
     </div>
   );
 }
 
-type SubTab = "milestones" | "tasks";
+function Group({
+  label,
+  tone = "muted",
+  items,
+  today,
+  onToggle,
+  onRemove,
+}: {
+  label: string;
+  tone?: "muted" | "alert";
+  items: PlanItem[];
+  today: string;
+  onToggle: (item: PlanItem) => void;
+  onRemove: (item: PlanItem) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <p
+        className={`text-xs font-semibold uppercase tracking-widest mb-2 ${
+          tone === "alert" ? "text-red-500" : "text-gray-400"
+        }`}
+      >
+        {label}
+      </p>
+      <div className="space-y-2">
+        {items.map((item) => (
+          <PlanItemRow
+            key={item.key}
+            item={item}
+            today={today}
+            onToggle={onToggle}
+            onRemove={onRemove}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type Filter = "all" | "milestones" | "tasks";
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "all", label: "Everything" },
+  { value: "milestones", label: "Milestones" },
+  { value: "tasks", label: "Tasks" },
+];
 
 export function Timeline() {
   const { timeline, tasks, answers, defaultTasks } = usePlan();
   const { toggleTimelineItem, toggleTask, addTask, removeTask } = usePlanStore();
-  const [subTab, setSubTab] = useState<SubTab>("milestones");
+  const [filter, setFilter] = useState<Filter>("all");
   const [newTitle, setNewTitle] = useState("");
 
   if (!answers) return null;
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayISO();
 
-  // Merge default tasks with store tasks
-  const storeTasks = tasks;
-  const defaultIds = new Set(storeTasks.map((t) => t.id));
-  const merged = [
-    ...storeTasks,
-    ...defaultTasks.filter((t) => !defaultIds.has(t.id)),
-  ].sort((a, b) => {
-    const pri = { high: 0, medium: 1, low: 2 };
-    return pri[a.priority] - pri[b.priority];
-  });
+  // Store tasks win over the adapter defaults with the same id (the store copy
+  // carries the user's done state).
+  const storeTaskIds = new Set(tasks.map((t) => t.id));
+  const mergedTasks = [...tasks, ...defaultTasks.filter((t) => !storeTaskIds.has(t.id))];
 
-  const doneTasks = merged.filter((t) => t.done);
-  const pendingTasks = merged.filter((t) => !t.done);
-  const doneTimeline = timeline.filter((t) => t.done).length;
+  const milestoneItems: PlanItem[] = timeline.map((m) => ({
+    key: `milestone-${m.id}`,
+    id: m.id,
+    kind: "milestone",
+    title: m.title,
+    date: m.targetDate || undefined,
+    category: m.category,
+    flag: m.flag,
+    done: m.done,
+    monthsBefore: m.monthsBefore,
+  }));
 
-  // Group timeline into overdue / upcoming
-  const overdueItems = timeline.filter((t) => !t.done && t.targetDate < today);
-  const upcomingItems = timeline.filter((t) => !t.done && t.targetDate >= today);
-  const doneItems = timeline.filter((t) => t.done);
+  const taskItems: PlanItem[] = mergedTasks.map((t) => ({
+    key: `task-${t.id}`,
+    id: t.id,
+    kind: "task",
+    title: t.title,
+    date: t.dueDate,
+    category: t.category,
+    priority: t.priority,
+    flag: t.flag,
+    done: t.done,
+    removable: t.id.startsWith("custom-"),
+  }));
+
+  const allItems = [...milestoneItems, ...taskItems];
+  const visible = allItems.filter((i) =>
+    filter === "all" ? true : filter === "milestones" ? i.kind === "milestone" : i.kind === "task",
+  );
+
+  const overdue = visible.filter((i) => !i.done && i.date && i.date < today).sort(byDate);
+  const upcoming = visible.filter((i) => !i.done && i.date && i.date >= today).sort(byDate);
+  const undated = visible.filter((i) => !i.done && !i.date).sort(byDate);
+  const done = visible.filter((i) => i.done).sort(byDate);
+
+  const doneMilestones = milestoneItems.filter((i) => i.done).length;
+  const doneTasks = taskItems.filter((i) => i.done).length;
+
+  const summary = [
+    "Everything on your plan, in date order",
+    `${doneMilestones} of ${milestoneItems.length} milestones done`,
+    `${doneTasks} of ${taskItems.length} tasks done`,
+    `Wedding day ${describeWeddingDate(answers)}${answers.dateIsExact ? "" : " (date TBC)"}`,
+  ].join(" · ");
+
+  function handleToggle(item: PlanItem) {
+    if (item.kind === "milestone") {
+      toggleTimelineItem(item.id);
+      return;
+    }
+    if (storeTaskIds.has(item.id)) {
+      toggleTask(item.id);
+      return;
+    }
+    // Adapter-derived tasks only exist in the store once they're touched —
+    // toggleTask can't flip one that was never persisted, so materialise it.
+    const seed = defaultTasks.find((t) => t.id === item.id);
+    if (seed) addTask({ ...seed, done: !seed.done });
+  }
+
+  function handleRemove(item: PlanItem) {
+    if (item.kind === "task") removeTask(item.id);
+  }
 
   function handleAdd() {
     if (!newTitle.trim()) return;
@@ -123,164 +271,85 @@ export function Timeline() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Timeline & Tasks</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {doneTimeline} of {timeline.length} milestones done &middot;{" "}
-          {doneTasks.length} of {merged.length} tasks done
-        </p>
+        <h1 className="text-2xl font-bold text-gray-900">Timeline &amp; Tasks</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{summary}</p>
       </div>
 
-      {/* Sub-tabs */}
+      {/* Add a task */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          placeholder="Add a task..."
+          aria-label="New task title"
+          className="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
+          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+        />
+        <button
+          onClick={handleAdd}
+          className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity"
+        >
+          Add
+        </button>
+      </div>
+
+      {/* Filter — narrows the single list, it does not split it into pages */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-        {(["milestones", "tasks"] as SubTab[]).map((tab) => (
+        {FILTERS.map(({ value, label }) => (
           <button
-            key={tab}
-            onClick={() => setSubTab(tab)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${
-              subTab === tab
+            key={value}
+            onClick={() => setFilter(value)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              filter === value
                 ? "bg-white text-gray-900 shadow-sm"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {tab}
+            {label}
           </button>
         ))}
       </div>
 
-      {/* Milestones tab */}
-      {subTab === "milestones" && (
-        <div className="space-y-6">
-          {overdueItems.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-red-500 mb-2">
-                Overdue — {overdueItems.length} item{overdueItems.length !== 1 ? "s" : ""}
-              </p>
-              <div className="space-y-2">
-                {overdueItems.map((item) => (
-                  <MilestoneRow key={item.id} item={item} today={today} onToggle={toggleTimelineItem} />
-                ))}
-              </div>
-            </div>
-          )}
+      {/* One combined list */}
+      <div className="space-y-6">
+        <Group
+          label={`Overdue — ${overdue.length} item${overdue.length !== 1 ? "s" : ""}`}
+          tone="alert"
+          items={overdue}
+          today={today}
+          onToggle={handleToggle}
+          onRemove={handleRemove}
+        />
+        <Group
+          label="Upcoming"
+          items={upcoming}
+          today={today}
+          onToggle={handleToggle}
+          onRemove={handleRemove}
+        />
+        <Group
+          label="No date yet"
+          items={undated}
+          today={today}
+          onToggle={handleToggle}
+          onRemove={handleRemove}
+        />
+        <Group
+          label={`Done — ${done.length}`}
+          items={done}
+          today={today}
+          onToggle={handleToggle}
+          onRemove={handleRemove}
+        />
 
-          {upcomingItems.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">
-                Upcoming
-              </p>
-              <div className="space-y-2">
-                {upcomingItems.map((item) => (
-                  <MilestoneRow key={item.id} item={item} today={today} onToggle={toggleTimelineItem} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {doneItems.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">
-                Done — {doneItems.length}
-              </p>
-              <div className="space-y-2">
-                {doneItems.map((item) => (
-                  <MilestoneRow key={item.id} item={item} today={today} onToggle={toggleTimelineItem} />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tasks tab */}
-      {subTab === "tasks" && (
-        <div className="space-y-4">
-          {/* Add task */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="Add a task..."
-              className="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            />
-            <button
-              onClick={handleAdd}
-              className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity"
-            >
-              Add
-            </button>
-          </div>
-
-          {/* Pending */}
-          <div className="space-y-2">
-            {pendingTasks.map((task) => (
-              <div
-                key={task.id}
-                className="bg-white border border-gray-200 rounded-xl px-5 py-3 flex items-start gap-3"
-              >
-                <button
-                  onClick={() => toggleTask(task.id)}
-                  aria-label={`Mark "${task.title}" done`}
-                  className="relative mt-0.5 w-4 h-4 rounded border-2 border-gray-300 hover:border-[var(--accent)] shrink-0 transition-colors after:content-[''] after:absolute after:-inset-2.5"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{task.title}</p>
-                  {task.flag && (
-                    <p className="text-xs text-[var(--accent)] mt-0.5">{task.flag}</p>
-                  )}
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <Badge variant={priorityVariant(task.priority)}>{task.priority}</Badge>
-                    <Badge variant="gray">{task.category}</Badge>
-                    {task.dueDate && (
-                      <span className="text-xs text-gray-400">
-                        Due{" "}
-                        {new Date(task.dueDate).toLocaleDateString("en-US", {
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {task.id.startsWith("custom-") && (
-                  <button
-                    onClick={() => removeTask(task.id)}
-                    className="text-gray-300 hover:text-red-400 text-xs transition-colors shrink-0"
-                  >
-                    remove
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Done */}
-          {doneTasks.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Done</p>
-              <div className="space-y-2">
-                {doneTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="bg-gray-50 border border-gray-100 rounded-xl px-5 py-3 flex items-center gap-3"
-                  >
-                    <button
-                      onClick={() => toggleTask(task.id)}
-                      aria-label={`Mark "${task.title}" not done`}
-                      className="relative w-4 h-4 rounded bg-[var(--accent)] border-2 border-[var(--accent)] shrink-0 after:content-[''] after:absolute after:-inset-2.5"
-                    />
-                    <p className="text-sm text-gray-400 line-through">{task.title}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+        {visible.length === 0 && (
+          <p className="text-sm text-gray-400">Nothing here yet.</p>
+        )}
+      </div>
     </div>
   );
 }

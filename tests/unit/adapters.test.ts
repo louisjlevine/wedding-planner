@@ -294,3 +294,36 @@ describe("buildInitialTasks", () => {
     expect(budgetTask.done).toBe(true);
   });
 });
+
+// ── Exact wedding dates ───────────────────────────────────────────────────────
+
+describe("date arithmetic with exact wedding dates", () => {
+  it("derives milestone targets from the exact day the couple picked", () => {
+    const answers = { ...BASE_ANSWERS, date: "2027-09-04", dateIsExact: true };
+    const items = buildTimeline(answers);
+    expect(items.find((i) => i.id === "wedding_day")?.targetDate).toBe("2027-09-04");
+    expect(items.find((i) => i.id === "rehearsal")?.targetDate).toBe("2027-09-03");
+    expect(items.find((i) => i.id === "venue")?.targetDate).toBe("2026-09-04");
+    expect(items.find((i) => i.id === "rsvp_deadline")?.targetDate).toBe("2027-07-04");
+  });
+
+  it("clamps to the last day of the month instead of overflowing", () => {
+    // Mar 31 minus one month is Feb 28 — never Mar 3.
+    const answers = { ...BASE_ANSWERS, date: "2027-03-31", dateIsExact: true };
+    const items = buildTimeline(answers);
+    expect(items.find((i) => i.id === "final_headcount")?.targetDate).toBe("2027-02-28");
+  });
+
+  it("keeps task due dates on the exact date's day of month", () => {
+    const answers = { ...BASE_ANSWERS, date: "2027-09-04", dateIsExact: true };
+    const tasks = buildInitialTasks(answers);
+    expect(tasks.find((t) => t.id === "t4")?.dueDate).toBe("2026-09-04");
+    expect(tasks.find((t) => t.id === "t7")?.dueDate).toBe("2027-03-04");
+  });
+
+  it("returns empty target dates when no wedding date is set", () => {
+    const items = buildTimeline({ ...BASE_ANSWERS, date: "" });
+    expect(items.find((i) => i.id === "venue")?.targetDate).toBe("");
+    expect(items.find((i) => i.id === "rehearsal")?.targetDate).toBe("");
+  });
+});

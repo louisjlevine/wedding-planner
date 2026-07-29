@@ -1,4 +1,5 @@
 import type { Task, TimelineItem, Vendor, WeddingAnswers, BudgetCategory, EmailDigestPrefs } from "./types";
+import { describeWeddingDate, formatDate as formatISODate } from "./date-utils";
 
 export interface DigestRequestBody {
   tasks: Task[];
@@ -23,12 +24,10 @@ export function isValidDigestBody(body: unknown): body is DigestRequestBody {
   );
 }
 
+// Re-exported for callers that already import it from here. Parses the ISO date
+// in local time so the day never slips backwards for western timezones.
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatISODate(iso);
 }
 
 function generateHtml({
@@ -202,8 +201,8 @@ export function buildDigest(data: DigestRequestBody) {
   const lines: string[] = [
     `Wedding Digest — ${coupleNames}`,
     daysUntil > 0
-      ? `${daysUntil} days until your wedding (${answers.date})`
-      : `Today is your wedding day! (${answers.date})`,
+      ? `${daysUntil} days until your wedding (${describeWeddingDate(answers)})`
+      : `Today is your wedding day! (${describeWeddingDate(answers)})`,
     "",
   ];
 
@@ -250,7 +249,7 @@ export function buildDigest(data: DigestRequestBody) {
   const html = generateHtml({
     coupleNames,
     daysUntil,
-    weddingDateStr: formatDate(answers.date),
+    weddingDateStr: describeWeddingDate(answers),
     overdueTasks,
     upcomingTasks,
     upcomingMilestones,

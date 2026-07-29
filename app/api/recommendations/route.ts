@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import type { WeddingAnswers, ResearchRecommendation } from "@/lib/types";
 import type { ResearchType } from "@/lib/research-prompts";
+import { describeWeddingDateForPrompt } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     const prompt = `You are an expert wedding planner recommending ${label} for Louis & ${answers.partnerName || "their partner"}.
 
 Wedding details:
-- Date: ${answers.date} (${answers.location})
+- Date: ${describeWeddingDateForPrompt(answers)} (${answers.location})
 - Guests: ${answers.guestCount} | Budget: $${answers.budget?.toLocaleString()}${isLuxury ? " (luxury)" : ""}
 - Vibe: ${answers.vibe?.join(", ")}
 - Priorities: ${answers.priorities?.join(", ")}

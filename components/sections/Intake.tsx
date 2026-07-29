@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/lib/plan-store";
+import {
+  SEASONS,
+  seasonToDate,
+  monthToSeason,
+  formatDateLong,
+  todayISO,
+  type Season,
+} from "@/lib/date-utils";
 import type {
   WeddingAnswers,
   WeddingVibe,
@@ -59,31 +67,13 @@ const STRESS: { value: StressSource; label: string }[] = [
   { value: "decision_fatigue", label: "Too many decisions" },
 ];
 
-type Season = "Spring" | "Summer" | "Autumn" | "Winter";
-
-const SEASONS: { value: Season; desc: string }[] = [
-  { value: "Spring", desc: "Mar – May" },
-  { value: "Summer", desc: "Jun – Aug" },
-  { value: "Autumn", desc: "Sep – Nov" },
-  { value: "Winter", desc: "Dec – Feb" },
-];
-
-// Map season + year → representative ISO date
-function seasonToDate(season: Season, year: number): string {
-  const month = { Spring: "05", Summer: "07", Autumn: "10", Winter: "12" }[season];
-  return `${year}-${month}-15`;
-}
-
 function defaultSeason(): { season: Season; year: number } {
   const d = new Date();
   d.setFullYear(d.getFullYear() + 1);
-  const month = d.getMonth() + 1; // 1-12
-  const season: Season =
-    month <= 2 || month === 12 ? "Winter" :
-    month <= 5 ? "Spring" :
-    month <= 8 ? "Summer" : "Autumn";
-  return { season, year: d.getFullYear() };
+  return { season: monthToSeason(d.getMonth() + 1), year: d.getFullYear() };
 }
+
+type DateMode = "season" | "exact";
 
 const BUDGET_RANGES: { label: string; sub: string; value: number }[] = [
   { label: "Under $15k",    sub: "Micro / elopement",  value: 12_000 },
@@ -135,8 +125,10 @@ export function Intake() {
   const [step, setStep] = useState<Step>(0);
   const [partnerName, setPartnerName] = useState("");
   const { season: defaultSeasonVal, year: defaultYear } = defaultSeason();
+  const [dateMode, setDateMode] = useState<DateMode>("season");
   const [season, setSeason] = useState<Season>(defaultSeasonVal);
   const [year, setYear] = useState<number>(defaultYear);
+  const [exactDate, setExactDate] = useState("");
   const [location, setLocation] = useState("");
   const [guestCount, setGuestCount] = useState("");
   const [budget, setBudget] = useState<number | null>(null);
@@ -174,10 +166,13 @@ export function Intake() {
     setStep((s) => Math.max(s - 1, 0) as Step);
   }
 
+  const dateIsExact = dateMode === "exact" && !!exactDate;
+
   function finish() {
     const answers: WeddingAnswers = {
       partnerName,
-      date: seasonToDate(season, year),
+      date: dateIsExact ? exactDate : seasonToDate(season, year),
+      dateIsExact,
       location,
       guestCount: parseInt(guestCount, 10),
       budget: budget!,
@@ -192,7 +187,8 @@ export function Intake() {
 
   const canProceed = [
     !!partnerName.trim(),
-    true, // season+year always valid (has defaults)
+    dateMode === "season" || !!exactDate, // season+year has defaults; exact needs a day
+
     !!location.trim(),
     !!guestCount && parseInt(guestCount) > 0,
     budget !== null,
@@ -256,42 +252,91 @@ export function Intake() {
               When&apos;s the big day?
             </h2>
             <p className="text-sm text-gray-500 mb-4">
-              Season and year — you can refine the exact date later
+              Pick the exact day if you have it — otherwise a season and year is
+              plenty to get started.
             </p>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              {SEASONS.map(({ value, desc }) => (
+
+            {/* Mode switch — exact day vs. season + year */}
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4">
+              {([
+                { value: "exact", label: "Exact date" },
+                { value: "season", label: "Season & year" },
+              ] as { value: DateMode; label: string }[]).map(({ value, label }) => (
                 <button
                   key={value}
-                  onClick={() => setSeason(value)}
-                  className={`px-4 py-3 rounded-lg text-sm border transition-all text-left ${
-                    season === value
-                      ? "bg-[var(--accent)] text-white border-[var(--accent)]"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]"
+                  onClick={() => setDateMode(value)}
+                  className={`flex-1 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    dateMode === value
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
-                  <div className="font-medium">{value}</div>
-                  <div className={`text-xs mt-0.5 ${season === value ? "text-pink-100" : "text-gray-400"}`}>
-                    {desc}
-                  </div>
+                  {label}
                 </button>
               ))}
             </div>
-            <div>
-              <label className="text-xs text-gray-500 mb-1.5 block">Year</label>
-              <select
-                value={year}
-                onChange={(e) => setYear(Number(e.target.value))}
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
-              >
-                {[0, 1, 2, 3].map((offset) => {
-                  const y = new Date().getFullYear() + offset;
-                  return <option key={y} value={y}>{y}</option>;
-                })}
-              </select>
-            </div>
-            <p className="text-xs text-[var(--accent)] mt-3">
-              Planning for {season} {year} — roughly {seasonToDate(season, year).slice(0, 7)}
-            </p>
+
+            {dateMode === "exact" ? (
+              <div>
+                <label htmlFor="intake-exact-date" className="text-xs text-gray-500 mb-1.5 block">
+                  Wedding date
+                </label>
+                <input
+                  id="intake-exact-date"
+                  type="date"
+                  value={exactDate}
+                  min={todayISO()}
+                  onChange={(e) => setExactDate(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
+                  onKeyDown={(e) => e.key === "Enter" && canProceed && next()}
+                  autoFocus
+                />
+                <p className="text-xs text-[var(--accent)] mt-3">
+                  {exactDate
+                    ? `Counting down to ${formatDateLong(exactDate)}`
+                    : "Every milestone and due date is counted back from this day."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {SEASONS.map(({ value, desc }) => (
+                    <button
+                      key={value}
+                      onClick={() => setSeason(value)}
+                      className={`px-4 py-3 rounded-lg text-sm border transition-all text-left ${
+                        season === value
+                          ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                          : "bg-white text-gray-700 border-gray-200 hover:border-[var(--accent)]"
+                      }`}
+                    >
+                      <div className="font-medium">{value}</div>
+                      <div className={`text-xs mt-0.5 ${season === value ? "text-pink-100" : "text-gray-400"}`}>
+                        {desc}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <label htmlFor="intake-year" className="text-xs text-gray-500 mb-1.5 block">Year</label>
+                  <select
+                    id="intake-year"
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
+                  >
+                    {[0, 1, 2, 3].map((offset) => {
+                      const y = new Date().getFullYear() + offset;
+                      return <option key={y} value={y}>{y}</option>;
+                    })}
+                  </select>
+                </div>
+                <p className="text-xs text-[var(--accent)] mt-3">
+                  Planning for {season} {year} — we&apos;ll pace everything off{" "}
+                  {formatDateLong(seasonToDate(season, year))} until you set the exact date.
+                </p>
+              </>
+            )}
           </div>
         )}
 

@@ -12,6 +12,7 @@ The root configuration object — drives all adaptive logic.
 |---|---|---|
 | partnerName | string | |
 | date | string | ISO date |
+| dateIsExact | boolean? | true = the couple picked this exact day; false/undefined = placeholder derived from a season + year (15th of the season's middle month). Display goes through `describeWeddingDate()` in `lib/date-utils.ts`. |
 | location | string | city / region free text |
 | guestCount | number | |
 | budget | number | total in dollars |

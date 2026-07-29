@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/lib/plan-store";
+import { daysUntil as daysUntilDate, describeWeddingDate } from "@/lib/date-utils";
 import { IconButton } from "@/components/ui/Button";
 
 interface TopbarProps {
@@ -49,11 +50,12 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     router.refresh();
   }
 
-  const daysUntil = answers?.date
-    ? Math.ceil(
-        (new Date(answers.date).getTime() - Date.now()) / (1000 * 60 * 60 * 24) // eslint-disable-line react-hooks/purity
-      )
-    : null;
+  const daysUntil = daysUntilDate(
+    answers?.date,
+    Date.now() // eslint-disable-line react-hooks/purity
+  );
+  // Approximate dates come from a season + year, so the countdown is an estimate.
+  const dateIsApproximate = !!answers && !answers.dateIsExact;
 
   return (
     <header className="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-6 shrink-0">
@@ -75,8 +77,11 @@ export function Topbar({ onMenuClick }: TopbarProps) {
               Louis & {answers.partnerName}
             </span>
             {daysUntil !== null && daysUntil > 0 && (
-              <span className="hidden sm:inline text-xs bg-[var(--accent)]/10 text-[var(--accent)] px-2.5 py-0.5 rounded-full font-semibold">
-                {daysUntil} days to go
+              <span
+                title={describeWeddingDate(answers)}
+                className="hidden sm:inline text-xs bg-[var(--accent)]/10 text-[var(--accent)] px-2.5 py-0.5 rounded-full font-semibold"
+              >
+                {dateIsApproximate ? "~" : ""}{daysUntil} days to go
               </span>
             )}
           </>

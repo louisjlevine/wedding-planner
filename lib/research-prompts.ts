@@ -1,4 +1,5 @@
 import type { WeddingAnswers } from "./types";
+import { describeWeddingDate, describeWeddingDateForPrompt } from "./date-utils";
 
 export type ResearchType =
   | "venue"
@@ -27,7 +28,7 @@ export function buildResearchPrompt(
   const context = `
 Wedding context:
 - Partner: ${answers.partnerName}
-- Date: ${answers.date}
+- Date: ${describeWeddingDateForPrompt(answers)}
 - Location: ${answers.location}
 - Guests: ${answers.guestCount}
 - Budget: $${answers.budget.toLocaleString()}${isLuxury ? " (luxury tier)" : ""}
@@ -84,7 +85,7 @@ Be specific and practical.`,
 
 Research wedding flowers and decor. Cover:
 1. Floral styles that match their ${answers.vibe.join("/")} vibe
-2. Seasonal flower availability around ${answers.date}
+2. Seasonal flower availability around ${describeWeddingDate(answers)}
 3. Budget allocation guidance for flowers
 4. DIY vs professional tradeoffs
 ${isOutdoor ? "4. Outdoor-specific: weather-resistant flowers and wind-proof arrangements" : ""}
@@ -125,7 +126,7 @@ Be specific and practical.`,
 
 Research honeymoon planning. Cover:
 1. Destination ideas that match their ${answers.vibe.join("/")} vibe and ${answers.location} base
-2. Best timing relative to their ${answers.date} wedding date
+2. Best timing relative to their ${describeWeddingDate(answers)} wedding date
 3. Budget guidance for honeymoon
 ${isLuxury ? "3. Luxury honeymoon experiences and resorts" : ""}
 4. Booking timeline and deals

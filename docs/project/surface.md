@@ -26,9 +26,8 @@ components/
 ├── sections/
 │   ├── Intake.tsx          # 10-question intake wizard — drives everything
 │   ├── Overview.tsx        # Dashboard with key metrics
-│   ├── Timeline.tsx        # Derived milestones
+│   ├── Timeline.tsx        # Combined milestones + tasks on one page
 │   ├── Budget.tsx          # Budget categories + spend tracking
-│   ├── Tasks.tsx           # Task list
 │   ├── Vendors.tsx         # Vendor CRUD + notes/attachments
 │   ├── Compare.tsx         # Side-by-side venue cost comparison
 │   ├── Guests.tsx          # Guest list + RSVP tracking
