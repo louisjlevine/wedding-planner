@@ -5,6 +5,7 @@ import type {
   AdaptiveAdjustment,
   Task,
 } from "./types";
+import { parseISODate, toISODate } from "./date-utils";
 
 // ── Timeline ──────────────────────────────────────────────────────────────────
 
@@ -389,15 +390,19 @@ export function buildInitialTasks(answers: WeddingAnswers): Task[] {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function monthsBefore(isoDate: string, months: number): string {
-  if (!isoDate) return "";
-  const d = new Date(isoDate);
-  d.setMonth(d.getMonth() - months);
-  return d.toISOString().split("T")[0];
+  const d = parseISODate(isoDate);
+  if (!d) return "";
+  // Build the target month first, then clamp the day: rolling back from an exact
+  // date like Mar 31 must land on Feb 28, not overflow into March.
+  const target = new Date(d.getFullYear(), d.getMonth() - months, 1);
+  const lastDayOfMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(d.getDate(), lastDayOfMonth));
+  return toISODate(target);
 }
 
 function daysBefore(isoDate: string, days: number): string {
-  if (!isoDate) return "";
-  const d = new Date(isoDate);
+  const d = parseISODate(isoDate);
+  if (!d) return "";
   d.setDate(d.getDate() - days);
-  return d.toISOString().split("T")[0];
+  return toISODate(d);
 }

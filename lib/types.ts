@@ -39,6 +39,11 @@ export type StressSource =
 export interface WeddingAnswers {
   partnerName: string;
   date: string; // ISO date string
+  // true  → `date` is the exact day the couple picked
+  // false → `date` is a placeholder derived from a season + year (the 15th of the
+  //         season's middle month). Display code shows "Summer 2027" instead of a
+  //         specific day so nothing implies precision the couple doesn't have.
+  dateIsExact?: boolean;
   location: string;
   guestCount: number;
   budget: number;

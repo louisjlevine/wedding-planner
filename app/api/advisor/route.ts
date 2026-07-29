@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
 import type { WeddingAnswers } from "@/lib/types";
+import { describeWeddingDateForPrompt } from "@/lib/date-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     const context = answers
       ? `
 Wedding context for ${answers.partnerName ? `Louis & ${answers.partnerName}` : "this couple"}:
-- Date: ${answers.date}
+- Date: ${describeWeddingDateForPrompt(answers)}
 - Location: ${answers.location}
 - Guests: ${answers.guestCount}
 - Budget: $${answers.budget?.toLocaleString() ?? "TBD"}

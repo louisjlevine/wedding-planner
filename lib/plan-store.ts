@@ -290,6 +290,14 @@ export function migratePlanStore(persisted: unknown, version: number): PlanState
       state.customBudgetCategories = [];
     }
   }
+  if (version < 9) {
+    // New persisted field: WeddingAnswers.dateIsExact. Every date recorded
+    // before this version came from the season + year picker, so it's a
+    // placeholder — mark it approximate rather than claiming a specific day.
+    if (state.answers && state.answers.dateIsExact === undefined) {
+      state.answers = { ...state.answers, dateIsExact: false };
+    }
+  }
   return state as PlanState;
 }
 
@@ -750,7 +758,7 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
-      version: 8,
+      version: 9,
       migrate: (persisted, version) => migratePlanStore(persisted, version),
     }
   )
