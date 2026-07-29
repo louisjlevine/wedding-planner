@@ -43,7 +43,7 @@ function BudgetTableRow({
 
   return (
     <tr className="border-t border-gray-100 align-top">
-      <td className="sticky left-0 z-10 bg-white px-3 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">
+      <td className="sticky left-0 z-10 bg-white border-r border-gray-200 px-3 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">
         {cat.name}
         {cat.isCustom && (
           <span className="ml-2 text-[10px] font-normal uppercase tracking-wide text-gray-400">added</span>
@@ -81,7 +81,7 @@ function BudgetTableRow({
           {isOver && <span className="text-[10px] text-red-500 font-medium">over budget</span>}
         </div>
       </td>
-      <td className="px-3 py-3 text-xs text-gray-500 leading-relaxed">
+      <td className="px-3 py-3 text-xs text-gray-500 leading-relaxed min-w-[260px]">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             {cat.description ?? ""}
@@ -216,16 +216,21 @@ export function Budget() {
       )}
 
       <Panel title="Budget breakdown">
-        <div className="overflow-x-auto -mx-5 px-5">
-          <table className="w-full text-xs border border-gray-200 rounded-xl overflow-hidden">
+        {/* The border + rounding live on the scroll container, not the table.
+            `overflow-hidden` on the <table> would make the table itself the
+            sticky scrollport, which silently kills the frozen first column. */}
+        <div className="overflow-x-auto border border-gray-200 rounded-xl">
+          <table className="w-full text-xs">
             <thead>
               <tr className="bg-gray-50 text-left">
-                <th className="sticky left-0 z-20 bg-gray-50 px-3 py-2 font-medium text-gray-500 whitespace-nowrap">Type</th>
+                <th className="sticky left-0 z-20 bg-gray-50 border-r border-gray-200 px-3 py-2 font-medium text-gray-500 whitespace-nowrap">Type</th>
                 <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Estimate</th>
                 <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Revised Estimate</th>
                 <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Revised %</th>
                 <th className="px-3 py-2 font-medium text-gray-500 text-right whitespace-nowrap">Spent</th>
-                <th className="px-3 py-2 font-medium text-gray-500 whitespace-nowrap">Explanation</th>
+                {/* Floor the width so the prose column can't be squeezed to a
+                    sliver on narrow screens — it scrolls into view instead. */}
+                <th className="px-3 py-2 font-medium text-gray-500 whitespace-nowrap min-w-[260px]">Explanation</th>
               </tr>
             </thead>
             <tbody>
@@ -240,7 +245,7 @@ export function Budget() {
                 />
               ))}
               <tr className="border-t-2 border-gray-300 bg-[var(--accent)]/5">
-                <td className="sticky left-0 z-10 bg-[var(--accent-wash)] px-3 py-2.5 font-semibold text-gray-900">Total</td>
+                <td className="sticky left-0 z-10 bg-[var(--accent-wash)] border-r border-gray-200 px-3 py-2.5 font-semibold text-gray-900">Total</td>
                 <td className="px-3 py-2.5 text-right font-semibold text-gray-900 tabular-nums">
                   ${baseBudgetCategories.reduce((s, c) => s + c.amount, 0).toLocaleString()}
                 </td>
