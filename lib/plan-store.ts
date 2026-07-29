@@ -19,6 +19,7 @@ import type {
   BarMode,
   MiscLineItem,
   MiscLineItemLabel,
+  CustomBudgetCategory,
 } from "./types";
 import { priorityFromRelationship } from "./guest-priority";
 
@@ -42,6 +43,7 @@ interface PlanState {
   researchSessions: Record<string, ResearchSession>;
   advisorMessages: AdvisorMessage[];
   budgetOverrides: Record<string, BudgetOverride>;
+  customBudgetCategories: CustomBudgetCategory[];
   dismissedRecommendations: Record<string, string[]>; // type → [lowercased title, ...]
   triggerResearchFor: string | null; // set by Vendors "Find similar" to auto-fetch
   timelineDoneIds: string[];
@@ -100,6 +102,11 @@ interface PlanState {
   // Budget overrides
   setBudgetOverride: (id: string, override: BudgetOverride) => void;
   resetBudgetOverrides: () => void;
+
+  // User-added budget line items
+  addCustomBudgetCategory: (name: string) => CustomBudgetCategory;
+  updateCustomBudgetCategory: (id: string, updates: Partial<Omit<CustomBudgetCategory, "id">>) => void;
+  removeCustomBudgetCategory: (id: string) => void;
 
   // Research trigger from Vendors
   setTriggerResearchFor: (type: string | null) => void;
@@ -276,6 +283,13 @@ export function migratePlanStore(persisted: unknown, version: number): PlanState
       });
     }
   }
+  if (version < 8) {
+    // New persisted field: user-added budget line items. Existing plans start
+    // with none — the adapter-derived categories are unchanged.
+    if (!Array.isArray(state.customBudgetCategories)) {
+      state.customBudgetCategories = [];
+    }
+  }
   return state as PlanState;
 }
 
@@ -290,6 +304,7 @@ export const usePlanStore = create<PlanState>()(
       researchSessions: {},
       advisorMessages: [],
       budgetOverrides: {},
+      customBudgetCategories: [],
       dismissedRecommendations: {},
       triggerResearchFor: null,
       timelineDoneIds: [],
@@ -624,6 +639,50 @@ export const usePlanStore = create<PlanState>()(
 
       resetBudgetOverrides: () => set({ budgetOverrides: {} }),
 
+      addCustomBudgetCategory: (name) => {
+        const trimmed = name.trim();
+        if (!trimmed) return { id: "", name: "", amount: 0, spent: 0 };
+        let entry: CustomBudgetCategory | undefined;
+        set((state) => {
+          // Reuse an existing line rather than creating a duplicate row that
+          // would double-count in the allocation total.
+          const found = state.customBudgetCategories.find(
+            (c) => c.name.toLowerCase() === trimmed.toLowerCase(),
+          );
+          if (found) {
+            entry = found;
+            return state;
+          }
+          entry = {
+            id: `custom-${Date.now()}-${state.customBudgetCategories.length}`,
+            name: trimmed,
+            amount: 0,
+            spent: 0,
+          };
+          return { customBudgetCategories: [...state.customBudgetCategories, entry] };
+        });
+        return entry ?? { id: "", name: "", amount: 0, spent: 0 };
+      },
+
+      updateCustomBudgetCategory: (id, updates) =>
+        set((state) => ({
+          customBudgetCategories: state.customBudgetCategories.map((c) =>
+            c.id === id ? { ...c, ...updates } : c,
+          ),
+        })),
+
+      removeCustomBudgetCategory: (id) =>
+        set((state) => {
+          // Drop any stale override keyed to this id so a later line item that
+          // somehow reuses the id can't inherit its amounts.
+          const { [id]: _dropped, ...restOverrides } = state.budgetOverrides;
+          void _dropped;
+          return {
+            customBudgetCategories: state.customBudgetCategories.filter((c) => c.id !== id),
+            budgetOverrides: restOverrides,
+          };
+        }),
+
       setTriggerResearchFor: (type) => set({ triggerResearchFor: type }),
 
       toggleTimelineItem: (id) =>
@@ -691,7 +750,7 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
-      version: 7,
+      version: 8,
       migrate: (persisted, version) => migratePlanStore(persisted, version),
     }
   )

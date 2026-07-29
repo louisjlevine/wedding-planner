@@ -9,7 +9,11 @@
 
 html, body {
   width: 100%;
-  overflow-x: hidden;
+  /* `clip` not `hidden`: overflow-x:hidden on the root turns the viewport into
+     a scroll container, which on mobile blocks panning and clamps pinch-zoom-
+     out. `clip` suppresses the same stray horizontal scroll without creating
+     a scroll container, so zoom/pan stay under the user's control. */
+  overflow-x: clip;
 }
 
 body {
