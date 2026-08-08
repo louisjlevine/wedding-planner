@@ -424,6 +424,16 @@ export function describeSchedule(task: Pick<Task, "monthsBefore" | "daysBefore">
 }
 
 /**
+ * Quick-pick assignees: the couple, plus "Both". `Task.assignee` is free text,
+ * so these are shortcuts in the editor rather than the only allowed values —
+ * anyone else (a parent, the planner) can be typed in.
+ */
+export function assigneeSuggestions(answers: Pick<WeddingAnswers, "partnerName">): string[] {
+  const partner = answers.partnerName?.trim();
+  return partner ? ["Louis", partner, "Both"] : ["Louis", "Both"];
+}
+
+/**
  * The full plan: everything the user has touched (which lives in the store)
  * plus any seed item they haven't. Adapter-derived tasks are only persisted
  * once edited, so counting the store alone undercounts the plan.

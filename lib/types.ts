@@ -154,6 +154,13 @@ export interface Task {
   done: boolean;
   priority: "high" | "medium" | "low";
   flag?: string; // e.g. "book early — venues fill 18mo out"
+  /**
+   * Who owns this task. Free text rather than an enum so it covers the couple
+   * ("Louis", the partner's name, "Both") *and* anyone else they hand work to —
+   * a parent, the maid of honour, a planner. Undefined means unassigned; the
+   * editor normalises a blank input back to undefined.
+   */
+  assignee?: string;
 }
 
 export type GuestRelationship = "family" | "close_friend" | "friend" | "acquaintance";

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { usePlan } from "@/hooks/usePlan";
 import { usePlanStore } from "@/lib/plan-store";
 import { Badge } from "@/components/ui/Badge";
-import { describeSchedule, resolveDueDate } from "@/lib/plan-adapters";
+import { assigneeSuggestions, describeSchedule, resolveDueDate } from "@/lib/plan-adapters";
 import { describeWeddingDate, formatDate, todayISO } from "@/lib/date-utils";
 import type { Task, WeddingAnswers } from "@/lib/types";
 
@@ -145,18 +145,91 @@ function DateModePicker({
   );
 }
 
-function DateEditor({
+// ── Assignee ──────────────────────────────────────────────────────────────────
+
+const chipClass = (active: boolean) =>
+  `px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+    active
+      ? "bg-[var(--accent)] text-white"
+      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+  }`;
+
+/**
+ * Quick-pick chips for the couple plus a free-text box for anyone else. The
+ * text input is the source of truth — chips just fill it — so "Mom" or
+ * "Wedding planner" works exactly like "Louis".
+ */
+function AssigneePicker({
+  value,
+  onChange,
+  suggestions,
+  idPrefix,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  suggestions: string[];
+  idPrefix: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {suggestions.map((name) => (
+        <button
+          key={name}
+          type="button"
+          aria-label={`${idPrefix}: ${name}`}
+          // Clicking the active chip clears it, so "unassign" needs no extra control.
+          onClick={() => onChange(value === name ? "" : name)}
+          className={chipClass(value === name)}
+        >
+          {name}
+        </button>
+      ))}
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="or someone else..."
+        aria-label={`${idPrefix} assignee`}
+        className={`${inputClass} w-44`}
+      />
+    </div>
+  );
+}
+
+// ── Task editing ──────────────────────────────────────────────────────────────
+
+const PRIORITIES: Task["priority"][] = ["high", "medium", "low"];
+
+function EditorField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+/** Everything about a task the user can change. `done` is the checkbox's job. */
+type TaskEdits = Pick<Task, "title" | "category" | "priority" | "assignee"> & DateFields;
+
+function TaskEditor({
   task,
   weddingDate,
+  assignees,
   onSave,
   onCancel,
 }: {
   task: Task;
   weddingDate: string;
-  onSave: (fields: DateFields) => void;
+  assignees: string[];
+  onSave: (edits: TaskEdits) => void;
   onCancel: () => void;
 }) {
   const initialMode = modeOf(task);
+  const [title, setTitle] = useState(task.title);
+  const [assignee, setAssignee] = useState(task.assignee ?? "");
+  const [category, setCategory] = useState(task.category);
+  const [priority, setPriority] = useState<Task["priority"]>(task.priority);
   const [mode, setMode] = useState<DateMode>(initialMode);
   const [exact, setExact] = useState(
     task.dueDate ?? (initialMode === "relative" ? resolveDueDate(task, weddingDate) ?? "" : ""),
@@ -165,24 +238,95 @@ function DateEditor({
     task.monthsBefore != null ? String(task.monthsBefore) : task.daysBefore != null ? "0" : "6",
   );
 
+  // The row is identified by its *original* title, so the labels stay stable
+  // while the user is retyping the title in this very form.
+  const idPrefix = task.title;
+  const canSave = title.trim().length > 0;
+
+  function handleSave() {
+    if (!canSave) return;
+    onSave({
+      title: title.trim(),
+      category: category.trim() || "Other",
+      priority,
+      assignee: assignee.trim() || undefined,
+      ...fieldsFor(mode, exact, months),
+    });
+  }
+
   return (
-    <div className="mt-3 border-t border-gray-100 pt-3 space-y-3">
-      <DateModePicker
-        mode={mode}
-        onModeChange={setMode}
-        exact={exact}
-        onExactChange={setExact}
-        months={months}
-        onMonthsChange={setMonths}
-        weddingDate={weddingDate}
-        idPrefix={task.title}
-      />
+    <div className="mt-3 border-t border-gray-100 pt-3 space-y-4">
+      <EditorField label="Task">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          aria-label={`${idPrefix} title`}
+          className={`${inputClass} w-full`}
+        />
+      </EditorField>
+
+      <EditorField label="Assigned to">
+        <AssigneePicker
+          value={assignee}
+          onChange={setAssignee}
+          suggestions={assignees}
+          idPrefix={idPrefix}
+        />
+      </EditorField>
+
+      <div className="flex flex-wrap gap-6">
+        <EditorField label="Category">
+          <input
+            type="text"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            aria-label={`${idPrefix} category`}
+            className={`${inputClass} w-44`}
+          />
+        </EditorField>
+
+        <EditorField label="Priority">
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+            {PRIORITIES.map((p) => (
+              <button
+                key={p}
+                type="button"
+                aria-label={`${idPrefix} priority: ${p}`}
+                onClick={() => setPriority(p)}
+                className={`px-3 py-1 rounded-md text-xs font-medium capitalize transition-colors ${
+                  priority === p
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </EditorField>
+      </div>
+
+      <EditorField label="Date">
+        <DateModePicker
+          mode={mode}
+          onModeChange={setMode}
+          exact={exact}
+          onExactChange={setExact}
+          months={months}
+          onMonthsChange={setMonths}
+          weddingDate={weddingDate}
+          idPrefix={idPrefix}
+        />
+      </EditorField>
+
       <div className="flex gap-2">
         <button
-          onClick={() => onSave(fieldsFor(mode, exact, months))}
-          className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
+          onClick={handleSave}
+          disabled={!canSave}
+          className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Save date
+          Save changes
         </button>
         <button
           onClick={onCancel}
@@ -203,9 +347,10 @@ function TaskRow({
   today,
   weddingDate,
   editing,
+  assignees,
   onEdit,
   onToggle,
-  onSaveDate,
+  onSaveEdits,
   onRemove,
 }: {
   task: Task;
@@ -213,9 +358,10 @@ function TaskRow({
   today: string;
   weddingDate: string;
   editing: boolean;
+  assignees: string[];
   onEdit: (id: string | null) => void;
   onToggle: (task: Task) => void;
-  onSaveDate: (task: Task, fields: DateFields) => void;
+  onSaveEdits: (task: Task, edits: TaskEdits) => void;
   onRemove: (task: Task) => void;
 }) {
   const isToday = !!date && date === today;
@@ -266,11 +412,13 @@ function TaskRow({
             </p>
             <Badge variant={priorityVariant(task.priority)}>{task.priority}</Badge>
             <Badge variant="gray">{task.category}</Badge>
+            {task.assignee && <Badge variant="blue">{task.assignee}</Badge>}
           </div>
           {task.flag && <p className="text-xs text-[var(--accent)] mt-1">{task.flag}</p>}
         </div>
 
         <div className="shrink-0 text-right flex items-start gap-3">
+          {/* The date doubles as a shortcut into the editor it lives in. */}
           <button
             onClick={() => onEdit(editing ? null : task.id)}
             aria-label={`Edit date for "${task.title}"`}
@@ -287,6 +435,13 @@ function TaskRow({
               <span className="block text-xs text-gray-400 mt-0.5">{schedule}</span>
             )}
           </button>
+          <button
+            onClick={() => onEdit(editing ? null : task.id)}
+            aria-label={`Edit "${task.title}"`}
+            className="text-gray-400 hover:text-[var(--accent)] text-xs font-medium transition-colors mt-0.5"
+          >
+            {editing ? "close" : "edit"}
+          </button>
           {removable && (
             <button
               onClick={() => onRemove(task)}
@@ -299,10 +454,11 @@ function TaskRow({
       </div>
 
       {editing && (
-        <DateEditor
+        <TaskEditor
           task={task}
           weddingDate={weddingDate}
-          onSave={(fields) => onSaveDate(task, fields)}
+          assignees={assignees}
+          onSave={(edits) => onSaveEdits(task, edits)}
           onCancel={() => onEdit(null)}
         />
       )}
@@ -322,9 +478,10 @@ function Group({
   today: string;
   weddingDate: string;
   editingId: string | null;
+  assignees: string[];
   onEdit: (id: string | null) => void;
   onToggle: (task: Task) => void;
-  onSaveDate: (task: Task, fields: DateFields) => void;
+  onSaveEdits: (task: Task, edits: TaskEdits) => void;
   onRemove: (task: Task) => void;
 }) {
   if (items.length === 0) return null;
@@ -377,6 +534,7 @@ export function Timeline() {
   const [filter, setFilter] = useState<Filter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
+  const [newAssignee, setNewAssignee] = useState("");
   const [newMode, setNewMode] = useState<DateMode>("none");
   const [newExact, setNewExact] = useState("");
   const [newMonths, setNewMonths] = useState("6");
@@ -386,6 +544,7 @@ export function Timeline() {
   const today = todayISO();
   const weddingDate = answers.date;
   const storeTaskIds = new Set(tasks.map((t) => t.id));
+  const assignees = assigneeSuggestions(answers);
 
   const dated: DatedTask[] = allTasks.map((task) => ({
     task,
@@ -420,8 +579,8 @@ export function Timeline() {
     applyUpdate(task, { done: !task.done });
   }
 
-  function handleSaveDate(task: Task, fields: DateFields) {
-    applyUpdate(task, fields);
+  function handleSaveEdits(task: Task, edits: TaskEdits) {
+    applyUpdate(task, edits);
     setEditingId(null);
   }
 
@@ -438,9 +597,11 @@ export function Timeline() {
       category: "Custom",
       priority: "medium",
       done: false,
+      assignee: newAssignee.trim() || undefined,
       ...fieldsFor(newMode, newExact, newMonths),
     });
     setNewTitle("");
+    setNewAssignee("");
     setNewMode("none");
     setNewExact("");
     setNewMonths("6");
@@ -450,9 +611,10 @@ export function Timeline() {
     today,
     weddingDate,
     editingId,
+    assignees,
     onEdit: setEditingId,
     onToggle: handleToggle,
-    onSaveDate: handleSaveDate,
+    onSaveEdits: handleSaveEdits,
     onRemove: handleRemove,
   };
 
@@ -485,6 +647,12 @@ export function Timeline() {
             Add
           </button>
         </div>
+        <AssigneePicker
+          value={newAssignee}
+          onChange={setNewAssignee}
+          suggestions={assignees}
+          idPrefix="New task"
+        />
         <DateModePicker
           mode={newMode}
           onModeChange={setNewMode}
