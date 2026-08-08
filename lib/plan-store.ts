@@ -311,6 +311,16 @@ export function migratePlanStore(persisted: unknown, version: number): PlanState
     );
     delete legacy.timelineDoneIds;
   }
+  if (version < 11) {
+    // New persisted field: Task.assignee. Nothing to backfill — existing tasks
+    // are simply unassigned — but normalise any blank string to undefined so
+    // "nobody owns this" has a single representation everywhere.
+    if (Array.isArray(state.tasks)) {
+      state.tasks = state.tasks.map((t) =>
+        t.assignee?.trim() ? t : { ...t, assignee: undefined },
+      );
+    }
+  }
   return state as PlanState;
 }
 
@@ -772,7 +782,7 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
-      version: 10,
+      version: 11,
       migrate: (persisted, version) => migratePlanStore(persisted, version),
     }
   )

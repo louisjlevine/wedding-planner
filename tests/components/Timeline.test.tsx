@@ -172,7 +172,7 @@ describe("Timeline — editing a date after the fact", () => {
     fireEvent.change(screen.getByLabelText("Book your venue exact date"), {
       target: { value: `${WEDDING_YEAR}-02-14` },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save date" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     const stored = usePlanStore.getState().tasks.find((t) => t.id === "venue")!;
     expect(stored.dueDate).toBe(`${WEDDING_YEAR}-02-14`);
@@ -186,7 +186,7 @@ describe("Timeline — editing a date after the fact", () => {
     fireEvent.change(screen.getByLabelText("Book your venue months before the wedding"), {
       target: { value: "18" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save date" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     const stored = usePlanStore.getState().tasks.find((t) => t.id === "venue")!;
     expect(stored.monthsBefore).toBe(18);
@@ -205,7 +205,7 @@ describe("Timeline — editing a date after the fact", () => {
       screen.getByLabelText("Create a wedding email address months before the wedding"),
       { target: { value: "10" } },
     );
-    fireEvent.click(screen.getByRole("button", { name: "Save date" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(usePlanStore.getState().tasks.find((t) => t.id === "t1")?.monthsBefore).toBe(10);
   });
@@ -214,7 +214,7 @@ describe("Timeline — editing a date after the fact", () => {
     render(<Timeline />);
     fireEvent.click(screen.getByRole("button", { name: 'Edit date for "Book your venue"' }));
     fireEvent.click(screen.getByRole("button", { name: "Book your venue: No date" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save date" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     const stored = usePlanStore.getState().tasks.find((t) => t.id === "venue")!;
     expect(stored.dueDate).toBeUndefined();
@@ -240,11 +240,163 @@ describe("Timeline — editing a date after the fact", () => {
     fireEvent.change(screen.getByLabelText("Book hair trial exact date"), {
       target: { value: `${WEDDING_YEAR}-08-01` },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save date" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     const stored = usePlanStore.getState().tasks.filter((t) => t.id === "custom-1");
     expect(stored).toHaveLength(1);
     expect(stored[0].dueDate).toBe(`${WEDDING_YEAR}-08-01`);
+  });
+});
+
+describe("Timeline — editing the task itself", () => {
+  it("renames a task and keeps it a single row", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue title"), {
+      target: { value: "Book the barn" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    const stored = usePlanStore.getState().tasks.filter((t) => t.id === "venue");
+    expect(stored).toHaveLength(1);
+    expect(stored[0].title).toBe("Book the barn");
+    expect(screen.getByText("Book the barn")).toBeTruthy();
+    expect(screen.queryByText("Book your venue")).toBeNull();
+  });
+
+  it("refuses to save a blank title", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue title"), { target: { value: "  " } });
+
+    const save = screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(usePlanStore.getState().tasks.find((t) => t.id === "venue")).toBeUndefined();
+  });
+
+  it("changes category and priority", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue category"), {
+      target: { value: "Logistics" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Book your venue priority: low" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    const stored = usePlanStore.getState().tasks.find((t) => t.id === "venue")!;
+    expect(stored.category).toBe("Logistics");
+    expect(stored.priority).toBe("low");
+  });
+
+  it("falls back to a placeholder category rather than saving a blank one", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue category"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(usePlanStore.getState().tasks.find((t) => t.id === "venue")?.category).toBe("Other");
+  });
+
+  it("edits several fields in one save", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue title"), {
+      target: { value: "Lock in the barn" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Book your venue: Alex" }));
+    fireEvent.click(screen.getByRole("button", { name: "Book your venue priority: low" }));
+    fireEvent.click(screen.getByRole("button", { name: "Book your venue: Exact date" }));
+    fireEvent.change(screen.getByLabelText("Book your venue exact date"), {
+      target: { value: `${WEDDING_YEAR}-03-01` },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    const stored = usePlanStore.getState().tasks.find((t) => t.id === "venue")!;
+    expect(stored).toMatchObject({
+      title: "Lock in the barn",
+      assignee: "Alex",
+      priority: "low",
+      dueDate: `${WEDDING_YEAR}-03-01`,
+    });
+    expect(stored.monthsBefore).toBeUndefined();
+  });
+
+  it("discards edits on cancel", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue title"), {
+      target: { value: "Nope" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(usePlanStore.getState().tasks.find((t) => t.id === "venue")).toBeUndefined();
+    expect(screen.getByText("Book your venue")).toBeTruthy();
+  });
+});
+
+describe("Timeline — assignees", () => {
+  it("offers Louis, the partner, and Both as quick picks", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    expect(screen.getByRole("button", { name: "Book your venue: Louis" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Book your venue: Alex" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Book your venue: Both" })).toBeTruthy();
+  });
+
+  it("assigns a task from a quick pick and shows it on the row", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.click(screen.getByRole("button", { name: "Book your venue: Louis" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(usePlanStore.getState().tasks.find((t) => t.id === "venue")?.assignee).toBe("Louis");
+    // Scoped to the row — the add form's quick-pick chip also reads "Louis".
+    const row = screen
+      .getByText("Book your venue")
+      .closest<HTMLElement>("[class*='rounded-xl']")!;
+    expect(within(row).getByText("Louis")).toBeTruthy();
+  });
+
+  it("accepts anyone else as free text", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue assignee"), {
+      target: { value: "Maid of honour" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(usePlanStore.getState().tasks.find((t) => t.id === "venue")?.assignee)
+      .toBe("Maid of honour");
+  });
+
+  it("unassigns by clicking the active quick pick again", () => {
+    usePlanStore.setState({
+      tasks: [
+        {
+          id: "venue", title: "Book your venue", category: "Venue",
+          priority: "high", done: false, monthsBefore: 12, assignee: "Louis",
+        },
+      ],
+    });
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.click(screen.getByRole("button", { name: "Book your venue: Louis" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(usePlanStore.getState().tasks.find((t) => t.id === "venue")?.assignee).toBeUndefined();
+  });
+
+  it("assigns a task at creation time", () => {
+    render(<Timeline />);
+    fireEvent.change(screen.getByLabelText("New task title"), {
+      target: { value: "Chase the florist" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "New task: Both" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    const added = usePlanStore.getState().tasks.find((t) => t.title === "Chase the florist")!;
+    expect(added.assignee).toBe("Both");
   });
 });
 

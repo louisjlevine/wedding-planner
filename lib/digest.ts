@@ -76,7 +76,9 @@ function generateHtml({
 
   const detail = (t: Task) => {
     const due = dueDateOf(t);
-    return `Due ${due ? formatDate(due) : "–"} · ${t.category}`;
+    const parts = [`Due ${due ? formatDate(due) : "–"}`, t.category];
+    if (t.assignee) parts.push(t.assignee);
+    return parts.join(" · ");
   };
 
   if (overdueTasks.length > 0) {
@@ -161,6 +163,7 @@ export function buildDigest(data: DigestRequestBody) {
   // Relatively-scheduled tasks carry an offset rather than a date, so every
   // due-date read has to go through the resolver.
   const dueDateOf = (t: Task) => resolveDueDate(t, answers.date);
+  const assignedTo = (t: Task) => (t.assignee ? ` — ${t.assignee}` : "");
 
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
@@ -208,7 +211,7 @@ export function buildDigest(data: DigestRequestBody) {
   if (overdueTasks.length > 0) {
     lines.push(`OVERDUE TASKS (${overdueTasks.length})`);
     overdueTasks.forEach((t) => {
-      lines.push(`  [!] ${t.title} — due ${dueDateOf(t) ?? "unknown"} — ${t.category}`);
+      lines.push(`  [!] ${t.title} — due ${dueDateOf(t) ?? "unknown"} — ${t.category}${assignedTo(t)}`);
     });
     lines.push("");
   }
@@ -216,7 +219,7 @@ export function buildDigest(data: DigestRequestBody) {
   if (upcomingTasks.length > 0) {
     lines.push(`TASKS DUE IN THE NEXT 14 DAYS (${upcomingTasks.length})`);
     upcomingTasks.forEach((t) => {
-      lines.push(`  [ ] ${t.title} — due ${dueDateOf(t) ?? "unknown"} — ${t.category}`);
+      lines.push(`  [ ] ${t.title} — due ${dueDateOf(t) ?? "unknown"} — ${t.category}${assignedTo(t)}`);
     });
     lines.push("");
   }

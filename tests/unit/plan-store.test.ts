@@ -495,3 +495,29 @@ describe("migratePlanStore — v9 → v10 milestones merged into tasks", () => {
     expect(migrated.tasks).toEqual([]);
   });
 });
+
+describe("migratePlanStore — v10 → v11 task assignee", () => {
+  const task = (over: Partial<import("@/lib/types").Task> = {}) => ({
+    id: "custom-1", title: "Book hair trial", category: "Custom",
+    priority: "medium" as const, done: false, ...over,
+  });
+
+  it("leaves existing tasks unassigned", () => {
+    const migrated = migratePlanStore({ tasks: [task()] }, 10);
+    expect(migrated.tasks[0].assignee).toBeUndefined();
+  });
+
+  it("normalises a blank assignee to undefined", () => {
+    const migrated = migratePlanStore({ tasks: [task({ assignee: "   " })] }, 10);
+    expect(migrated.tasks[0].assignee).toBeUndefined();
+  });
+
+  it("keeps a real assignee", () => {
+    const migrated = migratePlanStore({ tasks: [task({ assignee: "Louis" })] }, 10);
+    expect(migrated.tasks[0].assignee).toBe("Louis");
+  });
+
+  it("handles a payload with no tasks array", () => {
+    expect(migratePlanStore({}, 10).tasks).toBeUndefined();
+  });
+});

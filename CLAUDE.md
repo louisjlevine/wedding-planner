@@ -89,6 +89,7 @@ User can say `full team` (run everything) or `skip QA` / `skip security` (drop s
 - **`ResearchCard` is the only AI prose renderer** — keep the `<pre className="whitespace-pre-wrap">` wrapper.
 - **`BudgetBar` and `MetricCard`** are shared across Overview, Budget, and Compare — changes propagate to all three.
 - **Milestones and tasks are ONE type** — there is no `TimelineItem` and no "milestone" concept. Everything is a `Task` in `tasks`, rendered by `Timeline.tsx` as a single list (Overdue / Upcoming / No date yet / Done) with a status filter, not sub-tabs. Don't reintroduce a type discriminator or split the page apart.
+- **Tasks are fully editable in place** — `Timeline.tsx`'s row editor owns title, assignee, category, priority, and date in one Save. `Task.assignee` is deliberately free text (`assigneeSuggestions()` only supplies the quick-pick chips), so anyone outside the couple can own a task.
 - **A task's date is either exact or relative** — `dueDate` (a fixed day) *or* `monthsBefore` / `daysBefore` (an offset from `answers.date`, so it moves when the wedding date moves). Never read `task.dueDate` directly; go through `resolveDueDate(task, answers.date)` in `plan-adapters.ts` or relatively-scheduled items look undated.
 - **Adapter-derived tasks aren't in the store until touched** — any write (toggle, date edit) must materialise the task via `addTask` when its id isn't in `tasks` yet; `updateTask` alone is a no-op. Anything counting or listing plan items should use `allTasks` from `usePlan()` (or `mergePlanTasks`), never `tasks` alone.
 - **ESLint `// eslint-disable-line` comments** in `Topbar.tsx`, `Overview.tsx`, `Budget.tsx`, and `Research.tsx` are intentional — don't remove them.
@@ -165,7 +166,7 @@ tests/
 │   └── research-prompts.test.ts    # buildResearchPrompt — all types + context flags
 ├── components/
 │   ├── ResearchCard.test.tsx       # sole AI-prose renderer
-│   └── Timeline.test.tsx           # single plan list + date editing
+│   └── Timeline.test.tsx           # single plan list, task editing, assignees
 ├── api/
 │   ├── research.test.ts            # input validation, type allowlist, error safety
 │   ├── recommendations.test.ts     # JSON parsing, URL filtering, status normalisation

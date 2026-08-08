@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  assigneeSuggestions,
   buildBudgetCategories,
   buildInitialTasks,
   describeSchedule,
@@ -170,6 +171,16 @@ describe("mergePlanTasks", () => {
 
   it("includes seed tasks the store has never touched", () => {
     expect(mergePlanTasks([], seed)).toHaveLength(seed.length);
+  });
+});
+
+describe("assigneeSuggestions", () => {
+  it("offers the couple plus Both", () => {
+    expect(assigneeSuggestions(BASE_ANSWERS)).toEqual(["Louis", "Alex", "Both"]);
+  });
+
+  it("drops the partner slot when no name is set yet", () => {
+    expect(assigneeSuggestions({ partnerName: "   " })).toEqual(["Louis", "Both"]);
   });
 });
 
