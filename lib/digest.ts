@@ -1,9 +1,11 @@
-import type { Task, TimelineItem, Vendor, WeddingAnswers, BudgetCategory, EmailDigestPrefs } from "./types";
+import type { Task, Vendor, WeddingAnswers, BudgetCategory, EmailDigestPrefs } from "./types";
 import { describeWeddingDate, formatDate as formatISODate } from "./date-utils";
+import { resolveDueDate } from "./plan-adapters";
 
 export interface DigestRequestBody {
+  // One list — milestones and tasks are the same thing now. Pre-merge clients
+  // also send a `timeline` array; it's ignored rather than rejected.
   tasks: Task[];
-  timeline: TimelineItem[];
   vendors: Vendor[];
   answers: WeddingAnswers;
   budgetCategories: BudgetCategory[];
@@ -16,7 +18,6 @@ export function isValidDigestBody(body: unknown): body is DigestRequestBody {
   const b = body as Record<string, unknown>;
   return (
     Array.isArray(b.tasks) &&
-    Array.isArray(b.timeline) &&
     Array.isArray(b.vendors) &&
     typeof b.answers === "object" && b.answers !== null &&
     Array.isArray(b.budgetCategories) &&
@@ -36,7 +37,7 @@ function generateHtml({
   weddingDateStr,
   overdueTasks,
   upcomingTasks,
-  upcomingMilestones,
+  dueDateOf,
   totalSpent,
   remaining,
   budget,
@@ -48,7 +49,7 @@ function generateHtml({
   weddingDateStr: string;
   overdueTasks: Task[];
   upcomingTasks: Task[];
-  upcomingMilestones: TimelineItem[];
+  dueDateOf: (task: Task) => string | undefined;
   totalSpent: number;
   remaining: number;
   budget: number;
@@ -73,25 +74,19 @@ function generateHtml({
 
   let body = "";
 
+  const detail = (t: Task) => {
+    const due = dueDateOf(t);
+    return `Due ${due ? formatDate(due) : "–"} · ${t.category}`;
+  };
+
   if (overdueTasks.length > 0) {
-    const rows = overdueTasks
-      .map((t) => taskRow(t.title, `Due ${t.dueDate ? formatDate(t.dueDate) : "–"} · ${t.category}`, true))
-      .join("");
+    const rows = overdueTasks.map((t) => taskRow(t.title, detail(t), true)).join("");
     body += section(`Overdue — ${overdueTasks.length} item${overdueTasks.length !== 1 ? "s" : ""}`, "#dc2626", rows);
   }
 
   if (upcomingTasks.length > 0) {
-    const rows = upcomingTasks
-      .map((t) => taskRow(t.title, `Due ${t.dueDate ? formatDate(t.dueDate) : "–"} · ${t.category}`))
-      .join("");
+    const rows = upcomingTasks.map((t) => taskRow(t.title, detail(t))).join("");
     body += section("Due in the next 14 days", accent, rows);
-  }
-
-  if (upcomingMilestones.length > 0) {
-    const rows = upcomingMilestones
-      .map((m) => taskRow(m.title, `${formatDate(m.targetDate)} · ${m.category}`))
-      .join("");
-    body += section("Upcoming milestones", "#6366f1", rows);
   }
 
   const spentPct = budget > 0 ? Math.round((totalSpent / budget) * 100) : 0;
@@ -161,7 +156,11 @@ function generateHtml({
 }
 
 export function buildDigest(data: DigestRequestBody) {
-  const { tasks, timeline, vendors, answers, budgetCategories } = data;
+  const { tasks, vendors, answers, budgetCategories } = data;
+
+  // Relatively-scheduled tasks carry an offset rather than a date, so every
+  // due-date read has to go through the resolver.
+  const dueDateOf = (t: Task) => resolveDueDate(t, answers.date);
 
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
@@ -174,15 +173,15 @@ export function buildDigest(data: DigestRequestBody) {
     (weddingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  const overdueTasks = tasks.filter(
-    (t) => !t.done && t.dueDate && t.dueDate < todayStr
-  );
-  const upcomingTasks = tasks.filter(
-    (t) => !t.done && t.dueDate && t.dueDate >= todayStr && t.dueDate <= cutoffStr
-  );
-  const upcomingMilestones = timeline.filter(
-    (t) => !t.done && t.targetDate >= todayStr && t.targetDate <= cutoffStr
-  );
+  const overdueTasks = tasks.filter((t) => {
+    const due = dueDateOf(t);
+    return !t.done && !!due && due < todayStr;
+  });
+  const upcomingTasks = tasks.filter((t) => {
+    const due = dueDateOf(t);
+    return !t.done && !!due && due >= todayStr && due <= cutoffStr;
+  });
+  const openItems = tasks.filter((t) => !t.done).length;
   const totalSpent = budgetCategories.reduce((s, c) => s + (c.spent ?? 0), 0);
   const remaining = answers.budget - totalSpent;
   const vendorNudges = vendors.filter((v) => v.status === "considering");
@@ -209,7 +208,7 @@ export function buildDigest(data: DigestRequestBody) {
   if (overdueTasks.length > 0) {
     lines.push(`OVERDUE TASKS (${overdueTasks.length})`);
     overdueTasks.forEach((t) => {
-      lines.push(`  [!] ${t.title} — due ${t.dueDate ?? "unknown"} — ${t.category}`);
+      lines.push(`  [!] ${t.title} — due ${dueDateOf(t) ?? "unknown"} — ${t.category}`);
     });
     lines.push("");
   }
@@ -217,15 +216,7 @@ export function buildDigest(data: DigestRequestBody) {
   if (upcomingTasks.length > 0) {
     lines.push(`TASKS DUE IN THE NEXT 14 DAYS (${upcomingTasks.length})`);
     upcomingTasks.forEach((t) => {
-      lines.push(`  [ ] ${t.title} — due ${t.dueDate ?? "unknown"} — ${t.category}`);
-    });
-    lines.push("");
-  }
-
-  if (upcomingMilestones.length > 0) {
-    lines.push(`UPCOMING MILESTONES (${upcomingMilestones.length})`);
-    upcomingMilestones.forEach((m) => {
-      lines.push(`  [ ] ${m.title} — ${formatDate(m.targetDate)} — ${m.category}`);
+      lines.push(`  [ ] ${t.title} — due ${dueDateOf(t) ?? "unknown"} — ${t.category}`);
     });
     lines.push("");
   }
@@ -252,7 +243,7 @@ export function buildDigest(data: DigestRequestBody) {
     weddingDateStr: describeWeddingDate(answers),
     overdueTasks,
     upcomingTasks,
-    upcomingMilestones,
+    dueDateOf,
     totalSpent,
     remaining,
     budget: answers.budget,
@@ -267,7 +258,7 @@ export function buildDigest(data: DigestRequestBody) {
     stats: {
       overdueTasks: overdueTasks.length,
       upcomingTasks: upcomingTasks.length,
-      upcomingMilestones: upcomingMilestones.length,
+      openItems,
     },
   };
 }

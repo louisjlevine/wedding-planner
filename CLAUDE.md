@@ -9,8 +9,9 @@ with App Router. All AI calls go through Next.js API routes (never client-side).
   Shape: { answers: WeddingAnswers, vendors: Vendor[], tasks: Task[], guests: Guest[] }
 - **AI routes**: /api/research and /api/advisor. Both use @anthropic-ai/sdk server-side.
   Never expose ANTHROPIC_API_KEY to the client.
-- **Adaptive logic**: lib/plan-adapters.ts takes WeddingAnswers and returns 
-  derived timeline[], budgetCategories[], tasks[]. All sections consume these adapters.
+- **Adaptive logic**: lib/plan-adapters.ts takes WeddingAnswers and returns
+  derived tasks[] (the whole plan — milestones and tasks are one type) and
+  budgetCategories[]. All sections consume these adapters.
 - **Research**: Each ResearchCard passes a `type` key. research-prompts.ts builds 
   the context-aware prompt from stored answers + type.
 
@@ -87,8 +88,9 @@ User can say `full team` (run everything) or `skip QA` / `skip security` (drop s
 - **Intake question order is fixed** — `Intake.tsx` must keep questions in the order defined in CLAUDE.md; `plan-adapters.ts` depends on it.
 - **`ResearchCard` is the only AI prose renderer** — keep the `<pre className="whitespace-pre-wrap">` wrapper.
 - **`BudgetBar` and `MetricCard`** are shared across Overview, Budget, and Compare — changes propagate to all three.
-- **Milestones and tasks render on one page** — `Timeline.tsx` is a single combined list (Overdue / Upcoming / No date yet / Done) with a filter, not sub-tabs. Don't split it back apart.
-- **Adapter-derived tasks aren't in the store until touched** — toggling one must materialise it via `addTask`; `toggleTask` alone is a no-op. Anything counting tasks must merge `tasks` with `defaultTasks`.
+- **Milestones and tasks are ONE type** — there is no `TimelineItem` and no "milestone" concept. Everything is a `Task` in `tasks`, rendered by `Timeline.tsx` as a single list (Overdue / Upcoming / No date yet / Done) with a status filter, not sub-tabs. Don't reintroduce a type discriminator or split the page apart.
+- **A task's date is either exact or relative** — `dueDate` (a fixed day) *or* `monthsBefore` / `daysBefore` (an offset from `answers.date`, so it moves when the wedding date moves). Never read `task.dueDate` directly; go through `resolveDueDate(task, answers.date)` in `plan-adapters.ts` or relatively-scheduled items look undated.
+- **Adapter-derived tasks aren't in the store until touched** — any write (toggle, date edit) must materialise the task via `addTask` when its id isn't in `tasks` yet; `updateTask` alone is a no-op. Anything counting or listing plan items should use `allTasks` from `usePlan()` (or `mergePlanTasks`), never `tasks` alone.
 - **ESLint `// eslint-disable-line` comments** in `Topbar.tsx`, `Overview.tsx`, `Budget.tsx`, and `Research.tsx` are intentional — don't remove them.
 - **No Anthropic SDK in client components** — all AI calls go through `/api/*` routes.
 - **Zustand store version** — any new persisted field requires a migration case in `migratePlanStore()` with a bumped version number.
@@ -157,13 +159,13 @@ npm run pre-release       # full pre-release gate (tests + lint + audit + securi
 tests/
 ├── setup.ts                        # global setup (suppress console.error noise)
 ├── unit/
-│   ├── adapters.test.ts            # buildTimeline, buildBudgetCategories, buildInitialTasks
+│   ├── adapters.test.ts            # buildInitialTasks, resolveDueDate, buildBudgetCategories
 │   ├── date-utils.test.ts          # local-time parsing, season mapping, exact vs approximate
 │   ├── guest-probability.test.ts   # getBaseProbability, guestExpectedCount, estimatedAttendance
 │   └── research-prompts.test.ts    # buildResearchPrompt — all types + context flags
 ├── components/
 │   ├── ResearchCard.test.tsx       # sole AI-prose renderer
-│   └── Timeline.test.tsx           # combined milestones + tasks page
+│   └── Timeline.test.tsx           # single plan list + date editing
 ├── api/
 │   ├── research.test.ts            # input validation, type allowlist, error safety
 │   ├── recommendations.test.ts     # JSON parsing, URL filtering, status normalisation

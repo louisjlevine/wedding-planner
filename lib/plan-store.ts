@@ -22,6 +22,12 @@ import type {
   CustomBudgetCategory,
 } from "./types";
 import { priorityFromRelationship } from "./guest-priority";
+import { adoptLegacyMilestoneDoneIds } from "./plan-adapters";
+
+/** Shape of pre-v10 persisted state, when milestones were tracked separately. */
+interface LegacyMilestoneState {
+  timelineDoneIds?: string[];
+}
 
 const EMPTY_COMPARISON: ComparisonSelection = {
   venueIds: [],
@@ -46,7 +52,6 @@ interface PlanState {
   customBudgetCategories: CustomBudgetCategory[];
   dismissedRecommendations: Record<string, string[]>; // type → [lowercased title, ...]
   triggerResearchFor: string | null; // set by Vendors "Find similar" to auto-fetch
-  timelineDoneIds: string[];
   activeTab: Tab;
   intakeComplete: boolean;
   vendorFilterHideRejected: boolean;
@@ -73,7 +78,6 @@ interface PlanState {
 
   addTask: (task: Task) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
-  toggleTask: (id: string) => void;
   removeTask: (id: string) => void;
 
   addGuest: (guest: Guest) => void;
@@ -110,9 +114,6 @@ interface PlanState {
 
   // Research trigger from Vendors
   setTriggerResearchFor: (type: string | null) => void;
-
-  // Timeline done state
-  toggleTimelineItem: (id: string) => void;
 
   emailPrefs: EmailDigestPrefs | null;
   setEmailPrefs: (prefs: EmailDigestPrefs) => void;
@@ -298,6 +299,18 @@ export function migratePlanStore(persisted: unknown, version: number): PlanState
       state.answers = { ...state.answers, dateIsExact: false };
     }
   }
+  if (version < 10) {
+    // Milestones and tasks merged into one list. Milestone completion used to
+    // live in `timelineDoneIds` (ids only, no task row); fold it into `tasks`
+    // so the done state survives, then drop the old slice.
+    const legacy = state as Partial<PlanState> & LegacyMilestoneState;
+    state.tasks = adoptLegacyMilestoneDoneIds(
+      state.answers,
+      state.tasks ?? [],
+      legacy.timelineDoneIds ?? [],
+    );
+    delete legacy.timelineDoneIds;
+  }
   return state as PlanState;
 }
 
@@ -315,7 +328,6 @@ export const usePlanStore = create<PlanState>()(
       customBudgetCategories: [],
       dismissedRecommendations: {},
       triggerResearchFor: null,
-      timelineDoneIds: [],
       activeTab: "overview",
       intakeComplete: false,
       emailPrefs: null,
@@ -487,13 +499,6 @@ export const usePlanStore = create<PlanState>()(
         set((state) => ({
           tasks: state.tasks.map((t) =>
             t.id === id ? { ...t, ...updates } : t
-          ),
-        })),
-
-      toggleTask: (id) =>
-        set((state) => ({
-          tasks: state.tasks.map((t) =>
-            t.id === id ? { ...t, done: !t.done } : t
           ),
         })),
 
@@ -693,13 +698,6 @@ export const usePlanStore = create<PlanState>()(
 
       setTriggerResearchFor: (type) => set({ triggerResearchFor: type }),
 
-      toggleTimelineItem: (id) =>
-        set((state) => ({
-          timelineDoneIds: state.timelineDoneIds.includes(id)
-            ? state.timelineDoneIds.filter((x) => x !== id)
-            : [...state.timelineDoneIds, id],
-        })),
-
       // Advisor memory
       setAdvisorMessages: (messages) => set({ advisorMessages: messages }),
 
@@ -737,6 +735,22 @@ export const usePlanStore = create<PlanState>()(
 
       importStore: (data) =>
         set((state) => {
+          // Server snapshots bypass the persist migration, so a device that
+          // hasn't synced since the milestone/task merge can still send
+          // `timelineDoneIds`. Fold it in here too or that done state is lost.
+          const legacy = data as Partial<PlanState> & LegacyMilestoneState;
+          if (legacy.timelineDoneIds?.length) {
+            const answers = data.answers ?? state.answers;
+            data = {
+              ...data,
+              tasks: adoptLegacyMilestoneDoneIds(
+                answers,
+                data.tasks ?? state.tasks,
+                legacy.timelineDoneIds,
+              ),
+            };
+            delete (data as LegacyMilestoneState).timelineDoneIds;
+          }
           // Union local + incoming deletion records so deletes from any device stick
           const incomingDeleted = Array.isArray(data.deletedVendorIds)
             ? data.deletedVendorIds
@@ -758,7 +772,7 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
-      version: 9,
+      version: 10,
       migrate: (persisted, version) => migratePlanStore(persisted, version),
     }
   )

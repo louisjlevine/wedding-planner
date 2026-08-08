@@ -447,3 +447,51 @@ describe("migratePlanStore — v8 → v9 exact wedding date flag", () => {
     expect(migrated.answers?.dateIsExact).toBeUndefined();
   });
 });
+
+describe("migratePlanStore — v9 → v10 milestones merged into tasks", () => {
+  const answers = {
+    partnerName: "Alex",
+    date: "2027-07-15",
+    dateIsExact: true,
+    location: "Nashville, TN",
+    guestCount: 100,
+    budget: 50_000,
+    vibe: ["romantic"],
+    priorities: ["venue", "food", "photography"],
+    setting: "indoor",
+    funding: "self",
+    stress: ["budget"],
+  } as unknown as import("@/lib/types").WeddingAnswers;
+
+  it("materialises completed milestones as done tasks and drops the old slice", () => {
+    const migrated = migratePlanStore(
+      { answers, tasks: [], timelineDoneIds: ["venue", "catering"] },
+      9,
+    );
+    const done = migrated.tasks.filter((t) => t.done).map((t) => t.id).sort();
+    expect(done).toEqual(["catering", "venue"]);
+    expect((migrated as { timelineDoneIds?: string[] }).timelineDoneIds).toBeUndefined();
+  });
+
+  it("keeps existing tasks alongside the adopted milestones", () => {
+    const existing = {
+      id: "custom-1", title: "Book hair trial", category: "Custom",
+      priority: "medium" as const, done: false,
+    };
+    const migrated = migratePlanStore(
+      { answers, tasks: [existing], timelineDoneIds: ["venue"] },
+      9,
+    );
+    expect(migrated.tasks.map((t) => t.id).sort()).toEqual(["custom-1", "venue"]);
+  });
+
+  it("is a no-op when nothing was ticked off", () => {
+    const migrated = migratePlanStore({ answers, tasks: [], timelineDoneIds: [] }, 9);
+    expect(migrated.tasks).toEqual([]);
+  });
+
+  it("leaves v10+ payloads untouched", () => {
+    const migrated = migratePlanStore({ answers, tasks: [], timelineDoneIds: ["venue"] }, 10);
+    expect(migrated.tasks).toEqual([]);
+  });
+});

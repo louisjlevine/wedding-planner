@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Pool } from "pg";
-import { buildTimeline, buildBudgetCategories, buildInitialTasks } from "@/lib/plan-adapters";
+import {
+  adoptLegacyMilestoneDoneIds,
+  buildBudgetCategories,
+  buildInitialTasks,
+  mergePlanTasks,
+} from "@/lib/plan-adapters";
 import { buildDigest, sendViaResend } from "@/lib/digest";
 import type { EmailDigestPrefs, WeddingAnswers, Vendor, Task } from "@/lib/types";
 
@@ -70,12 +75,6 @@ export async function GET(req: NextRequest) {
   }
 
   // Reconstruct derived plan data (mirrors usePlan hook logic)
-  const timelineDoneIds = (planState.timelineDoneIds as string[] | undefined) ?? [];
-  const doneSet = new Set(timelineDoneIds);
-  const timeline = buildTimeline(answers).map((item) =>
-    doneSet.has(item.id) ? { ...item, done: true } : item
-  );
-
   const budgetOverrides =
     (planState.budgetOverrides as Record<string, { amount: number; spent: number }> | undefined) ?? {};
   const budgetCategories = buildBudgetCategories(answers).map((cat) => {
@@ -92,17 +91,19 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  const storeTasks = (planState.tasks as Task[] | undefined) ?? [];
-  const storeTaskIds = new Set(storeTasks.map((t) => t.id));
-  const allTasks = [
-    ...storeTasks,
-    ...buildInitialTasks(answers).filter((t) => !storeTaskIds.has(t.id)),
-  ];
+  // The DB snapshot isn't run through the store migration, so it can still be
+  // pre-merge state with milestone completion in `timelineDoneIds`.
+  const storeTasks = adoptLegacyMilestoneDoneIds(
+    answers,
+    (planState.tasks as Task[] | undefined) ?? [],
+    (planState.timelineDoneIds as string[] | undefined) ?? [],
+  );
+  const allTasks = mergePlanTasks(storeTasks, buildInitialTasks(answers));
 
   const vendors = (planState.vendors as Vendor[] | undefined) ?? [];
 
   // Build and send the digest
-  const digest = buildDigest({ tasks: allTasks, timeline, vendors, answers, budgetCategories, emailPrefs });
+  const digest = buildDigest({ tasks: allTasks, vendors, answers, budgetCategories, emailPrefs });
 
   const recipients: string[] = [];
   if (emailPrefs.optInLouis && emailPrefs.emailLouis) recipients.push(emailPrefs.emailLouis);

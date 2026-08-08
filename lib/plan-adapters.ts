@@ -1,138 +1,10 @@
 import type {
   WeddingAnswers,
-  TimelineItem,
   BudgetCategory,
   AdaptiveAdjustment,
   Task,
 } from "./types";
-import { parseISODate, toISODate } from "./date-utils";
-
-// ── Timeline ──────────────────────────────────────────────────────────────────
-
-export function buildTimeline(answers: WeddingAnswers): TimelineItem[] {
-  const items: TimelineItem[] = [
-    {
-      id: "venue",
-      title: "Book your venue",
-      monthsBefore: 12,
-      targetDate: monthsBefore(answers.date, 12),
-      category: "Venue",
-      done: false,
-      flag:
-        answers.location.toLowerCase().includes("mountain") ||
-        answers.location.toLowerCase().includes("colorado") ||
-        answers.location.toLowerCase().includes("aspen") ||
-        answers.location.toLowerCase().includes("vail")
-          ? "Book early — mountain venues fill 18+ months out"
-          : answers.guestCount < 50
-          ? "Smaller guest list gives you more venue flexibility"
-          : undefined,
-    },
-    {
-      id: "photographer",
-      title: "Book photographer & videographer",
-      monthsBefore: 12,
-      targetDate: monthsBefore(answers.date, 12),
-      category: "Photography",
-      done: false,
-    },
-    {
-      id: "catering",
-      title: "Select caterer / catering style",
-      monthsBefore: 10,
-      targetDate: monthsBefore(answers.date, 10),
-      category: "Catering",
-      done: false,
-    },
-    {
-      id: "dress",
-      title: "Start dress / attire shopping",
-      monthsBefore: 10,
-      targetDate: monthsBefore(answers.date, 10),
-      category: "Attire",
-      done: false,
-    },
-    {
-      id: "flowers",
-      title: "Consult with florists",
-      monthsBefore: 9,
-      targetDate: monthsBefore(answers.date, 9),
-      category: "Flowers",
-      done: false,
-    },
-    {
-      id: "music",
-      title: "Book band or DJ",
-      monthsBefore: 9,
-      targetDate: monthsBefore(answers.date, 9),
-      category: "Music",
-      done: false,
-    },
-    {
-      id: "invitations",
-      title: "Design & order invitations",
-      monthsBefore: 6,
-      targetDate: monthsBefore(answers.date, 6),
-      category: "Stationery",
-      done: false,
-    },
-    {
-      id: "send_invites",
-      title: "Send invitations",
-      monthsBefore: 4,
-      targetDate: monthsBefore(answers.date, 4),
-      category: "Stationery",
-      done: false,
-    },
-    {
-      id: "rsvp_deadline",
-      title: "RSVP deadline",
-      monthsBefore: 2,
-      targetDate: monthsBefore(answers.date, 2),
-      category: "Guests",
-      done: false,
-    },
-    {
-      id: "final_headcount",
-      title: "Final headcount to caterer",
-      monthsBefore: 1,
-      targetDate: monthsBefore(answers.date, 1),
-      category: "Catering",
-      done: false,
-    },
-    {
-      id: "rehearsal",
-      title: "Rehearsal & rehearsal dinner",
-      monthsBefore: 0,
-      targetDate: daysBefore(answers.date, 1),
-      category: "Ceremony",
-      done: false,
-    },
-    {
-      id: "wedding_day",
-      title: "Wedding day! 💍",
-      monthsBefore: 0,
-      targetDate: answers.date,
-      category: "Wedding",
-      done: false,
-    },
-  ];
-
-  // Outdoor setting → add weather contingency
-  if (answers.setting === "outdoor" || answers.setting === "mixed") {
-    items.splice(1, 0, {
-      id: "tent_weather",
-      title: "Confirm tent / weather contingency plan",
-      monthsBefore: 6,
-      targetDate: monthsBefore(answers.date, 6),
-      category: "Logistics",
-      flag: "Outdoor setting — have a rain backup ready",
-      done: false,
-    });
-  }
-
-  return items.sort((a, b) => b.monthsBefore - a.monthsBefore);
-}
+import { dateDaysBefore, dateMonthsBefore } from "./date-utils";
 
 // ── Budget ────────────────────────────────────────────────────────────────────
 
@@ -310,8 +182,23 @@ export function buildBudgetCategories(
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 
+/**
+ * The starting plan: every item the couple gets before they touch anything.
+ * This used to be two lists — `buildTimeline()` milestones and `buildInitialTasks()`
+ * tasks — rendered as separate types. They're one list of `Task` now, and the
+ * former milestones are simply the items scheduled by `monthsBefore`.
+ */
 export function buildInitialTasks(answers: WeddingAnswers): Task[] {
+  const isOutdoor = answers.setting === "outdoor" || answers.setting === "mixed";
+  const location = answers.location.toLowerCase();
+  const isMountain =
+    location.includes("mountain") ||
+    location.includes("colorado") ||
+    location.includes("aspen") ||
+    location.includes("vail");
+
   const tasks: Task[] = [
+    // ── Undated admin ──
     {
       id: "t1",
       title: "Create a wedding email address",
@@ -326,83 +213,245 @@ export function buildInitialTasks(answers: WeddingAnswers): Task[] {
       priority: "high",
       done: true,
     },
+    // ── Scheduled relative to the wedding day ──
     {
-      id: "t3",
-      title: "Draft your guest list",
-      category: "Guests",
+      id: "venue",
+      title: "Book your venue",
+      monthsBefore: 12,
+      category: "Venue",
       priority: "high",
       done: false,
-      dueDate: monthsBefore(answers.date, 11),
+      flag: isMountain
+        ? "Book early — mountain venues fill 18+ months out"
+        : answers.guestCount < 50
+        ? "Smaller guest list gives you more venue flexibility"
+        : undefined,
+    },
+    {
+      id: "photographer",
+      title: "Book photographer & videographer",
+      monthsBefore: 12,
+      category: "Photography",
+      priority: "high",
+      done: false,
     },
     {
       id: "t4",
       title: "Research & tour venues",
+      monthsBefore: 12,
       category: "Venue",
       priority: "high",
       done: false,
-      dueDate: monthsBefore(answers.date, 12),
       flag:
         answers.guestCount < 50
           ? "Smaller guest list — more flexibility on venue timing"
           : undefined,
     },
     {
+      id: "t3",
+      title: "Draft your guest list",
+      monthsBefore: 11,
+      category: "Guests",
+      priority: "high",
+      done: false,
+    },
+    {
+      id: "catering",
+      title: "Select caterer / catering style",
+      monthsBefore: 10,
+      category: "Catering",
+      priority: "high",
+      done: false,
+    },
+    {
+      id: "dress",
+      title: "Start dress / attire shopping",
+      monthsBefore: 10,
+      category: "Attire",
+      priority: "medium",
+      done: false,
+    },
+    {
+      id: "flowers",
+      title: "Consult with florists",
+      monthsBefore: 9,
+      category: "Flowers",
+      priority: "medium",
+      done: false,
+    },
+    {
+      id: "music",
+      title: "Book band or DJ",
+      monthsBefore: 9,
+      category: "Music",
+      priority: "medium",
+      done: false,
+    },
+    {
       id: "t5",
       title: "Book officiant",
+      monthsBefore: 9,
       category: "Ceremony",
       priority: "medium",
       done: false,
-      dueDate: monthsBefore(answers.date, 9),
     },
     {
       id: "t6",
       title: "Create wedding website",
+      monthsBefore: 8,
       category: "Admin",
       priority: "medium",
       done: false,
-      dueDate: monthsBefore(answers.date, 8),
+    },
+    {
+      id: "invitations",
+      title: "Design & order invitations",
+      monthsBefore: 6,
+      category: "Stationery",
+      priority: "medium",
+      done: false,
     },
     {
       id: "t7",
       title: "Plan honeymoon",
+      monthsBefore: 6,
       category: "Honeymoon",
       priority: answers.priorities.includes("honeymoon") ? "high" : "low",
       done: false,
-      dueDate: monthsBefore(answers.date, 6),
+    },
+    {
+      id: "send_invites",
+      title: "Send invitations",
+      monthsBefore: 4,
+      category: "Stationery",
+      priority: "high",
+      done: false,
+    },
+    {
+      id: "rsvp_deadline",
+      title: "RSVP deadline",
+      monthsBefore: 2,
+      category: "Guests",
+      priority: "high",
+      done: false,
+    },
+    {
+      id: "final_headcount",
+      title: "Final headcount to caterer",
+      monthsBefore: 1,
+      category: "Catering",
+      priority: "high",
+      done: false,
+    },
+    {
+      id: "rehearsal",
+      title: "Rehearsal & rehearsal dinner",
+      daysBefore: 1,
+      category: "Ceremony",
+      priority: "high",
+      done: false,
+    },
+    {
+      id: "wedding_day",
+      title: "Wedding day! 💍",
+      daysBefore: 0,
+      category: "Wedding",
+      priority: "high",
+      done: false,
     },
   ];
 
-  if (answers.setting === "outdoor" || answers.setting === "mixed") {
-    tasks.push({
-      id: "t_tent",
-      title: "Get quotes for tent rental & weather backup",
-      category: "Logistics",
-      priority: "high",
-      done: false,
-      flag: "Required for outdoor setting",
-      dueDate: monthsBefore(answers.date, 9),
-    });
+  if (isOutdoor) {
+    tasks.push(
+      {
+        id: "tent_weather",
+        title: "Confirm tent / weather contingency plan",
+        monthsBefore: 6,
+        category: "Logistics",
+        priority: "high",
+        done: false,
+        flag: "Outdoor setting — have a rain backup ready",
+      },
+      {
+        id: "t_tent",
+        title: "Get quotes for tent rental & weather backup",
+        monthsBefore: 9,
+        category: "Logistics",
+        priority: "high",
+        done: false,
+        flag: "Required for outdoor setting",
+      },
+    );
   }
 
-  return tasks;
+  return tasks.sort((a, b) => seedOffsetDays(b) - seedOffsetDays(a));
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function monthsBefore(isoDate: string, months: number): string {
-  const d = parseISODate(isoDate);
-  if (!d) return "";
-  // Build the target month first, then clamp the day: rolling back from an exact
-  // date like Mar 31 must land on Feb 28, not overflow into March.
-  const target = new Date(d.getFullYear(), d.getMonth() - months, 1);
-  const lastDayOfMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-  target.setDate(Math.min(d.getDate(), lastDayOfMonth));
-  return toISODate(target);
+/** Sort key for the seed list: furthest out first, undated items last. */
+function seedOffsetDays(task: Task): number {
+  if (task.daysBefore != null) return task.daysBefore;
+  if (task.monthsBefore != null) return task.monthsBefore * 31;
+  return -1;
 }
 
-function daysBefore(isoDate: string, days: number): string {
-  const d = parseISODate(isoDate);
-  if (!d) return "";
-  d.setDate(d.getDate() - days);
-  return toISODate(d);
+/**
+ * The date a task actually lands on. An explicit `dueDate` wins; otherwise the
+ * offset is applied to the wedding day, so relatively-scheduled items follow the
+ * wedding date whenever it changes. Undefined when the task has no date, or when
+ * it's relative and the wedding date isn't set yet.
+ */
+export function resolveDueDate(
+  task: Pick<Task, "dueDate" | "monthsBefore" | "daysBefore">,
+  weddingDate: string | undefined | null,
+): string | undefined {
+  if (task.dueDate) return task.dueDate;
+  if (task.daysBefore != null) return dateDaysBefore(weddingDate, task.daysBefore) || undefined;
+  if (task.monthsBefore != null) return dateMonthsBefore(weddingDate, task.monthsBefore) || undefined;
+  return undefined;
+}
+
+/** Human label for how a task is scheduled, e.g. "12 months before the wedding". */
+export function describeSchedule(task: Pick<Task, "monthsBefore" | "daysBefore">): string | undefined {
+  if (task.daysBefore != null) {
+    if (task.daysBefore === 0) return "on the wedding day";
+    return `${task.daysBefore} day${task.daysBefore === 1 ? "" : "s"} before the wedding`;
+  }
+  if (task.monthsBefore != null) {
+    if (task.monthsBefore === 0) return "on the wedding day";
+    return `${task.monthsBefore} month${task.monthsBefore === 1 ? "" : "s"} before the wedding`;
+  }
+  return undefined;
+}
+
+/**
+ * The full plan: everything the user has touched (which lives in the store)
+ * plus any seed item they haven't. Adapter-derived tasks are only persisted
+ * once edited, so counting the store alone undercounts the plan.
+ */
+export function mergePlanTasks(storeTasks: Task[], seedTasks: Task[]): Task[] {
+  const storeIds = new Set(storeTasks.map((t) => t.id));
+  return [...storeTasks, ...seedTasks.filter((t) => !storeIds.has(t.id))];
+}
+
+/**
+ * Milestones used to be tracked separately, with completion recorded as a list
+ * of ids in `timelineDoneIds`. They're ordinary tasks now, so that done state
+ * has to be materialised into the task list. Used by the store migration and by
+ * any read path that can still see pre-merge persisted state.
+ */
+export function adoptLegacyMilestoneDoneIds(
+  answers: WeddingAnswers | null | undefined,
+  tasks: Task[],
+  doneIds: string[],
+): Task[] {
+  if (!answers || doneIds.length === 0) return tasks;
+  const existing = new Set(tasks.map((t) => t.id));
+  const seeds = new Map(buildInitialTasks(answers).map((t) => [t.id, t]));
+  const adopted: Task[] = [];
+  for (const id of doneIds) {
+    if (existing.has(id)) continue;
+    const seed = seeds.get(id);
+    if (seed) adopted.push({ ...seed, done: true });
+  }
+  return adopted.length > 0 ? [...tasks, ...adopted] : tasks;
 }

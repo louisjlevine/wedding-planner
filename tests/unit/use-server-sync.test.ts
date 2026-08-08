@@ -70,7 +70,6 @@ beforeEach(() => {
     advisorMessages: [],
     budgetOverrides: {},
     dismissedRecommendations: {},
-    timelineDoneIds: [],
     intakeComplete: true,
     deletedVendorIds: [],
   });

@@ -19,7 +19,7 @@ const DEFAULT_PREFS: EmailDigestPrefs = {
 interface DigestStats {
   overdueTasks: number;
   upcomingTasks: number;
-  upcomingMilestones: number;
+  openItems: number;
 }
 
 interface DigestPreview {
@@ -32,7 +32,7 @@ interface DigestPreview {
 
 export function DigestSettings() {
   const { answers, vendors, emailPrefs, setEmailPrefs } = usePlanStore();
-  const { tasks, timeline, budgetCategories, defaultTasks } = usePlan();
+  const { allTasks, budgetCategories } = usePlan();
 
   const [form, setForm] = useState<EmailDigestPrefs>(emailPrefs ?? DEFAULT_PREFS);
   const [preview, setPreview] = useState<DigestPreview | null>(null);
@@ -43,13 +43,6 @@ export function DigestSettings() {
   const [previewError, setPreviewError] = useState(false);
 
   if (!answers) return null;
-
-  // Merge store tasks with adapter defaults (same logic as Tasks/Timeline)
-  const storeTaskIds = new Set(tasks.map((t) => t.id));
-  const allTasks = [
-    ...tasks,
-    ...defaultTasks.filter((t) => !storeTaskIds.has(t.id)),
-  ];
 
   function handleChange<K extends keyof EmailDigestPrefs>(key: K, value: EmailDigestPrefs[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -67,7 +60,6 @@ export function DigestSettings() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tasks: allTasks,
-        timeline,
         vendors,
         answers,
         budgetCategories,
@@ -117,7 +109,7 @@ export function DigestSettings() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Email Digest</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Weekly summary of overdue tasks, upcoming deadlines, and planning milestones.
+          Weekly summary of overdue items, upcoming deadlines, and vendor follow-ups.
         </p>
       </div>
 
@@ -265,7 +257,7 @@ export function DigestSettings() {
                 color={preview.stats.overdueTasks > 0 ? "red" : "gray"}
               />
               <StatPill label="Due soon" count={preview.stats.upcomingTasks} color="pink" />
-              <StatPill label="Milestones" count={preview.stats.upcomingMilestones} color="indigo" />
+              <StatPill label="Still open" count={preview.stats.openItems} color="indigo" />
             </div>
 
             <div>

@@ -1,18 +1,11 @@
 "use client";
 
 import { usePlanStore } from "@/lib/plan-store";
-import { buildTimeline, buildBudgetCategories, buildInitialTasks } from "@/lib/plan-adapters";
+import { buildBudgetCategories, buildInitialTasks, mergePlanTasks } from "@/lib/plan-adapters";
 import type { BudgetCategory } from "@/lib/types";
 
 export function usePlan() {
   const store = usePlanStore();
-
-  const doneSet = new Set(store.timelineDoneIds);
-  const timeline = store.answers
-    ? buildTimeline(store.answers).map((item) =>
-        doneSet.has(item.id) ? { ...item, done: true } : item
-      )
-    : [];
 
   const startingBudget = store.answers?.budget ?? 0;
   // The "estimate" view — what the adapter would suggest with zero user
@@ -57,12 +50,16 @@ export function usePlan() {
   const budgetCategories = [...adaptedCategories, ...customCategories];
 
   const defaultTasks = store.answers ? buildInitialTasks(store.answers) : [];
+  // The whole plan in one list. Adapter-derived tasks only land in the store
+  // once touched, so `store.tasks` alone is never the full picture — anything
+  // counting or listing plan items should read `allTasks`.
+  const allTasks = mergePlanTasks(store.tasks, defaultTasks);
 
   return {
     ...store,
-    timeline,
     budgetCategories,
     baseBudgetCategories,
     defaultTasks,
+    allTasks,
   };
 }

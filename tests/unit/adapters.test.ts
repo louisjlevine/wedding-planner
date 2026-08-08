@@ -1,9 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
-  buildTimeline,
   buildBudgetCategories,
   buildInitialTasks,
+  describeSchedule,
+  mergePlanTasks,
+  adoptLegacyMilestoneDoneIds,
+  resolveDueDate,
 } from "@/lib/plan-adapters";
+import type { Task } from "@/lib/types";
 import type { WeddingAnswers } from "@/lib/types";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -21,86 +25,178 @@ const BASE_ANSWERS: WeddingAnswers = {
   stress: ["budget", "logistics"],
 };
 
-// ── buildTimeline ─────────────────────────────────────────────────────────────
+// ── buildInitialTasks — the single merged plan list ───────────────────────────
 
-describe("buildTimeline", () => {
-  it("returns at least 12 items for an indoor wedding", () => {
-    const items = buildTimeline(BASE_ANSWERS);
-    expect(items.length).toBeGreaterThanOrEqual(12);
+describe("buildInitialTasks — one list, no milestone/task split", () => {
+  it("returns former milestones and former tasks in the same array", () => {
+    const items = buildInitialTasks(BASE_ANSWERS);
+    // "venue" was a milestone, "t1" was a task — both are plain Tasks now.
+    expect(items.find((i) => i.id === "venue")).toBeDefined();
+    expect(items.find((i) => i.id === "t1")).toBeDefined();
   });
 
-  it("adds tent/weather item for outdoor setting", () => {
-    const answers = { ...BASE_ANSWERS, setting: "outdoor" as const };
-    const items = buildTimeline(answers);
+  it("every item is a Task with the same required fields", () => {
+    for (const item of buildInitialTasks(BASE_ANSWERS)) {
+      expect(typeof item.id).toBe("string");
+      expect(typeof item.title).toBe("string");
+      expect(typeof item.category).toBe("string");
+      expect(typeof item.done).toBe("boolean");
+      expect(["high", "medium", "low"]).toContain(item.priority);
+      // No lingering type discriminator.
+      expect("kind" in item).toBe(false);
+    }
+  });
+
+  it("returns at least 19 items for an indoor wedding", () => {
+    expect(buildInitialTasks(BASE_ANSWERS).length).toBeGreaterThanOrEqual(19);
+  });
+
+  it("adds both weather items for outdoor setting", () => {
+    const items = buildInitialTasks({ ...BASE_ANSWERS, setting: "outdoor" as const });
     const tent = items.find((i) => i.id === "tent_weather");
-    expect(tent).toBeDefined();
     expect(tent?.flag).toMatch(/outdoor/i);
+    expect(items.find((i) => i.id === "t_tent")?.flag).toMatch(/outdoor/i);
   });
 
-  it("adds tent/weather item for mixed setting", () => {
-    const answers = { ...BASE_ANSWERS, setting: "mixed" as const };
-    const items = buildTimeline(answers);
+  it("adds weather items for mixed setting", () => {
+    const items = buildInitialTasks({ ...BASE_ANSWERS, setting: "mixed" as const });
     expect(items.find((i) => i.id === "tent_weather")).toBeDefined();
   });
 
-  it("does NOT add tent item for indoor setting", () => {
-    const items = buildTimeline(BASE_ANSWERS);
+  it("does NOT add weather items for indoor setting", () => {
+    const items = buildInitialTasks(BASE_ANSWERS);
     expect(items.find((i) => i.id === "tent_weather")).toBeUndefined();
+    expect(items.find((i) => i.id === "t_tent")).toBeUndefined();
   });
 
-  it("flags venue item for mountain location", () => {
-    const answers = { ...BASE_ANSWERS, location: "Aspen, Colorado" };
-    const venue = buildTimeline(answers).find((i) => i.id === "venue");
-    expect(venue?.flag).toMatch(/mountain|book early/i);
-  });
-
-  it("flags venue item for vail location", () => {
-    const answers = { ...BASE_ANSWERS, location: "Vail, CO" };
-    const venue = buildTimeline(answers).find((i) => i.id === "venue");
-    expect(venue?.flag).toMatch(/mountain|book early/i);
-  });
-
-  it("flags venue item for colorado location", () => {
-    const answers = { ...BASE_ANSWERS, location: "Denver, Colorado" };
-    const venue = buildTimeline(answers).find((i) => i.id === "venue");
-    expect(venue?.flag).toMatch(/mountain|book early/i);
-  });
-
-  it("flags venue for small guest count (<50)", () => {
-    const answers = { ...BASE_ANSWERS, location: "New York, NY", guestCount: 30 };
-    const venue = buildTimeline(answers).find((i) => i.id === "venue");
-    expect(venue?.flag).toMatch(/flexibility/i);
-  });
-
-  it("returns items sorted by monthsBefore descending", () => {
-    const items = buildTimeline(BASE_ANSWERS);
-    for (let i = 1; i < items.length; i++) {
-      expect(items[i].monthsBefore).toBeLessThanOrEqual(items[i - 1].monthsBefore);
+  it("flags the venue item for mountain locations", () => {
+    for (const location of ["Aspen, Colorado", "Vail, CO", "Denver, Colorado"]) {
+      const venue = buildInitialTasks({ ...BASE_ANSWERS, location }).find((i) => i.id === "venue");
+      expect(venue?.flag).toMatch(/mountain|book early/i);
     }
   });
 
-  it("wedding_day targetDate equals answers.date", () => {
-    const items = buildTimeline(BASE_ANSWERS);
-    const weddingDay = items.find((i) => i.id === "wedding_day");
-    expect(weddingDay?.targetDate).toBe(BASE_ANSWERS.date);
+  it("flags the venue item for small guest count (<50)", () => {
+    const items = buildInitialTasks({ ...BASE_ANSWERS, guestCount: 30 });
+    expect(items.find((i) => i.id === "venue")?.flag).toMatch(/flexibility/i);
+    expect(items.find((i) => i.id === "t4")?.flag).toMatch(/flexibility/i);
   });
 
-  it("rehearsal is 1 day before wedding date", () => {
-    const items = buildTimeline(BASE_ANSWERS);
-    const rehearsal = items.find((i) => i.id === "rehearsal");
-    expect(rehearsal?.targetDate).toBe("2026-06-14");
+  it("sorts furthest-out first, with undated items last", () => {
+    const items = buildInitialTasks(BASE_ANSWERS);
+    const ids = items.map((i) => i.id);
+    expect(ids.indexOf("venue")).toBeLessThan(ids.indexOf("rsvp_deadline"));
+    expect(ids.indexOf("rsvp_deadline")).toBeLessThan(ids.indexOf("wedding_day"));
+    // t1/t2 carry no date at all — they sort to the end.
+    expect(ids.indexOf("wedding_day")).toBeLessThan(ids.indexOf("t1"));
   });
 
-  it("all items have required fields", () => {
-    const items = buildTimeline(BASE_ANSWERS);
-    for (const item of items) {
-      expect(typeof item.id).toBe("string");
-      expect(typeof item.title).toBe("string");
-      expect(typeof item.targetDate).toBe("string");
-      expect(typeof item.monthsBefore).toBe("number");
-      expect(typeof item.category).toBe("string");
-      expect(typeof item.done).toBe("boolean");
-    }
+  it("honeymoon task is high priority only when honeymoon is a priority", () => {
+    const priorities = ["honeymoon", "venue", "music"] as WeddingAnswers["priorities"];
+    expect(buildInitialTasks({ ...BASE_ANSWERS, priorities }).find((t) => t.id === "t7")?.priority)
+      .toBe("high");
+    expect(buildInitialTasks(BASE_ANSWERS).find((t) => t.id === "t7")?.priority).toBe("low");
+  });
+
+  it("budget task starts as done (already set in intake)", () => {
+    expect(buildInitialTasks(BASE_ANSWERS).find((t) => t.id === "t2")?.done).toBe(true);
+  });
+
+  it("schedules derived items relative to the wedding, not on a fixed date", () => {
+    const items = buildInitialTasks(BASE_ANSWERS);
+    const venue = items.find((i) => i.id === "venue")!;
+    expect(venue.monthsBefore).toBe(12);
+    // No baked-in dueDate — the date follows the wedding day wherever it moves.
+    expect(venue.dueDate).toBeUndefined();
+  });
+});
+
+// ── resolveDueDate ────────────────────────────────────────────────────────────
+
+describe("resolveDueDate", () => {
+  it("prefers an explicit dueDate over any offset", () => {
+    const task = { dueDate: "2026-01-05", monthsBefore: 12 };
+    expect(resolveDueDate(task, "2026-06-15")).toBe("2026-01-05");
+  });
+
+  it("derives the date from monthsBefore", () => {
+    expect(resolveDueDate({ monthsBefore: 12 }, "2026-06-15")).toBe("2025-06-15");
+  });
+
+  it("derives the date from daysBefore", () => {
+    expect(resolveDueDate({ daysBefore: 1 }, "2026-06-15")).toBe("2026-06-14");
+    expect(resolveDueDate({ daysBefore: 0 }, "2026-06-15")).toBe("2026-06-15");
+  });
+
+  it("returns undefined for an undated task", () => {
+    expect(resolveDueDate({}, "2026-06-15")).toBeUndefined();
+  });
+
+  it("returns undefined for a relative task when no wedding date is set", () => {
+    expect(resolveDueDate({ monthsBefore: 12 }, "")).toBeUndefined();
+  });
+
+  it("moves relative tasks when the wedding date moves", () => {
+    const task = { monthsBefore: 6 };
+    expect(resolveDueDate(task, "2026-06-15")).toBe("2025-12-15");
+    expect(resolveDueDate(task, "2027-06-15")).toBe("2026-12-15");
+  });
+});
+
+describe("describeSchedule", () => {
+  it("describes month and day offsets, singular and plural", () => {
+    expect(describeSchedule({ monthsBefore: 12 })).toBe("12 months before the wedding");
+    expect(describeSchedule({ monthsBefore: 1 })).toBe("1 month before the wedding");
+    expect(describeSchedule({ daysBefore: 1 })).toBe("1 day before the wedding");
+    expect(describeSchedule({ daysBefore: 0 })).toBe("on the wedding day");
+  });
+
+  it("returns undefined for a task with an exact date or no date", () => {
+    expect(describeSchedule({})).toBeUndefined();
+  });
+});
+
+// ── mergePlanTasks / legacy milestone adoption ────────────────────────────────
+
+describe("mergePlanTasks", () => {
+  const seed = buildInitialTasks(BASE_ANSWERS);
+
+  it("keeps the store copy when an id exists in both", () => {
+    const stored: Task = { ...seed.find((t) => t.id === "venue")!, done: true };
+    const merged = mergePlanTasks([stored], seed);
+    expect(merged.filter((t) => t.id === "venue")).toHaveLength(1);
+    expect(merged.find((t) => t.id === "venue")?.done).toBe(true);
+  });
+
+  it("includes seed tasks the store has never touched", () => {
+    expect(mergePlanTasks([], seed)).toHaveLength(seed.length);
+  });
+});
+
+describe("adoptLegacyMilestoneDoneIds", () => {
+  it("materialises completed milestones as done tasks", () => {
+    const tasks = adoptLegacyMilestoneDoneIds(BASE_ANSWERS, [], ["venue", "catering"]);
+    expect(tasks.map((t) => t.id).sort()).toEqual(["catering", "venue"]);
+    expect(tasks.every((t) => t.done)).toBe(true);
+  });
+
+  it("does not clobber a task the store already has", () => {
+    const existing: Task = {
+      id: "venue", title: "Book your venue", category: "Venue",
+      priority: "high", done: false, monthsBefore: 12,
+    };
+    const tasks = adoptLegacyMilestoneDoneIds(BASE_ANSWERS, [existing], ["venue"]);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].done).toBe(false);
+  });
+
+  it("ignores ids that match no seed task", () => {
+    expect(adoptLegacyMilestoneDoneIds(BASE_ANSWERS, [], ["not_a_milestone"])).toEqual([]);
+  });
+
+  it("is a no-op with no answers or no done ids", () => {
+    expect(adoptLegacyMilestoneDoneIds(null, [], ["venue"])).toEqual([]);
+    expect(adoptLegacyMilestoneDoneIds(BASE_ANSWERS, [], [])).toEqual([]);
   });
 });
 
@@ -235,95 +331,32 @@ describe("buildBudgetCategories", () => {
   });
 });
 
-// ── buildInitialTasks ─────────────────────────────────────────────────────────
-
-describe("buildInitialTasks", () => {
-  it("returns 7 base tasks for indoor setting", () => {
-    const tasks = buildInitialTasks(BASE_ANSWERS);
-    expect(tasks).toHaveLength(7);
-  });
-
-  it("adds tent task for outdoor setting", () => {
-    const answers = { ...BASE_ANSWERS, setting: "outdoor" as const };
-    const tasks = buildInitialTasks(answers);
-    expect(tasks).toHaveLength(8);
-    const tentTask = tasks.find((t) => t.id === "t_tent");
-    expect(tentTask).toBeDefined();
-    expect(tentTask?.flag).toMatch(/outdoor/i);
-  });
-
-  it("adds tent task for mixed setting", () => {
-    const answers = { ...BASE_ANSWERS, setting: "mixed" as const };
-    expect(buildInitialTasks(answers)).toHaveLength(8);
-  });
-
-  it("honeymoon task is high priority when honeymoon is a priority", () => {
-    const answers = { ...BASE_ANSWERS, priorities: ["honeymoon", "venue", "music"] as WeddingAnswers["priorities"] };
-    const tasks = buildInitialTasks(answers);
-    const honeymoon = tasks.find((t) => t.id === "t7")!;
-    expect(honeymoon.priority).toBe("high");
-  });
-
-  it("honeymoon task is low priority when honeymoon is NOT a priority", () => {
-    const tasks = buildInitialTasks(BASE_ANSWERS);
-    const honeymoon = tasks.find((t) => t.id === "t7")!;
-    expect(honeymoon.priority).toBe("low");
-  });
-
-  it("venue task has flexibility flag for small guest count", () => {
-    const answers = { ...BASE_ANSWERS, guestCount: 25 };
-    const tasks = buildInitialTasks(answers);
-    const venue = tasks.find((t) => t.id === "t4")!;
-    expect(venue.flag).toMatch(/flexibility/i);
-  });
-
-  it("all tasks have required fields", () => {
-    const tasks = buildInitialTasks(BASE_ANSWERS);
-    for (const task of tasks) {
-      expect(typeof task.id).toBe("string");
-      expect(typeof task.title).toBe("string");
-      expect(typeof task.category).toBe("string");
-      expect(typeof task.done).toBe("boolean");
-      expect(["high", "medium", "low"]).toContain(task.priority);
-    }
-  });
-
-  it("budget task starts as done (already set in intake)", () => {
-    const tasks = buildInitialTasks(BASE_ANSWERS);
-    const budgetTask = tasks.find((t) => t.id === "t2")!;
-    expect(budgetTask.done).toBe(true);
-  });
-});
-
 // ── Exact wedding dates ───────────────────────────────────────────────────────
 
 describe("date arithmetic with exact wedding dates", () => {
-  it("derives milestone targets from the exact day the couple picked", () => {
+  it("derives item dates from the exact day the couple picked", () => {
     const answers = { ...BASE_ANSWERS, date: "2027-09-04", dateIsExact: true };
-    const items = buildTimeline(answers);
-    expect(items.find((i) => i.id === "wedding_day")?.targetDate).toBe("2027-09-04");
-    expect(items.find((i) => i.id === "rehearsal")?.targetDate).toBe("2027-09-03");
-    expect(items.find((i) => i.id === "venue")?.targetDate).toBe("2026-09-04");
-    expect(items.find((i) => i.id === "rsvp_deadline")?.targetDate).toBe("2027-07-04");
+    const items = buildInitialTasks(answers);
+    const on = (id: string) => resolveDueDate(items.find((i) => i.id === id)!, answers.date);
+    expect(on("wedding_day")).toBe("2027-09-04");
+    expect(on("rehearsal")).toBe("2027-09-03");
+    expect(on("venue")).toBe("2026-09-04");
+    expect(on("rsvp_deadline")).toBe("2027-07-04");
+    expect(on("t4")).toBe("2026-09-04");
+    expect(on("t7")).toBe("2027-03-04");
   });
 
   it("clamps to the last day of the month instead of overflowing", () => {
     // Mar 31 minus one month is Feb 28 — never Mar 3.
     const answers = { ...BASE_ANSWERS, date: "2027-03-31", dateIsExact: true };
-    const items = buildTimeline(answers);
-    expect(items.find((i) => i.id === "final_headcount")?.targetDate).toBe("2027-02-28");
+    const items = buildInitialTasks(answers);
+    expect(resolveDueDate(items.find((i) => i.id === "final_headcount")!, answers.date))
+      .toBe("2027-02-28");
   });
 
-  it("keeps task due dates on the exact date's day of month", () => {
-    const answers = { ...BASE_ANSWERS, date: "2027-09-04", dateIsExact: true };
-    const tasks = buildInitialTasks(answers);
-    expect(tasks.find((t) => t.id === "t4")?.dueDate).toBe("2026-09-04");
-    expect(tasks.find((t) => t.id === "t7")?.dueDate).toBe("2027-03-04");
-  });
-
-  it("returns empty target dates when no wedding date is set", () => {
-    const items = buildTimeline({ ...BASE_ANSWERS, date: "" });
-    expect(items.find((i) => i.id === "venue")?.targetDate).toBe("");
-    expect(items.find((i) => i.id === "rehearsal")?.targetDate).toBe("");
+  it("leaves dates unresolved when no wedding date is set", () => {
+    const items = buildInitialTasks({ ...BASE_ANSWERS, date: "" });
+    expect(resolveDueDate(items.find((i) => i.id === "venue")!, "")).toBeUndefined();
+    expect(resolveDueDate(items.find((i) => i.id === "rehearsal")!, "")).toBeUndefined();
   });
 });
