@@ -130,10 +130,26 @@ export interface Vendor {
   costModel?: VendorCostModel;
 }
 
+/**
+ * The single plan item. Milestones used to be a separate `TimelineItem` type
+ * scheduled relative to the wedding, while tasks carried an exact `dueDate`.
+ * They're one list now, so a task can be dated either way:
+ *
+ *   - `dueDate`      — pinned to a specific day
+ *   - `monthsBefore` — N months before the wedding; moves when the date moves
+ *   - `daysBefore`   — same, for sub-month offsets (the rehearsal dinner)
+ *   - none of them   — undated, lives in the "No date yet" group
+ *
+ * Exactly one should be set. `resolveDueDate()` in plan-adapters.ts is the only
+ * place that turns these into a concrete date; nothing should read `dueDate`
+ * directly or a relatively-scheduled item looks undated.
+ */
 export interface Task {
   id: string;
   title: string;
   dueDate?: string; // ISO date string
+  monthsBefore?: number;
+  daysBefore?: number;
   category: string;
   done: boolean;
   priority: "high" | "medium" | "low";
@@ -158,16 +174,6 @@ export interface Guest {
   guestLocation?: GuestLocation;
   side?: GuestSide;
   priority?: GuestPriority;
-}
-
-export interface TimelineItem {
-  id: string;
-  title: string;
-  targetDate: string; // ISO or relative like "12 months before"
-  monthsBefore: number;
-  category: string;
-  flag?: string;
-  done: boolean;
 }
 
 export interface AdaptiveAdjustment {

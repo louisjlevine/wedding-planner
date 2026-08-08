@@ -7,6 +7,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import type { WeddingPriority } from "@/lib/types";
+import { resolveDueDate } from "@/lib/plan-adapters";
 import {
   SEASONS,
   seasonToDate,
@@ -190,8 +191,7 @@ function EditDetailsPanel({ onClose }: { onClose: () => void }) {
 // ── Overview page ─────────────────────────────────────────────────────────────
 
 export function Overview() {
-  const { answers, tasks, defaultTasks, guests, vendors, timeline, budgetCategories, setActiveTab } =
-    usePlan();
+  const { answers, allTasks, guests, vendors, budgetCategories, setActiveTab } = usePlan();
   const [editingDetails, setEditingDetails] = useState(false);
 
   if (!answers) return null;
@@ -199,10 +199,6 @@ export function Overview() {
   const totalBudget  = answers.budget;
   const totalSpent   = budgetCategories.reduce((sum, c) => sum + c.spent, 0);
   const remaining    = totalBudget - totalSpent;
-  // Same merge the Timeline & Tasks page uses — adapter-derived tasks only land
-  // in the store once touched, so counting `tasks` alone undercounts the plan.
-  const storeTaskIds = new Set(tasks.map((t) => t.id));
-  const allTasks     = [...tasks, ...defaultTasks.filter((t) => !storeTaskIds.has(t.id))];
   const doneTasks    = allTasks.filter((t) => t.done).length;
   const totalTasks   = allTasks.length;
   const confirmedGuests = guests.filter((g) => g.rsvp === "yes").length;
@@ -211,13 +207,13 @@ export function Overview() {
     answers.date,
     Date.now() // eslint-disable-line react-hooks/purity
   ) ?? 0;
-  const nextItems = timeline
-    .filter((t) => !t.done && t.targetDate >= todayISO())
+  const today = todayISO();
+  const nextItems = allTasks
+    .map((t) => ({ task: t, date: resolveDueDate(t, answers.date) }))
+    .filter((i) => !i.task.done && !!i.date && i.date >= today)
+    .sort((a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0))
     .slice(0, 4);
-  const flags = [
-    ...timeline.filter((t) => t.flag),
-    ...allTasks.filter((t) => t.flag),
-  ].slice(0, 4);
+  const flags = allTasks.filter((t) => t.flag).slice(0, 4);
 
   const weddingDate = describeWeddingDate(answers);
   const dateIsApproximate = !answers.dateIsExact;
@@ -287,14 +283,14 @@ export function Overview() {
         >
           {nextItems.length > 0 ? (
             <ul className="space-y-3">
-              {nextItems.map((item) => (
-                <li key={item.id} className="flex items-start justify-between gap-4">
+              {nextItems.map(({ task, date }) => (
+                <li key={task.id} className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-800">{item.title}</p>
-                    {item.flag && <p className="text-xs text-[var(--accent)] mt-0.5">{item.flag}</p>}
+                    <p className="text-sm font-medium text-gray-800">{task.title}</p>
+                    {task.flag && <p className="text-xs text-[var(--accent)] mt-0.5">{task.flag}</p>}
                   </div>
                   <span className="text-xs text-gray-400 shrink-0 mt-0.5">
-                    {formatMonthYear(item.targetDate)}
+                    {formatMonthYear(date)}
                   </span>
                 </li>
               ))}
@@ -310,10 +306,10 @@ export function Overview() {
         >
           {flags.length > 0 ? (
             <ul className="space-y-3">
-              {flags.map((item, i) => (
-                <li key={i} className="flex items-start gap-2">
+              {flags.map((item) => (
+                <li key={item.id} className="flex items-start gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] mt-1.5 shrink-0" />
-                  <p className="text-sm text-gray-700">{"flag" in item ? item.flag : null}</p>
+                  <p className="text-sm text-gray-700">{item.flag}</p>
                 </li>
               ))}
             </ul>

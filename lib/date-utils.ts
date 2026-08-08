@@ -78,6 +78,28 @@ export function formatMonthYear(iso: string | undefined | null): string {
   return formatDate(iso, { month: "short", year: "numeric" });
 }
 
+/**
+ * `isoDate` shifted back by `months`, as "YYYY-MM-DD". Builds the target month
+ * first and then clamps the day, so rolling back from Mar 31 lands on Feb 28
+ * rather than overflowing into March. Empty string when `isoDate` is unusable.
+ */
+export function dateMonthsBefore(isoDate: string | undefined | null, months: number): string {
+  const d = parseISODate(isoDate);
+  if (!d) return "";
+  const target = new Date(d.getFullYear(), d.getMonth() - months, 1);
+  const lastDayOfMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(d.getDate(), lastDayOfMonth));
+  return toISODate(target);
+}
+
+/** `isoDate` shifted back by `days`, as "YYYY-MM-DD". Empty string when unusable. */
+export function dateDaysBefore(isoDate: string | undefined | null, days: number): string {
+  const d = parseISODate(isoDate);
+  if (!d) return "";
+  d.setDate(d.getDate() - days);
+  return toISODate(d);
+}
+
 /** Whole days from today (local) to `iso`. Negative once the date has passed. */
 export function daysUntil(iso: string | undefined | null, now: number = Date.now()): number | null {
   const target = parseISODate(iso);
