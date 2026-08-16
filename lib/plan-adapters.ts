@@ -437,10 +437,23 @@ export function assigneeSuggestions(answers: Pick<WeddingAnswers, "partnerName">
  * The full plan: everything the user has touched (which lives in the store)
  * plus any seed item they haven't. Adapter-derived tasks are only persisted
  * once edited, so counting the store alone undercounts the plan.
+ *
+ * `removedIds` are tasks the user deleted. A deleted seed task has to stay
+ * deleted — dropping it from the store alone would let the adapter hand it
+ * straight back on the next render — so the tombstone list filters both sides.
  */
-export function mergePlanTasks(storeTasks: Task[], seedTasks: Task[]): Task[] {
-  const storeIds = new Set(storeTasks.map((t) => t.id));
-  return [...storeTasks, ...seedTasks.filter((t) => !storeIds.has(t.id))];
+export function mergePlanTasks(
+  storeTasks: Task[],
+  seedTasks: Task[],
+  removedIds: string[] = [],
+): Task[] {
+  const removed = new Set(removedIds);
+  const kept = storeTasks.filter((t) => !removed.has(t.id));
+  const storeIds = new Set(kept.map((t) => t.id));
+  return [
+    ...kept,
+    ...seedTasks.filter((t) => !storeIds.has(t.id) && !removed.has(t.id)),
+  ];
 }
 
 /**

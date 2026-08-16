@@ -172,6 +172,22 @@ describe("mergePlanTasks", () => {
   it("includes seed tasks the store has never touched", () => {
     expect(mergePlanTasks([], seed)).toHaveLength(seed.length);
   });
+
+  it("drops a removed seed task rather than re-seeding it", () => {
+    const merged = mergePlanTasks([], seed, ["venue"]);
+    expect(merged.find((t) => t.id === "venue")).toBeUndefined();
+    expect(merged).toHaveLength(seed.length - 1);
+  });
+
+  it("drops a removed task that was already persisted", () => {
+    const stored: Task = { ...seed.find((t) => t.id === "venue")!, done: true };
+    expect(mergePlanTasks([stored], seed, ["venue"]).find((t) => t.id === "venue"))
+      .toBeUndefined();
+  });
+
+  it("keeps everything when nothing has been removed", () => {
+    expect(mergePlanTasks([], seed, [])).toHaveLength(seed.length);
+  });
 });
 
 describe("assigneeSuggestions", () => {

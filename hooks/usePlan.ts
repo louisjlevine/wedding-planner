@@ -52,8 +52,9 @@ export function usePlan() {
   const defaultTasks = store.answers ? buildInitialTasks(store.answers) : [];
   // The whole plan in one list. Adapter-derived tasks only land in the store
   // once touched, so `store.tasks` alone is never the full picture — anything
-  // counting or listing plan items should read `allTasks`.
-  const allTasks = mergePlanTasks(store.tasks, defaultTasks);
+  // counting or listing plan items should read `allTasks`. Deleted items are
+  // filtered out on both sides, seeds included.
+  const allTasks = mergePlanTasks(store.tasks, defaultTasks, store.removedTaskIds);
 
   return {
     ...store,
