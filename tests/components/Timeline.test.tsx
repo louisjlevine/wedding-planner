@@ -44,7 +44,7 @@ const ANSWERS: WeddingAnswers = {
 };
 
 beforeEach(() => {
-  usePlanStore.setState({ answers: ANSWERS, tasks: [] });
+  usePlanStore.setState({ answers: ANSWERS, tasks: [], removedTaskIds: [] });
 });
 
 afterEach(() => {
@@ -397,6 +397,175 @@ describe("Timeline — assignees", () => {
 
     const added = usePlanStore.getState().tasks.find((t) => t.title === "Chase the florist")!;
     expect(added.assignee).toBe("Both");
+  });
+});
+
+describe("Timeline — removing an item", () => {
+  /** Opens the row editor and confirms the two-step remove. */
+  function removeVia(title: string) {
+    fireEvent.click(screen.getByRole("button", { name: `Edit "${title}"` }));
+    fireEvent.click(screen.getByRole("button", { name: `Remove "${title}"` }));
+    fireEvent.click(screen.getByRole("button", { name: `Confirm removing "${title}"` }));
+  }
+
+  it("puts removal in the editor, not on the row", () => {
+    render(<Timeline />);
+    expect(screen.queryByRole("button", { name: 'Remove "Book your venue"' })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    expect(screen.getByRole("button", { name: 'Remove "Book your venue"' })).toBeTruthy();
+  });
+
+  it("asks before removing", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.click(screen.getByRole("button", { name: 'Remove "Book your venue"' }));
+
+    // Still on screen — the first click only arms the confirmation.
+    expect(screen.getByText("Book your venue")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Keep" }));
+    expect(screen.getByText("Book your venue")).toBeTruthy();
+    expect(usePlanStore.getState().removedTaskIds).toEqual([]);
+  });
+
+  it("removes an adapter-derived task and keeps it gone", () => {
+    render(<Timeline />);
+    removeVia("Book your venue");
+
+    expect(screen.queryByText("Book your venue")).toBeNull();
+    expect(usePlanStore.getState().removedTaskIds).toContain("venue");
+  });
+
+  it("removes an undated task", () => {
+    render(<Timeline />);
+    removeVia("Create a wedding email address");
+    expect(screen.queryByText("Create a wedding email address")).toBeNull();
+  });
+
+  it("removes a completed task", () => {
+    render(<Timeline />);
+    // "Set your overall budget" (t2) seeds as done.
+    removeVia("Set your overall budget");
+    expect(screen.queryByText("Set your overall budget")).toBeNull();
+  });
+
+  it("removes a user-added task", () => {
+    usePlanStore.setState({
+      tasks: [
+        {
+          id: "custom-1", title: "Book hair trial", category: "Custom",
+          priority: "medium", done: false,
+        },
+      ],
+    });
+    render(<Timeline />);
+    removeVia("Book hair trial");
+
+    expect(usePlanStore.getState().tasks.find((t) => t.id === "custom-1")).toBeUndefined();
+    expect(screen.queryByText("Book hair trial")).toBeNull();
+  });
+
+  it("drops the removed item from the plan count", () => {
+    render(<Timeline />);
+    const before = screen.getByText(/\d+ of \d+ done/).textContent!;
+    removeVia("Book your venue");
+    expect(screen.getByText(/\d+ of \d+ done/).textContent).not.toBe(before);
+  });
+
+  it("restores removed suggestions", () => {
+    render(<Timeline />);
+    removeVia("Book your venue");
+    fireEvent.click(screen.getByRole("button", { name: "Restore suggested tasks" }));
+
+    expect(screen.getByText("Book your venue")).toBeTruthy();
+    expect(usePlanStore.getState().removedTaskIds).toEqual([]);
+  });
+
+  it("offers no restore link until something is removed", () => {
+    render(<Timeline />);
+    expect(screen.queryByRole("button", { name: "Restore suggested tasks" })).toBeNull();
+  });
+});
+
+describe("Timeline — task notes", () => {
+  it("saves notes typed in the editor", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue notes"), {
+      target: { value: "Toured the barn — quote is 12k, holds a date for 10 days." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(usePlanStore.getState().tasks.find((t) => t.id === "venue")?.notes).toBe(
+      "Toured the barn — quote is 12k, holds a date for 10 days.",
+    );
+  });
+
+  it("shows saved notes on the row", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue notes"), {
+      target: { value: "Deposit due Friday" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(screen.getByText("Deposit due Friday")).toBeTruthy();
+  });
+
+  it("loads existing notes back into the editor", () => {
+    usePlanStore.setState({
+      tasks: [
+        {
+          id: "venue", title: "Book your venue", category: "Venue",
+          priority: "high", done: false, monthsBefore: 12, notes: "Deposit due Friday",
+        },
+      ],
+    });
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+
+    const field = screen.getByLabelText("Book your venue notes") as HTMLTextAreaElement;
+    expect(field.value).toBe("Deposit due Friday");
+  });
+
+  it("normalises blank notes to undefined", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue notes"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(usePlanStore.getState().tasks.find((t) => t.id === "venue")?.notes).toBeUndefined();
+  });
+
+  it("discards notes on cancel", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue notes"), {
+      target: { value: "Nope" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(usePlanStore.getState().tasks.find((t) => t.id === "venue")).toBeUndefined();
+    expect(screen.queryByText("Nope")).toBeNull();
+  });
+
+  it("keeps notes through an unrelated edit", () => {
+    render(<Timeline />);
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.change(screen.getByLabelText("Book your venue notes"), {
+      target: { value: "Deposit due Friday" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    fireEvent.click(screen.getByRole("button", { name: 'Edit "Book your venue"' }));
+    fireEvent.click(screen.getByRole("button", { name: "Book your venue priority: low" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    const stored = usePlanStore.getState().tasks.find((t) => t.id === "venue")!;
+    expect(stored.notes).toBe("Deposit due Friday");
+    expect(stored.priority).toBe("low");
   });
 });
 

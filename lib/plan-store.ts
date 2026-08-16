@@ -44,6 +44,10 @@ interface PlanState {
   answers: WeddingAnswers | null;
   vendors: Vendor[];
   tasks: Task[];
+  // Tasks the user deleted. Adapter-derived tasks are regenerated from
+  // `answers` on every render, so removing one has to be recorded or it comes
+  // straight back. `mergePlanTasks` filters on this.
+  removedTaskIds: string[];
   guests: Guest[];
   notes: Note[];
   researchSessions: Record<string, ResearchSession>;
@@ -79,6 +83,7 @@ interface PlanState {
   addTask: (task: Task) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   removeTask: (id: string) => void;
+  restoreRemovedTasks: () => void;
 
   addGuest: (guest: Guest) => void;
   updateGuest: (id: string, updates: Partial<Guest>) => void;
@@ -321,6 +326,14 @@ export function migratePlanStore(persisted: unknown, version: number): PlanState
       );
     }
   }
+  if (version < 12) {
+    // New persisted fields: `removedTaskIds` (tombstones for deleted plan items)
+    // and `Task.notes`. Nothing to backfill — no plan has deleted anything yet,
+    // and an absent note is the same as an empty one.
+    if (!Array.isArray(state.removedTaskIds)) {
+      state.removedTaskIds = [];
+    }
+  }
   return state as PlanState;
 }
 
@@ -330,6 +343,7 @@ export const usePlanStore = create<PlanState>()(
       answers: null,
       vendors: [],
       tasks: [],
+      removedTaskIds: [],
       guests: [],
       notes: [],
       researchSessions: {},
@@ -512,8 +526,21 @@ export const usePlanStore = create<PlanState>()(
           ),
         })),
 
+      // Dropping the task from `tasks` isn't enough for an adapter-derived one —
+      // `buildInitialTasks` would re-seed it on the next render — so the id is
+      // tombstoned too. Custom tasks are tombstoned as well so a server snapshot
+      // taken before the delete can't resurrect them.
       removeTask: (id) =>
-        set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
+        set((state) => ({
+          tasks: state.tasks.filter((t) => t.id !== id),
+          removedTaskIds: state.removedTaskIds.includes(id)
+            ? state.removedTaskIds
+            : [...state.removedTaskIds, id],
+        })),
+
+      // Clears every tombstone at once: seed tasks reappear, user-added ones are
+      // gone for good (nothing holds their content once they leave `tasks`).
+      restoreRemovedTasks: () => set({ removedTaskIds: [] }),
 
       addGuest: (guest) =>
         set((state) => ({ guests: [...state.guests, guest] })),
@@ -771,18 +798,30 @@ export const usePlanStore = create<PlanState>()(
           // Strip out any vendor whose id is in the merged deletion list
           const vendorsSource = Array.isArray(data.vendors) ? data.vendors : state.vendors;
           const vendors = vendorsSource.filter((v) => !deletedVendorIds.includes(v.id));
+          // Same for tasks — union the tombstones from both sides so a delete
+          // made on one device isn't undone by a snapshot from another.
+          const incomingRemovedTasks = Array.isArray(data.removedTaskIds)
+            ? data.removedTaskIds
+            : [];
+          const removedTaskIds = Array.from(
+            new Set([...state.removedTaskIds, ...incomingRemovedTasks])
+          );
+          const tasksSource = Array.isArray(data.tasks) ? data.tasks : state.tasks;
+          const tasks = tasksSource.filter((t) => !removedTaskIds.includes(t.id));
           return {
             ...state,
             ...data,
             vendors,
             deletedVendorIds,
+            tasks,
+            removedTaskIds,
             intakeComplete: !!(data.answers ?? state.answers),
           };
         }),
     }),
     {
       name: "wedding-planner-store",
-      version: 11,
+      version: 12,
       migrate: (persisted, version) => migratePlanStore(persisted, version),
     }
   )

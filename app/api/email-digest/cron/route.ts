@@ -98,7 +98,11 @@ export async function GET(req: NextRequest) {
     (planState.tasks as Task[] | undefined) ?? [],
     (planState.timelineDoneIds as string[] | undefined) ?? [],
   );
-  const allTasks = mergePlanTasks(storeTasks, buildInitialTasks(answers));
+  const allTasks = mergePlanTasks(
+    storeTasks,
+    buildInitialTasks(answers),
+    (planState.removedTaskIds as string[] | undefined) ?? [],
+  );
 
   const vendors = (planState.vendors as Vendor[] | undefined) ?? [];
 

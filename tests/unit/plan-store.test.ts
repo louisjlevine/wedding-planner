@@ -521,3 +521,82 @@ describe("migratePlanStore — v10 → v11 task assignee", () => {
     expect(migratePlanStore({}, 10).tasks).toBeUndefined();
   });
 });
+
+describe("migratePlanStore — v11 → v12 removed task tombstones", () => {
+  it("seeds an empty removedTaskIds array", () => {
+    expect(migratePlanStore({ tasks: [] }, 11).removedTaskIds).toEqual([]);
+  });
+
+  it("preserves tombstones already on the payload", () => {
+    expect(migratePlanStore({ removedTaskIds: ["venue"] }, 11).removedTaskIds).toEqual([
+      "venue",
+    ]);
+  });
+
+  it("leaves v12+ payloads untouched", () => {
+    expect(migratePlanStore({}, 12).removedTaskIds).toBeUndefined();
+  });
+});
+
+describe("removeTask", () => {
+  const task = (over: Partial<import("@/lib/types").Task> = {}) => ({
+    id: "custom-1", title: "Book hair trial", category: "Custom",
+    priority: "medium" as const, done: false, ...over,
+  });
+
+  beforeEach(() => {
+    usePlanStore.setState({ tasks: [], removedTaskIds: [] });
+  });
+
+  it("drops the task and records a tombstone", () => {
+    usePlanStore.setState({ tasks: [task()] });
+    usePlanStore.getState().removeTask("custom-1");
+    expect(usePlanStore.getState().tasks).toEqual([]);
+    expect(usePlanStore.getState().removedTaskIds).toEqual(["custom-1"]);
+  });
+
+  it("tombstones an adapter-derived task that was never in the store", () => {
+    usePlanStore.getState().removeTask("venue");
+    expect(usePlanStore.getState().removedTaskIds).toEqual(["venue"]);
+  });
+
+  it("does not record the same id twice", () => {
+    usePlanStore.getState().removeTask("venue");
+    usePlanStore.getState().removeTask("venue");
+    expect(usePlanStore.getState().removedTaskIds).toEqual(["venue"]);
+  });
+
+  it("clears every tombstone on restore", () => {
+    usePlanStore.getState().removeTask("venue");
+    usePlanStore.getState().restoreRemovedTasks();
+    expect(usePlanStore.getState().removedTaskIds).toEqual([]);
+  });
+});
+
+describe("importStore — task deletions survive a server pull", () => {
+  const task = (id: string) => ({
+    id, title: id, category: "Custom", priority: "medium" as const, done: false,
+  });
+
+  beforeEach(() => {
+    usePlanStore.setState({ tasks: [], removedTaskIds: [], deletedVendorIds: [], vendors: [] });
+  });
+
+  it("strips incoming tasks the user deleted locally", () => {
+    usePlanStore.setState({ removedTaskIds: ["venue"] });
+    usePlanStore.getState().importStore({ tasks: [task("venue"), task("catering")] });
+    expect(usePlanStore.getState().tasks.map((t) => t.id)).toEqual(["catering"]);
+  });
+
+  it("unions tombstones from the snapshot with local ones", () => {
+    usePlanStore.setState({ removedTaskIds: ["venue"] });
+    usePlanStore.getState().importStore({ removedTaskIds: ["catering"], tasks: [] });
+    expect(usePlanStore.getState().removedTaskIds.sort()).toEqual(["catering", "venue"]);
+  });
+
+  it("applies a tombstone from another device to local tasks", () => {
+    usePlanStore.setState({ tasks: [task("venue")] });
+    usePlanStore.getState().importStore({ removedTaskIds: ["venue"] });
+    expect(usePlanStore.getState().tasks).toEqual([]);
+  });
+});

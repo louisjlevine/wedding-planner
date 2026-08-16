@@ -210,7 +210,8 @@ function EditorField({ label, children }: { label: string; children: React.React
 }
 
 /** Everything about a task the user can change. `done` is the checkbox's job. */
-type TaskEdits = Pick<Task, "title" | "category" | "priority" | "assignee"> & DateFields;
+type TaskEdits = Pick<Task, "title" | "category" | "priority" | "assignee" | "notes"> &
+  DateFields;
 
 function TaskEditor({
   task,
@@ -218,18 +219,23 @@ function TaskEditor({
   assignees,
   onSave,
   onCancel,
+  onRemove,
 }: {
   task: Task;
   weddingDate: string;
   assignees: string[];
   onSave: (edits: TaskEdits) => void;
   onCancel: () => void;
+  onRemove: () => void;
 }) {
   const initialMode = modeOf(task);
   const [title, setTitle] = useState(task.title);
   const [assignee, setAssignee] = useState(task.assignee ?? "");
   const [category, setCategory] = useState(task.category);
   const [priority, setPriority] = useState<Task["priority"]>(task.priority);
+  const [notes, setNotes] = useState(task.notes ?? "");
+  // Deleting is one click away from Save, so it asks first.
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [mode, setMode] = useState<DateMode>(initialMode);
   const [exact, setExact] = useState(
     task.dueDate ?? (initialMode === "relative" ? resolveDueDate(task, weddingDate) ?? "" : ""),
@@ -250,6 +256,9 @@ function TaskEditor({
       category: category.trim() || "Other",
       priority,
       assignee: assignee.trim() || undefined,
+      // Blank notes read back as "no notes" rather than an empty string, so the
+      // row has one thing to test for.
+      notes: notes.trim() || undefined,
       ...fieldsFor(mode, exact, months),
     });
   }
@@ -320,20 +329,62 @@ function TaskEditor({
         />
       </EditorField>
 
-      <div className="flex gap-2">
-        <button
-          onClick={handleSave}
-          disabled={!canSave}
-          className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Save changes
-        </button>
-        <button
-          onClick={onCancel}
-          className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
-        >
-          Cancel
-        </button>
+      <EditorField label="Notes">
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          placeholder="Quotes, phone numbers, what's left to chase..."
+          aria-label={`${idPrefix} notes`}
+          className={`${inputClass} w-full resize-y leading-relaxed`}
+        />
+      </EditorField>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            disabled={!canSave}
+            className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Save changes
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
+          >
+            Cancel
+          </button>
+        </div>
+
+        {/* Removal lives here rather than on the row, and works for every item
+            on the plan — adapter-derived ones included. */}
+        {confirmingRemove ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Remove this task?</span>
+            <button
+              onClick={onRemove}
+              aria-label={`Confirm removing "${idPrefix}"`}
+              className="px-3 py-1.5 bg-red-500 text-white text-xs font-semibold rounded-lg hover:bg-red-600 transition-colors"
+            >
+              Remove
+            </button>
+            <button
+              onClick={() => setConfirmingRemove(false)}
+              className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
+            >
+              Keep
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmingRemove(true)}
+            aria-label={`Remove "${idPrefix}"`}
+            className="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-red-500 transition-colors"
+          >
+            Remove task
+          </button>
+        )}
       </div>
     </div>
   );
@@ -367,7 +418,7 @@ function TaskRow({
   const isToday = !!date && date === today;
   const isOverdue = !task.done && !!date && date < today;
   const schedule = describeSchedule(task);
-  const removable = task.id.startsWith("custom-");
+  const notes = task.notes?.trim();
 
   return (
     <div
@@ -415,6 +466,13 @@ function TaskRow({
             {task.assignee && <Badge variant="blue">{task.assignee}</Badge>}
           </div>
           {task.flag && <p className="text-xs text-[var(--accent)] mt-1">{task.flag}</p>}
+          {/* Preview only — the editor is where notes are written. Collapsed to
+              two lines so a long note can't push the rest of the list around. */}
+          {notes && !editing && (
+            <p className="text-xs text-gray-500 mt-1.5 whitespace-pre-line line-clamp-2">
+              {notes}
+            </p>
+          )}
         </div>
 
         <div className="shrink-0 text-right flex items-start gap-3">
@@ -442,14 +500,6 @@ function TaskRow({
           >
             {editing ? "close" : "edit"}
           </button>
-          {removable && (
-            <button
-              onClick={() => onRemove(task)}
-              className="text-gray-300 hover:text-red-400 text-xs transition-colors mt-0.5"
-            >
-              remove
-            </button>
-          )}
         </div>
       </div>
 
@@ -460,6 +510,7 @@ function TaskRow({
           assignees={assignees}
           onSave={(edits) => onSaveEdits(task, edits)}
           onCancel={() => onEdit(null)}
+          onRemove={() => onRemove(task)}
         />
       )}
     </div>
@@ -530,7 +581,8 @@ function summaryLine(answers: WeddingAnswers, done: number, total: number): stri
 
 export function Timeline() {
   const { allTasks, tasks, answers } = usePlan();
-  const { updateTask, addTask, removeTask } = usePlanStore();
+  const { updateTask, addTask, removeTask, removedTaskIds, restoreRemovedTasks } =
+    usePlanStore();
   const [filter, setFilter] = useState<Filter>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
@@ -626,6 +678,19 @@ export function Timeline() {
         <p className="text-sm text-gray-500 mt-0.5">
           {summaryLine(answers, doneCount, dated.length)}
         </p>
+        {/* Removing a suggested task shouldn't be a one-way door — the plan can
+            be re-seeded from the answers at any point. */}
+        {removedTaskIds.length > 0 && (
+          <p className="text-xs text-gray-400 mt-1.5">
+            {removedTaskIds.length} removed{" "}
+            <button
+              onClick={restoreRemovedTasks}
+              className="text-[var(--accent)] font-medium hover:underline"
+            >
+              Restore suggested tasks
+            </button>
+          </p>
+        )}
       </div>
 
       {/* Add a task — title plus an optional date, either exact or relative */}

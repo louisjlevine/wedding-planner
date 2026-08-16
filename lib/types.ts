@@ -161,6 +161,11 @@ export interface Task {
    * editor normalises a blank input back to undefined.
    */
   assignee?: string;
+  /**
+   * Free-form notes about this task — quotes, phone numbers, what's left to
+   * chase. Written in the row editor and saved with the rest of the task.
+   */
+  notes?: string;
 }
 
 export type GuestRelationship = "family" | "close_friend" | "friend" | "acquaintance";
