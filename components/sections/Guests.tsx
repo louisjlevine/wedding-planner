@@ -18,7 +18,10 @@ import {
   effectivePriority,
   compareGuestRank,
   applyCutoff,
+  moveGuest,
+  stepGuest,
   type CutoffMode,
+  type GuestPlacement,
 } from "@/lib/guest-priority";
 import type ExcelJS from "exceljs";
 import type { Guest, GuestRelationship, GuestLocation, GuestSide, GuestPriority } from "@/lib/types";
@@ -448,7 +451,8 @@ function EditGuestForm({
           onChange={(e) => setD((x) => ({ ...x, totalGuests: e.target.value }))}
           className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
       </div>
-      <div className="flex gap-2">
+      <div className="flex justify-end gap-2">
+        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
         <button onClick={() => onSave({
           name:          d.name.trim() || guest.name,
           email:         d.email    || undefined,
@@ -465,7 +469,6 @@ function EditGuestForm({
           className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
           Save
         </button>
-        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
       </div>
     </div>
   );
@@ -474,12 +477,15 @@ function EditGuestForm({
 // ── Main Guests page ──────────────────────────────────────────────────────────
 
 export function Guests() {
-  const { guests, addGuest, updateGuest, removeGuest } = usePlanStore();
+  const { guests, addGuest, updateGuest, updateGuests, removeGuest } = usePlanStore();
 
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sideFilter, setSideFilter] = useState<GuestSide | "all">("all");
   const [locationFilter, setLocationFilter] = useState<GuestLocation | "all">("all");
+  const [priorityFilter, setPriorityFilter] = useState<GuestPriority | "all">("all");
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; placement: GuestPlacement } | null>(null);
   const [cutoffMode, setCutoffMode] = useState<CutoffMode>("attending");
   const [cutoffInput, setCutoffInput] = useState<string>("");
   const [form, setForm] = useState({
@@ -636,8 +642,48 @@ export function Guests() {
       (sideFilter === "both" && g.side === "both")
     )
     .filter((g) => locationFilter === "all" || g.guestLocation === locationFilter)
+    .filter((g) => priorityFilter === "all" || effectivePriority(g) === priorityFilter)
     .slice()
     .sort(compareGuestRank);
+
+  const hasManualOrder = guests.some((g) => g.rank !== undefined);
+
+  // ── Reordering ───────────────────────────────────────────────────────────
+  // Writes `rank` (and, across a tier edge, `priority`) to the store, so the
+  // order persists and syncs like any other guest field.
+
+  function applyMove(updates: Record<string, Partial<Guest>> | null) {
+    if (updates) updateGuests(updates);
+  }
+
+  function resetOrder() {
+    updateGuests(Object.fromEntries(guests.map((g) => [g.id, { rank: undefined }])));
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLTableRowElement>, targetId: string) {
+    if (!draggingId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const rect = e.currentTarget.getBoundingClientRect();
+    const placement: GuestPlacement = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+    if (dropTarget?.id !== targetId || dropTarget.placement !== placement) {
+      setDropTarget({ id: targetId, placement });
+    }
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLTableRowElement>) {
+    e.preventDefault();
+    if (draggingId && dropTarget) {
+      applyMove(moveGuest(guests, draggingId, dropTarget.id, dropTarget.placement));
+    }
+    setDraggingId(null);
+    setDropTarget(null);
+  }
+
+  function handleDragEnd() {
+    setDraggingId(null);
+    setDropTarget(null);
+  }
 
   // Cutoff is computed against the FULL guest list (not the filtered/sorted
   // view) so the "would cut" set is stable as the user toggles filters.
@@ -747,6 +793,35 @@ export function Guests() {
         </div>
       )}
 
+      {/* Priority filter — each chip shows invites and est. attending for that tier */}
+      {guests.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {(["all", ...PRIORITY_TIERS] as const).map((p) => {
+            const tierGuests = p === "all" ? guests : guests.filter((g) => effectivePriority(g) === p);
+            const seats = tierGuests.reduce((s, g) => s + g.totalGuests, 0);
+            const est = estimatedAttendance(tierGuests);
+            const active = priorityFilter === p;
+            return (
+              <button
+                key={p}
+                onClick={() => setPriorityFilter(p)}
+                title={`${seats} invited, ~${est} estimated attending`}
+                className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                  active
+                    ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                    : "border-gray-200 text-gray-500 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                }`}
+              >
+                {p === "all" ? "All priorities" : PRIORITY_LABELS[p]}{" "}
+                <span className={active ? "text-white/70" : "text-gray-400"}>
+                  ({seats} invited &middot; ~{est} est.)
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Cutoff planner */}
       {guests.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
@@ -755,6 +830,15 @@ export function Guests() {
               <h3 className="text-sm font-semibold text-gray-700">Cutoff planner</h3>
               <p className="text-xs text-gray-500 mt-0.5">
                 Rank by tier, then enter a target. Guests below the line are flagged as &ldquo;would cut&rdquo;.
+                Drag rows (or use the arrows) to set the order within a tier.
+                {hasManualOrder && (
+                  <>
+                    {" "}
+                    <button onClick={resetOrder} className="text-[var(--accent)] hover:underline">
+                      Reset to default order
+                    </button>
+                  </>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -898,13 +982,13 @@ export function Guests() {
               );
             })}
           </div>
-          <div className="flex gap-2">
+          <div className="flex justify-end gap-2">
+            <button onClick={cancelCsvImport} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+              Cancel
+            </button>
             <button onClick={confirmCsvImport}
               className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity">
               Confirm import
-            </button>
-            <button onClick={cancelCsvImport} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
-              Cancel
             </button>
           </div>
         </div>
@@ -1023,13 +1107,13 @@ export function Guests() {
               onChange={(e) => setForm((f) => ({ ...f, totalGuests: e.target.value }))}
               className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
           </div>
-          <div className="flex gap-2">
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setAdding(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+              Cancel
+            </button>
             <button onClick={handleAdd}
               className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
               Add
-            </button>
-            <button onClick={() => setAdding(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
-              Cancel
             </button>
           </div>
         </div>
@@ -1076,7 +1160,8 @@ export function Guests() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left text-xs font-medium text-gray-400 px-4 py-2.5">Name</th>
+                <th className="w-12"><span className="sr-only">Reorder</span></th>
+                <th className="text-left text-xs font-medium text-gray-400 pr-4 py-2.5">Name</th>
                 <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5">Priority</th>
                 <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5">RSVP</th>
                 <th className="text-left text-xs font-medium text-gray-400 px-3 py-2.5 hidden sm:table-cell">Relationship</th>
@@ -1088,7 +1173,7 @@ export function Guests() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredGuests.map((guest) => {
+              {filteredGuests.map((guest, index) => {
                 const prob = getBaseProbability(guest);
                 const showProb = guest.rsvp === "pending" || guest.rsvp === "maybe";
                 const isCut = cutoff.cutIds.has(guest.id);
@@ -1097,7 +1182,7 @@ export function Guests() {
                 if (editingId === guest.id) {
                   return (
                     <tr key={guest.id}>
-                      <td colSpan={9} className="p-3">
+                      <td colSpan={10} className="p-3">
                         <EditGuestForm
                           guest={guest}
                           onSave={(u) => { updateGuest(guest.id, u); setEditingId(null); }}
@@ -1111,12 +1196,60 @@ export function Guests() {
                 return (
                   <tr
                     key={guest.id}
+                    draggable={editingId === null}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", guest.id);
+                      setDraggingId(guest.id);
+                    }}
+                    onDragOver={(e) => handleDragOver(e, guest.id)}
+                    onDrop={handleDrop}
+                    onDragEnd={handleDragEnd}
                     onClick={() => setEditingId(guest.id)}
                     className={`cursor-pointer transition-colors ${
                       isCut ? "bg-red-50/40 hover:bg-red-50/70 opacity-60" : "hover:bg-gray-50"
+                    } ${draggingId === guest.id ? "opacity-40" : ""} ${
+                      dropTarget?.id === guest.id && draggingId !== guest.id
+                        ? dropTarget.placement === "before"
+                          ? "shadow-[inset_0_2px_0_0_var(--accent)]"
+                          : "shadow-[inset_0_-2px_0_0_var(--accent)]"
+                        : ""
                     }`}
                   >
-                    <td className="px-4 py-3">
+                    <td className="pl-2 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-0.5">
+                        <span className="text-gray-300 cursor-grab active:cursor-grabbing" title="Drag to reorder" aria-hidden="true">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
+                            <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+                            <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+                          </svg>
+                        </span>
+                        <div className="flex flex-col">
+                          <button
+                            onClick={() => applyMove(stepGuest(guests, filteredGuests, guest.id, -1))}
+                            disabled={index === 0}
+                            aria-label={`Move ${guest.name} up`}
+                            className="text-gray-300 hover:text-[var(--accent)] disabled:opacity-0 leading-none"
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => applyMove(stepGuest(guests, filteredGuests, guest.id, 1))}
+                            disabled={index === filteredGuests.length - 1}
+                            aria-label={`Move ${guest.name} down`}
+                            className="text-gray-300 hover:text-[var(--accent)] disabled:opacity-0 leading-none"
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="pr-4 py-3">
                       <div className="flex items-center gap-2">
                         <span className={`font-medium ${isCut ? "text-gray-500 line-through" : "text-gray-900"}`}>
                           {guest.name}

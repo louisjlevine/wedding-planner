@@ -6,6 +6,8 @@ import {
   compareGuestRank,
   rankedGuests,
   applyCutoff,
+  moveGuest,
+  stepGuest,
 } from "@/lib/guest-priority";
 
 const guest = (over: Partial<Guest> = {}): Guest => ({
@@ -112,5 +114,50 @@ describe("applyCutoff", () => {
     const r = applyCutoff(all, 3, "invited");
     expect(r.cutIds.has("3")).toBe(true);
     expect(r.cutIds.has("4")).toBe(true);
+  });
+});
+
+describe("manual rank", () => {
+  const apply = (gs: Guest[], u: Record<string, Partial<Guest>> | null) =>
+    gs.map((g) => (u?.[g.id] ? { ...g, ...u[g.id] } : g));
+  const ids = (gs: Guest[]) => rankedGuests(gs).map((g) => g.id);
+
+  const a = guest({ id: "a", name: "Ann",  priority: "must" });
+  const b = guest({ id: "b", name: "Bob",  priority: "must" });
+  const c = guest({ id: "c", name: "Cat",  priority: "want" });
+  const d = guest({ id: "d", name: "Dan",  priority: "want" });
+  const all = [a, b, c, d];
+
+  it("ranked guests come before unranked ones within a tier, but never cross tiers", () => {
+    expect(ids([a, { ...b, rank: 5 }, c, { ...d, rank: 0 }])).toEqual(["b", "a", "d", "c"]);
+  });
+
+  it("moveGuest reorders within a tier and persists ranks for everyone", () => {
+    const next = apply(all, moveGuest(all, "b", "a", "before"));
+    expect(ids(next)).toEqual(["b", "a", "c", "d"]);
+    expect(next.every((g) => typeof g.rank === "number")).toBe(true);
+  });
+
+  it("dropping onto another tier adopts that tier", () => {
+    const next = apply(all, moveGuest(all, "d", "a", "after"));
+    expect(ids(next)).toEqual(["a", "d", "b", "c"]);
+    expect(next.find((g) => g.id === "d")!.priority).toBe("must");
+  });
+
+  it("moveGuest returns null for a no-op", () => {
+    expect(moveGuest(all, "a", "a", "before")).toBeNull();
+    expect(moveGuest(all, "a", "b", "before")).toBeNull();
+  });
+
+  it("stepGuest swaps within a tier and crosses tier edges one step at a time", () => {
+    const ranked = rankedGuests(all);
+    expect(ids(apply(all, stepGuest(all, ranked, "b", -1)))).toEqual(["b", "a", "c", "d"]);
+    const up = apply(all, stepGuest(all, ranked, "c", -1));
+    expect(ids(up)).toEqual(["a", "b", "c", "d"]);
+    expect(up.find((g) => g.id === "c")!.priority).toBe("must");
+    const down = apply(all, stepGuest(all, ranked, "b", 1));
+    expect(ids(down)).toEqual(["a", "b", "c", "d"]);
+    expect(down.find((g) => g.id === "b")!.priority).toBe("want");
+    expect(stepGuest(all, ranked, "a", -1)).toBeNull();
   });
 });

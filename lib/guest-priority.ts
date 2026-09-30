@@ -44,15 +44,19 @@ export function effectivePriority(g: Guest): GuestPriority {
 }
 
 /**
- * Stable sort: priority tier (must → want → ifSpace), then relationship
+ * Stable sort: priority tier (must → want → ifSpace), then the couple's
+ * manual `rank` (unranked guests after ranked ones), then relationship
  * (family → close_friend → friend → acquaintance → unset), then name A→Z.
- * The first two are how we want guests ranked when applying a cutoff;
- * name is the tiebreaker so the visual order is deterministic.
+ * This is the order a cutoff is applied in; name is the final tiebreaker so
+ * the visual order is deterministic.
  */
 export function compareGuestRank(a: Guest, b: Guest): number {
   const pa = PRIORITY_RANK[effectivePriority(a)];
   const pb = PRIORITY_RANK[effectivePriority(b)];
   if (pa !== pb) return pa - pb;
+  const ka = a.rank ?? Infinity;
+  const kb = b.rank ?? Infinity;
+  if (ka !== kb) return ka < kb ? -1 : 1;
   const ra = a.relationship ? RELATIONSHIP_RANK[a.relationship] : 99;
   const rb = b.relationship ? RELATIONSHIP_RANK[b.relationship] : 99;
   if (ra !== rb) return ra - rb;
@@ -61,6 +65,68 @@ export function compareGuestRank(a: Guest, b: Guest): number {
 
 export function rankedGuests(guests: Guest[]): Guest[] {
   return [...guests].sort(compareGuestRank);
+}
+
+export type GuestPlacement = "before" | "after";
+
+/**
+ * Move guest `id` to sit directly before/after `targetId` in the ranked list,
+ * adopting the target's priority tier (so dragging across a tier boundary
+ * re-tiers the guest). Every guest is then re-ranked 0..n-1 in the new order,
+ * which makes the manual order explicit and persistent.
+ *
+ * Returns the per-guest updates to write, or null when nothing would change.
+ */
+export function moveGuest(
+  guests: Guest[],
+  id: string,
+  targetId: string,
+  placement: GuestPlacement,
+): Record<string, Partial<Guest>> | null {
+  if (id === targetId) return null;
+  const ranked = rankedGuests(guests);
+  const moving = ranked.find((g) => g.id === id);
+  const target = ranked.find((g) => g.id === targetId);
+  if (!moving || !target) return null;
+
+  const rest = ranked.filter((g) => g.id !== id);
+  const at = rest.indexOf(target) + (placement === "after" ? 1 : 0);
+  const tier = effectivePriority(target);
+  const reordered = [...rest.slice(0, at), { ...moving, priority: tier }, ...rest.slice(at)];
+
+  if (reordered.every((g, i) => g.id === ranked[i].id) && effectivePriority(moving) === tier) {
+    return null;
+  }
+
+  const updates: Record<string, Partial<Guest>> = {};
+  reordered.forEach((g, i) => {
+    const u: Partial<Guest> = {};
+    if (g.rank !== i) u.rank = i;
+    if (g.id === id && moving.priority !== tier) u.priority = tier;
+    if (Object.keys(u).length) updates[g.id] = u;
+  });
+  return updates;
+}
+
+/**
+ * One step up or down within `visible` (the list as currently shown, i.e.
+ * already filtered and ranked). Inside a tier it swaps with the neighbour;
+ * at a tier edge it just crosses into the adjacent tier (bottom of the tier
+ * above, or top of the tier below) rather than jumping past the neighbour.
+ */
+export function stepGuest(
+  guests: Guest[],
+  visible: Guest[],
+  id: string,
+  direction: -1 | 1,
+): Record<string, Partial<Guest>> | null {
+  const idx = visible.findIndex((g) => g.id === id);
+  const neighbour = visible[idx + direction];
+  if (idx === -1 || !neighbour) return null;
+  const sameTier = effectivePriority(visible[idx]) === effectivePriority(neighbour);
+  const placement: GuestPlacement =
+    direction === -1 ? (sameTier ? "before" : "after") : (sameTier ? "after" : "before");
+  return moveGuest(guests, id, neighbour.id, placement);
 }
 
 export type CutoffMode = "attending" | "invited";

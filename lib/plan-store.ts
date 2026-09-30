@@ -88,6 +88,8 @@ interface PlanState {
   addGuest: (guest: Guest) => void;
   updateGuest: (id: string, updates: Partial<Guest>) => void;
   removeGuest: (id: string) => void;
+  /** Apply several guest patches in one write (used by reordering). */
+  updateGuests: (updates: Record<string, Partial<Guest>>) => void;
 
   addNote: (content: string) => void;
   removeNote: (id: string) => void;
@@ -334,6 +336,16 @@ export function migratePlanStore(persisted: unknown, version: number): PlanState
       state.removedTaskIds = [];
     }
   }
+  if (version < 13) {
+    // New persisted field: Guest.rank (manual order on the guest list).
+    // Nothing to backfill — unranked guests keep their old relationship/name
+    // order — but drop anything that isn't a finite number.
+    if (Array.isArray(state.guests)) {
+      state.guests = state.guests.map((g) =>
+        g.rank === undefined || Number.isFinite(g.rank) ? g : { ...g, rank: undefined },
+      );
+    }
+  }
   return state as PlanState;
 }
 
@@ -555,6 +567,13 @@ export const usePlanStore = create<PlanState>()(
       removeGuest: (id) =>
         set((state) => ({
           guests: state.guests.filter((g) => g.id !== id),
+        })),
+
+      updateGuests: (updates) =>
+        set((state) => ({
+          guests: state.guests.map((g) =>
+            updates[g.id] ? { ...g, ...updates[g.id] } : g
+          ),
         })),
 
       addNote: (content) =>
@@ -821,7 +840,7 @@ export const usePlanStore = create<PlanState>()(
     }),
     {
       name: "wedding-planner-store",
-      version: 12,
+      version: 13,
       migrate: (persisted, version) => migratePlanStore(persisted, version),
     }
   )
