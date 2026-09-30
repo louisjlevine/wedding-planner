@@ -175,13 +175,13 @@ function EditDetailsPanel({ onClose }: { onClose: () => void }) {
         <p className="text-xs text-gray-400 mt-1">Changing priorities adjusts budget allocations (photography/food get +5% each)</p>
       </div>
 
-      <div className="flex gap-2 pt-1">
+      <div className="flex justify-end gap-2 pt-1">
+        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+          Cancel
+        </button>
         <button onClick={save}
           className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
           Save changes
-        </button>
-        <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
-          Cancel
         </button>
       </div>
     </div>

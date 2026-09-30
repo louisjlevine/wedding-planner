@@ -150,14 +150,14 @@ function RecommendationCard({
           <textarea value={draft.why} onChange={(e) => setDraft({ ...draft, why: e.target.value })}
             rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] resize-none" />
         </div>
-        <div className="flex gap-2">
-          <button onClick={saveEdit}
-            className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
-            Save
-          </button>
+        <div className="flex justify-end gap-2">
           <button onClick={() => { setDraft({ ...rec }); setEditing(false); }}
             className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
             Cancel
+          </button>
+          <button onClick={saveEdit}
+            className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors">
+            Save
           </button>
         </div>
       </div>

@@ -186,6 +186,13 @@ export interface Guest {
   guestLocation?: GuestLocation;
   side?: GuestSide;
   priority?: GuestPriority;
+  /**
+   * Manual position within the priority tier, set by drag-and-drop / the
+   * up-down arrows on the guest list. Lower comes first. Absent until the
+   * couple reorders someone; unranked guests sort after ranked ones in their
+   * tier, by relationship then name.
+   */
+  rank?: number;
 }
 
 export interface AdaptiveAdjustment {

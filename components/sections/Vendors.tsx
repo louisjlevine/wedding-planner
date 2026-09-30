@@ -893,7 +893,10 @@ function EditVendorForm({
           />
         )}
       </div>
-      <div className="flex gap-2 items-center">
+      <div className="flex gap-2 items-center justify-end">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
+          Cancel
+        </button>
         <button
           type="button"
           onClick={commit}
@@ -902,12 +905,9 @@ function EditVendorForm({
         >
           Save
         </button>
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
-          Cancel
-        </button>
 
-        {/* Save status indicator */}
-        <div className="flex items-center gap-1.5 text-xs">
+        {/* Save status indicator — sits on the left, buttons stay right */}
+        <div className="flex items-center gap-1.5 text-xs order-first mr-auto">
           {processing > 0 && (
             <>
               <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
@@ -1392,18 +1392,18 @@ export function Vendors() {
               />
             )}
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleAdd}
-              className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
-            >
-              Add
-            </button>
+          <div className="flex justify-end gap-2">
             <button
               onClick={() => setAdding(false)}
               className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700"
             >
               Cancel
+            </button>
+            <button
+              onClick={handleAdd}
+              className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-medium rounded-lg hover:opacity-90 transition-colors"
+            >
+              Add
             </button>
           </div>
         </div>

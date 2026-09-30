@@ -190,7 +190,7 @@ export function DigestSettings() {
           </div>
         </div>
 
-        <div className="flex gap-3 pt-1">
+        <div className="flex justify-end gap-3 pt-1">
           <Button onClick={handleSave}>
             {saved ? "Saved" : "Save preferences"}
           </Button>

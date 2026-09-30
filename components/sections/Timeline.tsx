@@ -341,19 +341,19 @@ function TaskEditor({
       </EditorField>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-2">
+        <div className="flex gap-2 order-last ml-auto">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
+          >
+            Cancel
+          </button>
           <button
             onClick={handleSave}
             disabled={!canSave}
             className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Save changes
-          </button>
-          <button
-            onClick={onCancel}
-            className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
-          >
-            Cancel
           </button>
         </div>
 
